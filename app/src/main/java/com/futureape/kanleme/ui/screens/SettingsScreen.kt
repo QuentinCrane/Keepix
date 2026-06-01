@@ -1,0 +1,1343 @@
+package com.futureape.kanleme.ui.screens
+
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
+import androidx.compose.material.icons.automirrored.rounded.DriveFileMove
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AspectRatio
+import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material.icons.rounded.CleaningServices
+import androidx.compose.material.icons.rounded.ColorLens
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.SettingsBackupRestore
+import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Vibration
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.futureape.kanleme.BuildConfig
+import com.futureape.kanleme.data.settings.AppSettings
+import com.futureape.kanleme.ui.components.AdaptiveCenter
+import com.futureape.kanleme.ui.components.GlassSurface
+import com.futureape.kanleme.ui.components.NativeFolderExcludeButton
+import com.futureape.kanleme.ui.util.rememberHapticKit
+import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.collect
+
+private enum class SettingsPage(val title: String) {
+    HOME("设置"),
+    CLEANING_DISPLAY("整理页面显示"),
+    ORGANIZE("整理方式"),
+    EXCLUDED_FOLDERS("排除文件夹"),
+    EXPERIENCE("操作体验"),
+    APPEARANCE("外观显示"),
+    DATA("数据与更新"),
+    CHANGELOG("更新日志"),
+    PRIVACY("隐私政策"),
+    HELP("使用帮助"),
+    DIAGNOSIS("诊断排障"),
+}
+
+@Composable
+fun SettingsScreen(
+    viewModel: KanlemeViewModel,
+    onBack: () -> Unit,
+    initialPage: String? = null,
+) {
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val photoFolders by viewModel.photoFolders.collectAsStateWithLifecycle()
+    val videoFolders by viewModel.videoFolders.collectAsStateWithLifecycle()
+    val allFolders = (photoFolders + videoFolders).distinct().sorted()
+    val haptics = rememberHapticKit(settings)
+    var pageName by rememberSaveable(initialPage) {
+        mutableStateOf(
+            initialPage
+                ?.let { runCatching { SettingsPage.valueOf(it) }.getOrNull() }
+                ?.takeIf { it != SettingsPage.HOME }
+                ?.name
+                ?: SettingsPage.HOME.name
+        )
+    }
+    val page = runCatching { SettingsPage.valueOf(pageName) }.getOrDefault(SettingsPage.HOME)
+    var customizeTab by rememberSaveable { mutableStateOf("photo") }
+    var manualExcludePath by remember { mutableStateOf("") }
+    var showAllFolderRules by remember { mutableStateOf(false) }
+    var predictiveBackProgress by remember { mutableFloatStateOf(0f) }
+
+    PredictiveBackHandler(enabled = page != SettingsPage.HOME) { backEvents ->
+        try {
+            backEvents.collect { event -> predictiveBackProgress = event.progress }
+            pageName = SettingsPage.HOME.name
+        } catch (_: CancellationException) {
+            // Gesture cancelled; keep the current secondary page.
+        } finally {
+            predictiveBackProgress = 0f
+        }
+    }
+
+    fun goTo(target: SettingsPage) {
+        pageName = target.name
+    }
+
+    AdaptiveCenter(maxWidth = 900.dp) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .graphicsLayer {
+                    translationX = predictiveBackProgress * 72f
+                    alpha = 1f - predictiveBackProgress * 0.10f
+                },
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            item {
+                SettingsHeader(
+                    title = page.title,
+                    subtitle = if (page == SettingsPage.HOME) "一级菜单" else "二级设置 · 修改后立即生效",
+                    onBack = {
+                        haptics.tick()
+                        if (page == SettingsPage.HOME) onBack() else pageName = SettingsPage.HOME.name
+                    },
+                )
+            }
+            item {
+                // Do not crossfade or slide two secondary setting pages at the same time:
+                // complex preview cards can otherwise visually overlap while Compose keeps
+                // both old and new content alive during the transition.
+                SettingsPageContent(
+                    page = page,
+                    settings = settings,
+                    allFolders = allFolders,
+                    customizeTab = customizeTab,
+                    onSelectCustomizeTab = { customizeTab = it; haptics.tick() },
+                    manualExcludePath = manualExcludePath,
+                    onManualExcludePathChange = { manualExcludePath = it },
+                    showAllFolderRules = showAllFolderRules,
+                    onToggleShowAllFolderRules = { showAllFolderRules = !showAllFolderRules },
+                    onManualExcludeConsumed = { manualExcludePath = "" },
+                    goTo = { target -> haptics.tick(); goTo(target) },
+                    onTick = { haptics.tick() },
+                    onSuccess = { haptics.success() },
+                    viewModel = viewModel,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsPageContent(
+    page: SettingsPage,
+    settings: AppSettings,
+    allFolders: List<String>,
+    customizeTab: String,
+    onSelectCustomizeTab: (String) -> Unit,
+    manualExcludePath: String,
+    onManualExcludePathChange: (String) -> Unit,
+    showAllFolderRules: Boolean,
+    onToggleShowAllFolderRules: () -> Unit,
+    onManualExcludeConsumed: () -> Unit,
+    goTo: (SettingsPage) -> Unit,
+    onTick: () -> Unit,
+    onSuccess: () -> Unit,
+    viewModel: KanlemeViewModel,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        when (page) {
+            SettingsPage.HOME -> {
+                SettingsOverviewCard(
+                    settings = settings,
+                    excludedCount = settings.excludedFolderPaths.size,
+                    onCustomizeClick = { goTo(SettingsPage.CLEANING_DISPLAY) },
+                )
+                SettingsGroup(listOf<@Composable () -> Unit>(
+                    { SettingsMenuRow(Icons.Rounded.TouchApp, "整理页面显示", customizationSummary(settings), color = Color(0xFF55A6C8), onClick = { goTo(SettingsPage.CLEANING_DISPLAY) }) },
+                    { SettingsMenuRow(Icons.Rounded.Layers, "整理方式", "删除模式、连续整理、相似照片检测", color = Color(0xFF6D9E65), onClick = { goTo(SettingsPage.ORGANIZE) }) },
+                    { SettingsMenuRow(Icons.Rounded.Block, "排除文件夹", if (settings.excludedFolderPaths.isEmpty()) "未排除任何文件夹" else "已排除 " + settings.excludedFolderPaths.size + " 个文件夹", color = Color(0xFFB64040), onClick = { goTo(SettingsPage.EXCLUDED_FOLDERS) }) },
+                    { SettingsMenuRow(Icons.Rounded.Tune, "操作体验", "滑动灵敏度、手势方向、声音、震动、视频比例", color = Color(0xFFD44C84), onClick = { goTo(SettingsPage.EXPERIENCE) }) },
+                    { SettingsMenuRow(Icons.Rounded.Palette, "外观显示", settings.themeMode.label + " · " + settings.folderDisplay.label, color = Color(settings.accentColor), onClick = { goTo(SettingsPage.APPEARANCE) }) },
+                    { SettingsMenuRow(Icons.Rounded.Backup, "数据与更新", "更新日志、隐私政策、使用帮助、媒体库维护", color = Color(0xFFE3B13B), onClick = { goTo(SettingsPage.DATA) }) },
+                    { SettingsMenuRow(Icons.Rounded.CleaningServices, "诊断排障", "照片清理模式和异常排查", color = Color(0xFF5E8DB4), onClick = { goTo(SettingsPage.DIAGNOSIS) }) },
+                ))
+            }
+
+            SettingsPage.CLEANING_DISPLAY -> {
+                OrganizerDisplayCustomizer(
+                    settings = settings,
+                    selectedTab = customizeTab,
+                    onSelectTab = onSelectCustomizeTab,
+                    onTogglePhotoTopBar = { onTick(); viewModel.setPhotoShowTopBar(!settings.photoShowTopBar) },
+                    onTogglePhotoFilterChips = { onTick(); viewModel.setPhotoShowFilterChips(!settings.photoShowFilterChips) },
+                    onTogglePhotoFolderChips = { onTick(); viewModel.setPhotoShowFolderChips(!settings.photoShowFolderChips) },
+                    onTogglePhotoActionRail = { onTick(); viewModel.setPhotoShowActionRail(!settings.photoShowActionRail) },
+                    onTogglePhotoInfoBar = { onTick(); viewModel.setPhotoShowInfoBar(!settings.photoShowInfoBar) },
+                    onTogglePhotoGestureHint = { onTick(); viewModel.setPhotoShowGestureHint(!settings.photoShowGestureHint) },
+                    onTogglePhotoShuffleButton = { onTick(); viewModel.setPhotoShowShuffleButton(!settings.photoShowShuffleButton) },
+                    onToggleVideoTopBar = { onTick(); viewModel.setVideoShowTopBar(!settings.videoShowTopBar) },
+                    onToggleVideoActionRail = { onTick(); viewModel.setVideoShowActionRail(!settings.videoShowActionRail) },
+                    onToggleVideoInfoPanel = { onTick(); viewModel.setVideoShowInfoPanel(!settings.videoShowInfoPanel) },
+                    onToggleVideoFolderChips = { onTick(); viewModel.setVideoShowFolderChips(!settings.videoShowFolderChips) },
+                    onToggleVideoProgressBar = { onTick(); viewModel.setVideoShowProgressBar(!settings.videoShowProgressBar) },
+                    onToggleVideoShuffleButton = { onTick(); viewModel.setVideoShowShuffleButton(!settings.videoShowShuffleButton) },
+                )
+            }
+
+            SettingsPage.ORGANIZE -> {
+                SectionTitle("整理方式")
+                SettingsGroup(listOf<@Composable () -> Unit>(
+                    { SettingsRow(Icons.Rounded.Delete, "删除模式", settings.deleteMode.label, color = Color(0xFFDD5A56), onClick = { onTick(); viewModel.cycleDeleteMode() }) },
+                    { SettingsRow(Icons.Rounded.Layers, "连续整理", "自动预加载后续内容，不再按轮次限制", onClick = { onTick(); viewModel.cycleBatchSize() }) },
+                    { SettingsSwitchRow(Icons.AutoMirrored.Rounded.DriveFileMove, "移动到文件夹时", "点按保留 / 长按收藏时自动归档", checked = settings.autoMoveOnKeepFavorite, onCheckedChange = { onTick(); viewModel.setAutoMoveOnKeepFavorite(it) }) },
+                    { SettingsSwitchRow(Icons.Rounded.BrokenImage, "相似照片检测", "自动检测连拍、截图和相似照片", checked = settings.similarDetection, onCheckedChange = { onTick(); viewModel.setSimilarDetection(it) }, badge = "测试") },
+                ))
+            }
+
+            SettingsPage.EXCLUDED_FOLDERS -> {
+                SectionTitle("排除文件夹")
+                val rows = mutableListOf<@Composable () -> Unit>()
+                rows.add {
+                    NativeFolderExcludeButton(
+                        title = "用系统选择器添加排除",
+                        subtitle = "优先调用安卓原生文件夹选择器；下方输入框仅作备用",
+                        onFolderSelected = { path -> onSuccess(); viewModel.addExcludedFolder(path) },
+                    )
+                }
+                rows.add {
+                    ManualExcludeFolderEditor(
+                        value = manualExcludePath,
+                        onValueChange = onManualExcludePathChange,
+                        onAdd = {
+                            val input = manualExcludePath.trim()
+                            if (input.isNotBlank()) {
+                                onSuccess()
+                                viewModel.addExcludedFolder(input)
+                                onManualExcludeConsumed()
+                            }
+                        },
+                    )
+                }
+                rows.add {
+                    SettingsRow(
+                        Icons.Rounded.Block,
+                        "排除状态",
+                        if (settings.excludedFolderPaths.isEmpty()) "未排除，照片和视频都会进入整理队列" else "已排除 " + settings.excludedFolderPaths.size + " 个文件夹；点已选项可取消",
+                        onClick = { onTick(); if (settings.excludedFolderPaths.isNotEmpty()) viewModel.clearExcludedFolders() },
+                        color = Color(0xFFB64040),
+                    )
+                }
+                settings.excludedFolderPaths.sorted().forEach { folderPath ->
+                    val label = folderDisplayName(folderPath)
+                    rows.add {
+                        SettingsSwitchRow(
+                            Icons.Rounded.Block,
+                            label,
+                            "系统路径：" + folderPath,
+                            checked = true,
+                            onCheckedChange = { onTick(); viewModel.toggleExcludedFolder(folderPath) },
+                            color = Color(0xFFB64040),
+                        )
+                    }
+                }
+                val availableFolders = allFolders.filterNot { folderRuleMatchesForUi(it, settings.excludedFolderPaths) }
+                if (availableFolders.isNotEmpty()) {
+                    val visibleFolders = if (showAllFolderRules) availableFolders.take(120) else availableFolders.take(10)
+                    rows.add {
+                        SettingsRow(
+                            Icons.Rounded.Folder,
+                            if (showAllFolderRules) "收起可选文件夹" else "展开可选文件夹",
+                            "当前显示 " + visibleFolders.size + " / " + availableFolders.size + " 个，可点右侧开关排除",
+                            onClick = { onTick(); onToggleShowAllFolderRules() },
+                            color = Color(0xFF5E8DB4),
+                        )
+                    }
+                    visibleFolders.forEach { folderPath ->
+                        val label = folderDisplayName(folderPath)
+                        rows.add {
+                            SettingsSwitchRow(
+                                Icons.Rounded.Folder,
+                                label,
+                                "系统路径：" + folderPath,
+                                checked = false,
+                                onCheckedChange = { onTick(); viewModel.toggleExcludedFolder(folderPath) },
+                                color = Color(0xFF5E8DB4),
+                            )
+                        }
+                    }
+                }
+                if (allFolders.isEmpty()) {
+                    rows.add { SettingsRow(Icons.Rounded.Info, "暂无文件夹", "先同步媒体库后，这里会列出照片和视频文件夹；也可以先手动输入相机文件夹名称", onClick = { onSuccess(); viewModel.refreshLibrary() }) }
+                }
+                SettingsGroup(rows)
+            }
+
+            SettingsPage.EXPERIENCE -> {
+                SectionTitle("操作体验")
+                SettingsGroup(listOf<@Composable () -> Unit>(
+                    { SettingsRow(Icons.Rounded.Tune, "滑动灵敏度", settings.swipeSensitivity.label, color = Color(0xFFD44C84), onClick = { onTick(); viewModel.cycleSwipeSensitivity() }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, "手势方向", settings.gestureDirection.label, color = Color(0xFFD44C84), onClick = { onTick(); viewModel.cycleGestureDirection() }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, "整理页面显示", "进入可视化自定义页面", color = Color(0xFF55A6C8), onClick = { goTo(SettingsPage.CLEANING_DISPLAY) }) },
+                    { SettingsSwitchRow(Icons.AutoMirrored.Rounded.DriveFileMove, "自动归档", "保留 / 收藏时移动到选择的相册", checked = settings.autoMoveOnKeepFavorite, onCheckedChange = { onTick(); viewModel.setAutoMoveOnKeepFavorite(it) }) },
+                    { SettingsSwitchRow(Icons.Rounded.MusicNote, "滑动音效", if (settings.swipeSound) "已开启" else "已关闭", checked = settings.swipeSound, onCheckedChange = { onTick(); viewModel.setSwipeSound(it) }, color = Color(0xFFE8A93B)) },
+                    { SettingsSwitchRow(Icons.Rounded.MusicNote, "打开视频默认静音", "进入视频整理时默认静音，点侧边栏音量按钮可恢复声音", checked = settings.videoDefaultMuted, onCheckedChange = { onTick(); viewModel.setVideoDefaultMuted(it) }, color = Color(0xFFE8A93B)) },
+                    { SettingsRow(Icons.Rounded.AspectRatio, "视频显示比例", settings.videoDisplayMode.label + " · " + settings.videoDisplayMode.description, color = Color(0xFF5E8DB4), onClick = { onTick(); viewModel.cycleVideoDisplayMode() }) },
+                    { SettingsRow(Icons.Rounded.Vibration, "震动反馈", settings.hapticLevel.label, color = Color(0xFF55A6C8), onClick = { onSuccess(); viewModel.cycleHapticLevel() }) },
+                ))
+            }
+
+            SettingsPage.APPEARANCE -> {
+                SectionTitle("外观显示")
+                SettingsGroup(listOf<@Composable () -> Unit>(
+                    { SettingsRow(Icons.Rounded.Palette, "主题模式", settings.themeMode.label, trailingContent = { ThemeModeDots(settings.themeMode.ordinal) }, onClick = { onTick(); viewModel.cycleThemeMode() }) },
+                    { SettingsRow(Icons.Rounded.ColorLens, "选择主题色", "点击切换应用主题色", trailingContent = { ColorDot(settings.accentColor) }, onClick = { onTick(); viewModel.cycleAccentColor() }) },
+                    { SettingsRow(Icons.Rounded.Folder, "文件夹显示", settings.folderDisplay.label, onClick = { onTick(); viewModel.cycleFolderDisplay() }) },
+                    { SettingsSwitchRow(Icons.Rounded.Palette, "沉浸背景", "整理时以前一张照片的模糊效果作为背景", checked = settings.immersiveBackground, onCheckedChange = { onTick(); viewModel.setImmersiveBackground(it) }) },
+                ))
+            }
+
+            SettingsPage.DATA -> {
+                SectionTitle("数据与更新")
+                SettingsGroup(listOf<@Composable () -> Unit>(
+                    { SettingsRow(Icons.Rounded.Info, "更新日志", "当前版本 " + BuildConfig.VERSION_NAME + " · 查看完整开发记录", color = Color(0xFFE3B13B), onClick = { goTo(SettingsPage.CHANGELOG) }) },
+                    { SettingsRow(Icons.Rounded.Info, "隐私政策", "本地相册权限、删除移动规则和数据存储说明", color = Color(0xFF55A6C8), onClick = { goTo(SettingsPage.PRIVACY) }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, "使用帮助", "照片整理、视频整理、筛选、相册和排除文件夹", color = Color(0xFF6D9E65), onClick = { goTo(SettingsPage.HELP) }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, "重新播放定位式教程", "再次进入照片/视频整理页时，按页面位置逐项指示", color = Color(0xFF7A6AA6), onClick = { onSuccess(); viewModel.replayPositionGuides() }) },
+                    { SettingsRow(Icons.Rounded.Backup, "导入 / 导出备份", "导入、导出和待人工确认管理", badge = "测试", color = Color(0xFFE3B13B), onClick = onTick) },
+                    { SettingsRow(Icons.Rounded.CleaningServices, "媒体库维护", "刷新媒体库、修复索引或重建相似数据", onClick = { onSuccess(); viewModel.refreshLibrary() }) },
+                    { SettingsRow(Icons.Rounded.Info, "版本信息", "版本 " + BuildConfig.VERSION_NAME + " · versionCode " + BuildConfig.VERSION_CODE, onClick = { goTo(SettingsPage.CHANGELOG) }) },
+                ))
+            }
+
+            SettingsPage.CHANGELOG -> { SectionTitle("更新日志"); ChangelogContent() }
+            SettingsPage.PRIVACY -> { SectionTitle("隐私政策"); PrivacyPolicyContent() }
+            SettingsPage.HELP -> { SectionTitle("使用帮助"); HelpContent() }
+            SettingsPage.DIAGNOSIS -> {
+                SectionTitle("诊断排障")
+                SettingsGroup(listOf<@Composable () -> Unit>(
+                    { SettingsRow(Icons.Rounded.CleaningServices, "照片清理模式", settings.photoCleanMode.label, onClick = { onTick(); viewModel.cyclePhotoCleanMode() }) },
+                ))
+                Text(settings.photoCleanMode.description, modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsHeader(title: String, subtitle: String, onBack: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "返回") }
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.headlineMedium)
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+
+@Composable
+private fun ChangelogContent() {
+    ContentCard(
+        title = "看了么开发更新记录",
+        subtitle = "当前版本：" + BuildConfig.VERSION_NAME,
+        sections = listOf(
+            "v2.2.8 · 视频控制与设置切换修复" to listOf(
+                "视频整理页删除底部播放 / 暂停胶囊，只保留侧边栏播放 / 暂停入口，避免和底部信息区、进度条重叠。",
+                "单击视频区域切换播放 / 暂停，左右滑切换沉浸观看和显示按钮，观看区域更干净。",
+                "设置页二级菜单取消双页面同时滑入滑出，改为单页面内容替换，避免切换时新旧内容交叉重叠显示。",
+            ),
+            "v2.2.7 · 相似照片真实进度与防卡住" to listOf(
+                "相似照片检测不再使用最高 88% 的模拟进度，改为根据已处理照片数量实时更新进度。",
+                "检测会复用已经计算过的缩略指纹，继续检测时不必从第一张照片重新开始。",
+                "跳过 RAW、GIF 等不适合快速缩略检测的文件，单张失败不会阻塞整体进度。",
+                "相似聚类从全量两两比较改为哈希桶候选比较，大相册检测时更不容易长时间卡在一个百分比。",
+            ),
+            "v2.2.6 · 视频控制轻量化" to listOf(
+                "视频整理页移除居中大号播放 / 暂停按钮，改为靠近底部的小型半透明胶囊，减少观看遮挡。",
+                "右侧视频操作栏整体缩窄，播放、静音、收藏、待删、分享和保留按钮尺寸更轻，和现有毛玻璃组件风格保持一致。",
+                "播放 / 暂停状态仍保留触感反馈，但不再用突兀的大按钮打断视频观看。",
+            ),
+            "v2.2.5 · 记忆页、系统删除、视频暂停与后台检测" to listOf(
+                "当年今日升级为照片 / 视频混合记忆页，按年份折叠分组，展开后显示多张媒体的类型、时间、文件夹、大小和整理状态。",
+                "视频整理页加入播放 / 暂停控制，暂停状态不会再被当前页刷新逻辑强制覆盖。",
+                "回收站永久删除接入 Android MediaStore 系统删除授权确认，单项和全部永久删除都会先弹出系统确认。",
+                "相似照片检测改为后台进度式任务，页面离开后继续运行，返回后可恢复查看进度，并支持继续检测。",
+            ),
+            "v2.2.3 · 发布前稳定性、随机与定位式教程" to listOf(
+                "平板竖屏恢复底部 Dock，只有横屏或超宽屏才切换左侧 Rail，避免竖屏首页被挤到左侧。",
+                "相似照片检测加入进行中状态、空结果提示和重新检测入口，并优化感知哈希解码，降低大图检测时卡死或闪退概率。",
+                "照片和视频首次整理默认进入随机队列，随机种子在开始整理和重新随机时都会刷新并持久化。",
+                "新手指引改为定位式覆盖层，直接对着顶部操作栏、中间内容区、底部信息栏和相册/操作按钮进行指示。",
+                "设置二级菜单去掉行项目淡入闪烁，只保留页面级滑入滑出和预测式返回反馈。",
+                "照片整理页降低背景模糊和预加载层数，减少切图时的解码压力，为发布版优化流畅度。",
+            ),
+            "v2.2.2 · 收藏预览与完整更新日志" to listOf(
+                "我的收藏中的照片支持点击进入全屏预览，补齐双指缩放、双击放大 / 复位和放大后拖动查看细节。",
+                "收藏预览底部加入相册查看、分享、待删操作，交互方式与回收站预览保持一致。",
+                "更新日志按前期“看了么app”迭代记录重新补全，从首页、照片 / 视频整理、平板适配、深色模式、排除文件夹、可视化自定义到当前稳定性修复均有说明。",
+            ),
+            "v2.2.1 · 回收站预览与防误触" to listOf(
+                "回收站列表中的照片支持直接点按预览，预览页支持双指缩放、双击放大和放大后拖动查看细节。",
+                "照片整理页手势判定加入方向锁定和主轴比例判断，斜向滑动不再轻易触发待删。",
+                "待删手势提高触发阈值，并把提示文案改为松手待删、松手收藏、松手保留，降低误触成本。",
+            ),
+            "v2.2.0 · 相册查看、缩放与触感" to listOf(
+                "照片放大页支持双指缩放、双击放大 / 复位和放大后拖动查看细节。",
+                "用相册查看时优先用标准 MediaStore 图片 Uri，并加入 ACTION_VIEW、REVIEW 和授权兜底。",
+                "底部 Dock 切换加入轻微震动反馈，平板侧边 Dock 同步支持。",
+                "修复视频扫描中潜在重复变量定义，降低后续编译踩坑概率。",
+            ),
+            "v2.1.9 · 稳定性与导航联动" to listOf(
+                "修复放大图片后调用系统相册时不能稳定定位当前图片的问题，补充 ClipData、EXTRA_STREAM、Uri 授权和系统查看兜底逻辑。",
+                "优化视频整理页播放器生命周期，只为当前视频创建播放器，减少连续刷视频和重新随机时的闪退概率。",
+                "整理页面实时预览同步最新紧凑布局，照片页不再显示旧右侧按钮栏，视频页重新随机进入第一行。",
+                "设置二级页面加入滑入、淡出切换动画，并接入预测式返回进度反馈。",
+                "我的页服务与支持入口与设置页使用帮助、隐私政策、更新日志、诊断排障统一跳转。",
+                "首页关键数字首次出现时加入滚动数字效果，并为主整理数字加入轻微震动反馈。",
+                "统一媒体格式化和文件夹规则工具函数，清理重复定义导致的 R8 / 编译歧义。",
+            ),
+            "v2.1.8 · 队列与文档修复" to listOf(
+                "将照片连续整理缓冲从 180 扩大到 1200，视频缓冲从 120 扩大到 600，避免用户误以为一轮只能整理少量文件。",
+                "照片整理页重新改为视觉居中摆放，不再因为底部信息栏导致主体图片偏下。",
+                "设置页补齐更新日志、隐私政策和使用帮助，并修正版本信息展示。",
+                "增强 Windows 一键编译脚本，优先使用 Gradle Wrapper，也会尝试系统 Gradle 和 Android Studio 自带 Gradle。",
+            ),
+            "v2.1.7 · 紧凑整理页" to listOf(
+                "照片整理页改为图片、图片信息、剩余数量为主的极简结构。",
+                "删除照片页右侧三个操作按钮，避免和滑动手势重合。",
+                "保留、重新随机、图片筛选、时间筛选压缩到顶部一行，筛选项改为点击后展开。",
+                "右下角分享入口替换为相册选择入口，减少整理页常驻内容。",
+                "视频整理页将重新随机放入第一行顶部操作区。",
+            ),
+            "v2.1.6 · 随机与结构修复" to listOf(
+                "修复重新随机看起来没有变化的问题，随机种子改为参与乘法扰动，而不是只做整体平移。",
+                "修复重新随机后顶部控件被撑乱的问题。",
+                "整理照片页和视频页 Compose 嵌套结构，减少括号不匹配风险。",
+                "视频重新随机时加入准备态，避免短暂闪出暂无队列。",
+            ),
+            "v2.1.5 · 查看与队列体验" to listOf(
+                "往年今日支持点开具体图片查看，不再只能停留在缩略展示。",
+                "整理页点击图片可进入放大查看，并尽量接入系统相册可识别的 Uri。",
+                "进入整理页时减少先显示暂无队列再显示图片的闪烁。",
+                "照片整理页接入更多相册属性信息，为后续相册查看、文件夹选择和信息展示做准备。",
+            ),
+            "v2.1.4 · 可视化自定义" to listOf(
+                "设置页加入一级菜单和二级菜单，避免所有开关堆在同一层。",
+                "整理页组件支持实时可视化预览，不再只面对一堆开关。",
+                "照片和视频整理页均加入手动重新随机能力。",
+                "可视化预览开始覆盖顶部栏、筛选、文件夹、重新随机、信息栏、手势提示等组件。",
+            ),
+            "v2.1.3 · 深色模式与排除文件夹" to listOf(
+                "修复深色模式下部分卡片、文字和背景白光不一致的问题，减少傻黑和白色光晕。",
+                "修复夜间模式下文字看不见、组件背景与整体不统一的问题。",
+                "排除文件夹支持在照片和视频整理入口中配置。",
+                "优先调用安卓原生文件夹选择器，手动输入仅作为备用。",
+            ),
+            "v2.1.2 · 照片 / 视频切换" to listOf(
+                "首页整理入口支持通过顶部选项切换照片整理或视频整理。",
+                "照片与视频切换时加入淡入淡出，减少背景突然闪烁。",
+                "照片和视频整理流程拆分，但保持统一的整理入口和操作语言。",
+            ),
+            "v2.1.1 · 平板与首页细节" to listOf(
+                "适配更宽屏幕下的整理入口和首页卡片布局。",
+                "优化平板宽度下照片、视频整理页面的卡片排布，避免仍按手机布局过度留白。",
+                "开始整理按钮加厚，提升点击感和视觉重量。",
+                "替换应用图标资源，并统一部分页面的主色调。",
+            ),
+            "v2.1.0 · 首页、我的页与基础功能整合" to listOf(
+                "首页聚合照片、视频、回收站、收藏、最近项目和常用整理入口。",
+                "我的页面加入服务与支持、功能入口和数据概览，后续逐步与设置页内容对齐。",
+                "底部 Dock 和大屏侧边导航形成基础导航框架。",
+            ),
+            "v2.0.0 · 本地照片与视频整理框架" to listOf(
+                "基于本地 MediaStore 扫描照片和视频，建立应用内索引。",
+                "照片整理支持保留、收藏、待删和撤销上一操作。",
+                "视频整理采用上下刷视频的整理体验，并提供收藏、待删等快速动作。",
+                "提供相似照片、时间线、最近照片、往年今日、回收站和收藏等基础页面。",
+            ),
+            "早期版本 · 看了么基础体验" to listOf(
+                "围绕相册清理建立轻量化的看图整理体验，而不是复杂文件管理器。",
+                "以本地处理为核心，不加入账号、会员、支付或云端同步。",
+                "逐步确立照片 / 视频双整理、手势操作、原生相册联动和可视化设置的产品方向。",
+            ),
+        ),
+    )
+}
+
+@Composable
+private fun PrivacyPolicyContent() {
+    ContentCard(
+        title = "隐私政策",
+        subtitle = "看了么以本地相册整理为核心，不包含账号、会员、支付或云端同步功能。",
+        sections = listOf(
+            "v2.2.5 · 记忆页、系统删除、视频暂停与后台检测" to listOf(
+                "当年今日升级为照片 / 视频混合记忆页，按年份折叠分组，展开后显示多张媒体的类型、时间、文件夹、大小和整理状态。",
+                "视频整理页加入播放 / 暂停控制，暂停状态不会再被当前页刷新逻辑强制覆盖。",
+                "回收站永久删除接入 Android MediaStore 系统删除授权确认，单项和全部永久删除都会先弹出系统确认。",
+                "相似照片检测改为后台进度式任务，页面离开后继续运行，返回后可恢复查看进度，并支持继续检测。",
+            ),
+            "1. 我们会访问哪些权限" to listOf(
+                "照片和视频权限：用于读取系统媒体库，显示可整理的图片和视频。",
+                "文件夹选择权限：仅在你主动添加排除文件夹或选择归档位置时调用安卓系统选择器。",
+                "媒体删除 / 移动权限：仅在你执行待删、系统回收站或移动到相册操作时触发。",
+            ),
+            "2. 数据存储在哪里" to listOf(
+                "媒体索引、整理状态、排除文件夹、主题偏好和手势设置保存在本机数据库或本机 DataStore。",
+                "应用不会把你的照片、视频、文件夹路径、整理记录上传到服务器。",
+                "当前版本没有账号体系，也没有远程同步。卸载应用可能会删除应用内部保存的设置和整理状态。",
+            ),
+            "3. 整理动作如何影响文件" to listOf(
+                "保留和收藏主要改变本地整理状态；开启自动归档时，可能会把照片移动到你选择的相册文件夹。",
+                "待删默认先进入应用内待确认状态；若选择系统回收站模式，会调用安卓系统能力处理删除。",
+                "永久删除或系统回收站操作可能不可逆，执行前请确认。",
+            ),
+            "4. 备份与导出" to listOf(
+                "导入 / 导出备份功能用于保存整理状态和设置。导出的文件由你自己选择保存和分享。",
+                "备份文件可能包含媒体路径、整理状态、排除规则等信息，请不要随意发送给不可信对象。",
+            ),
+            "5. 第三方与网络" to listOf(
+                "当前整理功能不需要上传媒体文件，也不依赖远程识别服务。",
+                "应用不包含广告追踪、会员支付或第三方账号登录。",
+            ),
+            "6. 你的控制权" to listOf(
+                "你可以随时撤销系统相册权限、清空排除文件夹、刷新媒体库或卸载应用。",
+                "如果你不希望某些文件夹进入整理队列，请在设置或整理入口中添加排除文件夹。",
+            ),
+        ),
+    )
+}
+
+@Composable
+private fun HelpContent() {
+    ContentCard(
+        title = "使用帮助",
+        subtitle = "按整理流程阅读即可，所有操作都围绕照片、视频、筛选和回收站展开。",
+        sections = listOf(
+            "v2.2.5 · 记忆页、系统删除、视频暂停与后台检测" to listOf(
+                "当年今日升级为照片 / 视频混合记忆页，按年份折叠分组，展开后显示多张媒体的类型、时间、文件夹、大小和整理状态。",
+                "视频整理页加入播放 / 暂停控制，暂停状态不会再被当前页刷新逻辑强制覆盖。",
+                "回收站永久删除接入 Android MediaStore 系统删除授权确认，单项和全部永久删除都会先弹出系统确认。",
+                "相似照片检测改为后台进度式任务，页面离开后继续运行，返回后可恢复查看进度，并支持继续检测。",
+            ),
+            "1. 首次使用" to listOf(
+                "进入应用后先授予照片和视频权限，应用会从系统 MediaStore 建立本地索引。",
+                "如果首页数量不准确，可以进入设置的数据与更新，点击媒体库维护重新扫描。",
+            ),
+            "2. 定位式新手教程" to listOf(
+                "首次进入照片/视频整理页时，会出现覆盖在真实页面上的位置指示，而不是普通文字手册。",
+                "每一步会框出对应区域，例如顶部操作栏、中间图片/视频区域、底部信息栏和相册/操作按钮。",
+                "可在设置的数据与更新中点击重新播放定位式教程，再次进入整理页即可重看。",
+            ),
+            "3. 照片整理" to listOf(
+                "主区域只保留当前图片、图片信息和剩余文件数量，减少干扰。",
+                "顶部保留用于快速保留当前图片；重新随机会重新生成随机队列。",
+                "图片筛选可切换全部、普通照片、截图、自拍、实况、长图。",
+                "时间筛选可切换全部时间、最近 7 天、本月和今年。",
+                "点按图片或信息栏可以放大查看。",
+            ),
+            "4. 手势操作" to listOf(
+                "横向滑动用于快速保留。",
+                "纵向滑动用于收藏或待删，具体方向可在设置中切换。",
+                "不想误触时，可以降低滑动灵敏度或先使用顶部按钮操作。",
+            ),
+            "5. 相册与排除文件夹" to listOf(
+                "右下角相册按钮用于选择目标相册，开启自动归档后，保留 / 收藏时可移动到对应文件夹。",
+                "排除文件夹用于让截图、微信、下载等目录不进入整理队列。",
+                "优先使用系统文件夹选择器添加排除；手动输入适合系统选择器不可用时兜底。",
+            ),
+            "6. 视频整理" to listOf(
+                "视频整理页采用上下刷视频的形式。",
+                "重新随机已经放到顶部第一行，点击即可重新生成视频顺序。",
+                "可在设置中调整视频显示比例、默认静音和进度条显示。",
+            ),
+            "7. 收藏与预览" to listOf(
+                "我的收藏会集中显示整理时收藏过的照片和视频。",
+                "收藏照片可以点击进入全屏预览，支持双击放大、双指缩放和放大后拖动。",
+                "收藏预览底部提供相册查看、分享和待删操作。",
+            ),
+            "8. 回收站与撤销" to listOf(
+                "误操作后优先使用撤销上一操作。",
+                "待删内容可以在回收站中恢复或永久删除。",
+                "回收站照片也支持全屏预览和缩放查看。",
+                "永久删除前请确认，因为部分系统删除操作无法直接恢复。",
+            ),
+            "9. 常见问题" to listOf(
+                "看到的队列数量不是相册总数：整理页会使用连续缓冲队列，后台会自动补充后续内容。",
+                "重新随机变化不明显：请确认当前筛选下文件数量足够，数量太少时随机结果会有限。",
+                "某些图片不显示：刷新媒体库，并检查该目录是否被加入排除文件夹。",
+                "深色模式文字看不清：切换主题色或主题模式后返回页面重新进入。",
+            ),
+        ),
+    )
+}
+
+@Composable
+private fun ContentCard(
+    title: String,
+    subtitle: String,
+    sections: List<Pair<String, List<String>>>,
+) {
+    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), tonalAlpha = 0.82f) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            sections.forEach { section ->
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(section.first, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                    section.second.forEach { line ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                            Text("•", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                            Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsOverviewCard(
+    settings: AppSettings,
+    excludedCount: Int,
+    onCustomizeClick: () -> Unit,
+) {
+    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), tonalAlpha = 0.82f) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                IconTile(Icons.Rounded.TouchApp, MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f)) {
+                    Text("当前整理界面", style = MaterialTheme.typography.titleLarge)
+                    Text(customizationSummary(settings), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Button(onClick = onCustomizeClick) { Text("可视化调整") }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OverviewMetric("照片组件", enabledCount(listOf(settings.photoShowTopBar, settings.photoShowFilterChips, settings.photoShowFolderChips, settings.photoShowInfoBar, settings.photoShowGestureHint, settings.photoShowShuffleButton)).toString() + "/6", Modifier.weight(1f))
+                OverviewMetric("视频组件", enabledCount(listOf(settings.videoShowTopBar, settings.videoShowActionRail, settings.videoShowInfoPanel, settings.videoShowFolderChips, settings.videoShowProgressBar, settings.videoShowShuffleButton)).toString() + "/6", Modifier.weight(1f))
+                OverviewMetric("排除", excludedCount.toString() + " 个", Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverviewMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun OrganizerDisplayCustomizer(
+    settings: AppSettings,
+    selectedTab: String,
+    onSelectTab: (String) -> Unit,
+    onTogglePhotoTopBar: () -> Unit,
+    onTogglePhotoFilterChips: () -> Unit,
+    onTogglePhotoFolderChips: () -> Unit,
+    onTogglePhotoActionRail: () -> Unit,
+    onTogglePhotoInfoBar: () -> Unit,
+    onTogglePhotoGestureHint: () -> Unit,
+    onTogglePhotoShuffleButton: () -> Unit,
+    onToggleVideoTopBar: () -> Unit,
+    onToggleVideoActionRail: () -> Unit,
+    onToggleVideoInfoPanel: () -> Unit,
+    onToggleVideoFolderChips: () -> Unit,
+    onToggleVideoProgressBar: () -> Unit,
+    onToggleVideoShuffleButton: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), tonalAlpha = 0.82f) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("实时预览", style = MaterialTheme.typography.titleLarge)
+                Text("这是实际整理页的缩略排布预览。点顶部、筛选、文件夹、重新随机、右侧操作栏、底部信息等区域即可显示或隐藏；隐藏后会出现“显示某组件”的回填按钮。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TwoSegmentSelector(selectedTab = selectedTab, onSelectTab = onSelectTab)
+                if (selectedTab == "photo") {
+                    PhotoOrganizerMockPreview(
+                        settings = settings,
+                        onToggleTopBar = onTogglePhotoTopBar,
+                        onToggleFilterChips = onTogglePhotoFilterChips,
+                        onToggleFolderChips = onTogglePhotoFolderChips,
+                        onToggleActionRail = onTogglePhotoActionRail,
+                        onToggleInfoBar = onTogglePhotoInfoBar,
+                        onToggleGestureHint = onTogglePhotoGestureHint,
+                        onToggleShuffleButton = onTogglePhotoShuffleButton,
+                    )
+                } else {
+                    VideoOrganizerMockPreview(
+                        settings = settings,
+                        onToggleTopBar = onToggleVideoTopBar,
+                        onToggleActionRail = onToggleVideoActionRail,
+                        onToggleInfoPanel = onToggleVideoInfoPanel,
+                        onToggleFolderChips = onToggleVideoFolderChips,
+                        onToggleProgressBar = onToggleVideoProgressBar,
+                        onToggleShuffleButton = onToggleVideoShuffleButton,
+                    )
+                }
+            }
+        }
+        if (selectedTab == "photo") {
+            ComponentPalette(
+                title = "照片整理页组件",
+                items = listOf(
+                    ComponentToggleItem("顶部保留/剩余", settings.photoShowTopBar, onTogglePhotoTopBar),
+                    ComponentToggleItem("图片/时间筛选", settings.photoShowFilterChips, onTogglePhotoFilterChips),
+                    ComponentToggleItem("相册按钮", settings.photoShowFolderChips, onTogglePhotoFolderChips),
+                    ComponentToggleItem("图片信息", settings.photoShowInfoBar, onTogglePhotoInfoBar),
+                    ComponentToggleItem("手势提示", settings.photoShowGestureHint, onTogglePhotoGestureHint),
+                    ComponentToggleItem("重新随机按钮", settings.photoShowShuffleButton, onTogglePhotoShuffleButton),
+                ),
+            )
+        } else {
+            ComponentPalette(
+                title = "视频整理页组件",
+                items = listOf(
+                    ComponentToggleItem("顶部进度", settings.videoShowTopBar, onToggleVideoTopBar),
+                    ComponentToggleItem("右侧操作栏", settings.videoShowActionRail, onToggleVideoActionRail),
+                    ComponentToggleItem("底部信息", settings.videoShowInfoPanel, onToggleVideoInfoPanel),
+                    ComponentToggleItem("文件夹栏", settings.videoShowFolderChips, onToggleVideoFolderChips),
+                    ComponentToggleItem("进度条", settings.videoShowProgressBar, onToggleVideoProgressBar),
+                    ComponentToggleItem("重新随机按钮", settings.videoShowShuffleButton, onToggleVideoShuffleButton),
+                ),
+            )
+        }
+    }
+}
+
+private data class ComponentToggleItem(
+    val label: String,
+    val enabled: Boolean,
+    val onToggle: () -> Unit,
+)
+
+@Composable
+private fun TwoSegmentSelector(selectedTab: String, onSelectTab: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(999.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        SegmentButton("照片整理", selectedTab == "photo", Modifier.weight(1f)) { onSelectTab("photo") }
+        SegmentButton("视频整理", selectedTab == "video", Modifier.weight(1f)) { onSelectTab("video") }
+    }
+}
+
+@Composable
+private fun SegmentButton(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = MaterialTheme.typography.titleSmall, color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun PhotoOrganizerMockPreview(
+    settings: AppSettings,
+    onToggleTopBar: () -> Unit,
+    onToggleFilterChips: () -> Unit,
+    onToggleFolderChips: () -> Unit,
+    onToggleActionRail: () -> Unit,
+    onToggleInfoBar: () -> Unit,
+    onToggleGestureHint: () -> Unit,
+    onToggleShuffleButton: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(468.dp)
+            .clip(RoundedCornerShape(30.dp))
+            .background(MaterialTheme.colorScheme.background)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.30f), RoundedCornerShape(30.dp))
+            .padding(14.dp),
+    ) {
+        PreviewAreaTitle(
+            "照片整理页实时布局",
+            "新版布局以中间图片为核心：顶部一行操作，底部只放信息和相册入口。",
+        )
+
+        if (settings.photoShowGestureHint) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .width(174.dp)
+                    .height(248.dp)
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.11f))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f), RoundedCornerShape(32.dp))
+                    .clickable(onClick = onToggleGestureHint),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.width(118.dp).height(166.dp).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.26f)))
+                    Text("图片居中", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                    Text("点击图片放大", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else {
+            PreviewHiddenBlock("图片手势提示已隐藏", onToggleGestureHint, Modifier.align(Alignment.Center).width(190.dp))
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 58.dp)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (settings.photoShowTopBar) PreviewComponentBlock("保留/剩余", "保留 · 剩余 120", onToggleTopBar, true, Color(0xFF67A9D6), Modifier.weight(1f))
+                else PreviewHiddenBlock("顶部保留/剩余", onToggleTopBar, Modifier.weight(1f))
+                if (settings.photoShowShuffleButton) PreviewComponentBlock("重新随机", "同一行", onToggleShuffleButton, true, Color(0xFFD89A45), Modifier.weight(1f))
+                else PreviewHiddenBlock("重新随机", onToggleShuffleButton, Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (settings.photoShowFilterChips) {
+                    PreviewComponentBlock("图片筛选", "点开后展开", onToggleFilterChips, true, Color(0xFF8CA7FF), Modifier.weight(1f))
+                    PreviewComponentBlock("时间筛选", "点开后展开", onToggleFilterChips, true, Color(0xFF8CA7FF), Modifier.weight(1f))
+                } else {
+                    PreviewHiddenBlock("图片筛选", onToggleFilterChips, Modifier.weight(1f))
+                    PreviewHiddenBlock("时间筛选", onToggleFilterChips, Modifier.weight(1f))
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (settings.photoShowInfoBar) PreviewComponentBlock("图片信息", "日期 · 文件夹 · 大小", onToggleInfoBar, true, Color(0xFFB47DE2), Modifier.weight(1f))
+            else PreviewHiddenBlock("图片信息已隐藏", onToggleInfoBar, Modifier.weight(1f))
+            if (settings.photoShowFolderChips) PreviewComponentBlock("相册", "替代分享按钮", onToggleFolderChips, true, Color(0xFF72B778), Modifier.width(96.dp))
+            else PreviewHiddenBlock("相册按钮", onToggleFolderChips, Modifier.width(96.dp))
+        }
+    }
+}
+
+@Composable
+private fun VideoOrganizerMockPreview(
+    settings: AppSettings,
+    onToggleTopBar: () -> Unit,
+    onToggleActionRail: () -> Unit,
+    onToggleInfoPanel: () -> Unit,
+    onToggleFolderChips: () -> Unit,
+    onToggleProgressBar: () -> Unit,
+    onToggleShuffleButton: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(468.dp)
+            .clip(RoundedCornerShape(30.dp))
+            .background(Color.Black)
+            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(30.dp))
+            .padding(14.dp),
+    ) {
+        PreviewAreaTitle("视频整理页实时布局", "重新随机已经进入第一行；播放器只为当前页创建，减少闪退概率。")
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 58.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (settings.videoShowTopBar) PreviewDarkComponentBlock("顶部进度", "12/600 · 待删 3", onToggleTopBar, Modifier.weight(1f))
+            else PreviewDarkHiddenBlock("顶部进度已隐藏", onToggleTopBar, Modifier.weight(1f))
+            if (settings.videoShowShuffleButton) PreviewDarkComponentBlock("重新随机", "第一行", onToggleShuffleButton, Modifier.width(116.dp))
+            else PreviewDarkHiddenBlock("随机按钮", onToggleShuffleButton, Modifier.width(116.dp))
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .width(156.dp)
+                .height(260.dp)
+                .clip(RoundedCornerShape(32.dp))
+                .background(Color.White.copy(alpha = 0.10f))
+                .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(32.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.width(108.dp).height(190.dp).clip(RoundedCornerShape(24.dp)).background(Color.White.copy(alpha = 0.16f)))
+                Text("短视频画面", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            }
+        }
+
+        if (settings.videoShowActionRail) {
+            Column(
+                modifier = Modifier.align(Alignment.CenterEnd).width(76.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                PreviewMiniAction("声音", Color(0xFF67A9D6), onToggleActionRail)
+                PreviewMiniAction("收藏", Color(0xFFE0A342), onToggleActionRail)
+                PreviewMiniAction("待删", Color(0xFFE36A6A), onToggleActionRail)
+                PreviewMiniAction("保留", Color(0xFF93D08B), onToggleActionRail)
+            }
+        } else {
+            PreviewDarkHiddenBlock("右侧操作栏", onToggleActionRail, Modifier.align(Alignment.CenterEnd).width(96.dp))
+        }
+
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (settings.videoShowInfoPanel) PreviewDarkComponentBlock("底部信息", "00:42 · 18MB · 长按 2 倍速", onToggleInfoPanel, Modifier.fillMaxWidth())
+            else PreviewDarkHiddenBlock("底部信息已隐藏", onToggleInfoPanel, Modifier.fillMaxWidth())
+            if (settings.videoShowFolderChips) PreviewDarkComponentBlock("文件夹栏", "Movies · Camera", onToggleFolderChips, Modifier.fillMaxWidth())
+            else PreviewDarkHiddenBlock("文件夹栏已隐藏", onToggleFolderChips, Modifier.fillMaxWidth())
+            if (settings.videoShowProgressBar) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.White.copy(alpha = 0.20f))
+                        .clickable(onClick = onToggleProgressBar),
+                ) {
+                    Box(Modifier.fillMaxWidth(0.46f).height(18.dp).background(MaterialTheme.colorScheme.primary))
+                }
+            } else {
+                PreviewDarkHiddenBlock("进度条已隐藏", onToggleProgressBar, Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewAreaTitle(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+        Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun PreviewComponentBlock(label: String, detail: String, onClick: () -> Unit, enabled: Boolean, color: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(46.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(color.copy(alpha = if (enabled) 0.18f else 0.06f))
+            .border(1.dp, color.copy(alpha = if (enabled) 0.42f else 0.18f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = color)
+            Text(detail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun PreviewHiddenBlock(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(46.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label + " · 点击显示", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun PreviewDarkComponentBlock(label: String, detail: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(46.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.13f))
+            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = Color.White)
+            Text(detail, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.70f), maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun PreviewDarkHiddenBlock(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(46.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label + " · 点击显示", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.70f))
+    }
+}
+
+@Composable
+private fun PreviewMiniAction(label: String, color: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(color.copy(alpha = 0.20f))
+            .border(1.dp, color.copy(alpha = 0.34f), RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = color)
+    }
+}
+
+@Composable
+private fun ComponentPalette(title: String, items: List<ComponentToggleItem>) {
+    val enabledNames = items.filter { it.enabled }.joinToString("、") { it.label }.ifBlank { "未显示任何组件" }
+    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), tonalAlpha = 0.82f) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge)
+            Text("当前显示：" + enabledNames, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items.chunked(2).forEach { rowItems ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowItems.forEach { item ->
+                            ComponentTogglePill(item = item, modifier = Modifier.weight(1f))
+                        }
+                        if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComponentTogglePill(item: ComponentToggleItem, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (item.enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .border(1.dp, if (item.enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.38f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
+            .clickable(onClick = item.onToggle)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text((if (item.enabled) "显示 · " else "隐藏 · ") + item.label, style = MaterialTheme.typography.labelLarge, color = if (item.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun PreviewTag(text: String, modifier: Modifier, onClick: () -> Unit, enabled: Boolean) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (enabled) MaterialTheme.colorScheme.surface.copy(alpha = 0.90f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+private fun PreviewDarkTag(text: String, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color.White.copy(alpha = 0.16f))
+            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelMedium, color = Color.White)
+    }
+}
+
+@Composable
+private fun HiddenComponentButton(visible: Boolean, text: String, modifier: Modifier, onClick: () -> Unit) {
+    if (visible) {
+        Box(
+            modifier = modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.26f), RoundedCornerShape(999.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+private fun SmallPreviewChip(text: String) {
+    Box(Modifier.clip(RoundedCornerShape(999.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 6.dp)) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun PreviewCircle(text: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(42.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.82f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+private fun customizationSummary(settings: AppSettings): String {
+    val photo = enabledCount(listOf(settings.photoShowTopBar, settings.photoShowFilterChips, settings.photoShowFolderChips, settings.photoShowInfoBar, settings.photoShowGestureHint, settings.photoShowShuffleButton))
+    val video = enabledCount(listOf(settings.videoShowTopBar, settings.videoShowActionRail, settings.videoShowInfoPanel, settings.videoShowFolderChips, settings.videoShowProgressBar, settings.videoShowShuffleButton))
+    return "照片显示 " + photo + "/6 · 视频显示 " + video + "/6"
+}
+
+private fun enabledCount(values: List<Boolean>): Int = values.count { it }
+
+private fun folderDisplayName(folderPath: String): String {
+    val normalized = folderPath.trim().replace('\\', '/').trim('/')
+    val name = normalized.substringAfterLast('/').ifBlank { normalized }
+    return when (name.lowercase()) {
+        "camera" -> "相机文件夹"
+        "dcim" -> "相册主文件夹"
+        "screenshots", "screenshot" -> "截图文件夹"
+        "download", "downloads" -> "下载文件夹"
+        "pictures" -> "图片文件夹"
+        "movies" -> "视频文件夹"
+        "weixin", "wechat" -> "微信文件夹"
+        "qq" -> "QQ 文件夹"
+        else -> if (name.isBlank()) "未命名文件夹" else name
+    }
+}
+
+@Composable
+private fun ManualExcludeFolderEditor(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onAdd: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            IconTile(Icons.Rounded.Add, MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f)) {
+                Text("手动新增排除文件夹", style = MaterialTheme.typography.titleMedium)
+                Text("可输入完整路径或文件夹名，例如：相机文件夹、截图文件夹、下载文件夹", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                placeholder = { Text("输入要排除的文件夹") },
+            )
+            Button(onClick = onAdd) { Text("添加") }
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 6.dp))
+}
+
+@Composable
+private fun SettingsGroup(rows: List<@Composable () -> Unit>) {
+    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), tonalAlpha = 0.78f) {
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            rows.forEach { row -> row() }
+        }
+    }
+}
+
+@Composable
+private fun SettingsMenuRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    color: Color = MaterialTheme.colorScheme.primary,
+    onClick: () -> Unit,
+) {
+    SettingsRow(icon = icon, title = title, subtitle = subtitle, color = color, onClick = onClick)
+}
+
+@Composable
+private fun SettingsRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    badge: String? = null,
+    color: Color = MaterialTheme.colorScheme.primary,
+    trailingContent: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        IconTile(icon, color)
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                if (badge != null) BadgeText(badge)
+            }
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        trailingContent?.invoke() ?: Icon(Icons.AutoMirrored.Rounded.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun SettingsSwitchRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    badge: String? = null,
+    color: Color = MaterialTheme.colorScheme.primary,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        IconTile(icon, color)
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                if (badge != null) BadgeText(badge)
+            }
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun IconTile(icon: ImageVector, color: Color) {
+    Box(
+        modifier = Modifier.size(40.dp).background(color.copy(alpha = 0.10f), RoundedCornerShape(10.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun BadgeText(text: String) {
+    Box(Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.13f), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun ColorDot(color: Long) {
+    Box(Modifier.size(34.dp).background(Color(color), RoundedCornerShape(999.dp)))
+}
+
+@Composable
+private fun ThemeModeDots(selectedIndex: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        repeat(3) { i ->
+            Box(
+                Modifier
+                    .size(28.dp)
+                    .background(
+                        if (i == selectedIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        RoundedCornerShape(999.dp),
+                    )
+            )
+        }
+    }
+}

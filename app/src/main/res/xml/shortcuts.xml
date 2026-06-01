@@ -1,0 +1,28 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="clean_photo"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_kanlemo"
+        android:shortcutShortLabel="@string/shortcut_photo"
+        android:shortcutLongLabel="@string/shortcut_photo">
+        <intent
+            android:action="com.futureape.kanleme.ACTION_CLEAN"
+            android:targetPackage="com.futureape.kanleme"
+            android:targetClass="com.futureape.kanleme.MainActivity">
+            <extra android:name="shortcut_target" android:value="photo" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="clean_video"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_kanlemo"
+        android:shortcutShortLabel="@string/shortcut_video"
+        android:shortcutLongLabel="@string/shortcut_video">
+        <intent
+            android:action="com.futureape.kanleme.ACTION_CLEAN"
+            android:targetPackage="com.futureape.kanleme"
+            android:targetClass="com.futureape.kanleme.MainActivity">
+            <extra android:name="shortcut_target" android:value="video" />
+        </intent>
+    </shortcut>
+</shortcuts>

@@ -1,0 +1,1924 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 15,
+    "identityHash": "e884a748b3928a60a407f27cd888b934",
+    "entities": [
+      {
+        "tableName": "photos",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `media_store_id` INTEGER NOT NULL, `stable_media_key` TEXT NOT NULL, `identity_version` INTEGER NOT NULL, `missing_since` INTEGER, `uri` TEXT NOT NULL, `display_name` TEXT NOT NULL, `size` INTEGER NOT NULL, `date_taken` INTEGER NOT NULL, `date_added` INTEGER NOT NULL, `date_modified` INTEGER NOT NULL, `relative_path` TEXT, `folder_path` TEXT NOT NULL, `folder_name` TEXT NOT NULL, `mime_type` TEXT NOT NULL, `width` INTEGER NOT NULL, `height` INTEGER NOT NULL, `is_motion_photo` INTEGER NOT NULL, `motion_video_uri` TEXT, `motion_video_offset` INTEGER NOT NULL, `motion_video_size` INTEGER NOT NULL, `is_separate_video` INTEGER NOT NULL, `is_screenshot` INTEGER NOT NULL, `is_selfie` INTEGER NOT NULL, `is_gif` INTEGER NOT NULL, `is_raw` INTEGER NOT NULL, `is_long_image` INTEGER NOT NULL, `motion_photo_needs_detection` INTEGER NOT NULL, `exif_latitude` REAL, `exif_longitude` REAL, `location_name` TEXT, `exif_make` TEXT, `exif_model` TEXT, `exif_orientation` INTEGER, `exif_width` INTEGER, `exif_height` INTEGER, `exif_focal_length` TEXT, `exif_aperture` TEXT, `exif_iso` TEXT, `exif_exposure_time` TEXT, `exif_white_balance` TEXT, `exif_flash` TEXT, `exif_metering_mode` TEXT, `exif_color_space` TEXT, `exif_lens_make` TEXT, `exif_lens_model` TEXT, `exif_software` TEXT, `exif_scanned` INTEGER NOT NULL, `processing_status` TEXT NOT NULL, `deletion_status` TEXT NOT NULL, `processed_at` INTEGER, `deleted_at` INTEGER, `delete_error` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaStoreId",
+            "columnName": "media_store_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stableMediaKey",
+            "columnName": "stable_media_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "identityVersion",
+            "columnName": "identity_version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "missingSince",
+            "columnName": "missing_since",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "uri",
+            "columnName": "uri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "size",
+            "columnName": "size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateTaken",
+            "columnName": "date_taken",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateAdded",
+            "columnName": "date_added",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateModified",
+            "columnName": "date_modified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relativePath",
+            "columnName": "relative_path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "folderPath",
+            "columnName": "folder_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "folderName",
+            "columnName": "folder_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "width",
+            "columnName": "width",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "height",
+            "columnName": "height",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isMotionPhoto",
+            "columnName": "is_motion_photo",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "motionVideoUri",
+            "columnName": "motion_video_uri",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "motionVideoOffset",
+            "columnName": "motion_video_offset",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "motionVideoSize",
+            "columnName": "motion_video_size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSeparateVideo",
+            "columnName": "is_separate_video",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isScreenshot",
+            "columnName": "is_screenshot",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSelfie",
+            "columnName": "is_selfie",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isGif",
+            "columnName": "is_gif",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isRaw",
+            "columnName": "is_raw",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isLongImage",
+            "columnName": "is_long_image",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "motionPhotoNeedsDetection",
+            "columnName": "motion_photo_needs_detection",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exifLatitude",
+            "columnName": "exif_latitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "exifLongitude",
+            "columnName": "exif_longitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "locationName",
+            "columnName": "location_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifMake",
+            "columnName": "exif_make",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifModel",
+            "columnName": "exif_model",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifOrientation",
+            "columnName": "exif_orientation",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "exifWidth",
+            "columnName": "exif_width",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "exifHeight",
+            "columnName": "exif_height",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "exifFocalLength",
+            "columnName": "exif_focal_length",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifAperture",
+            "columnName": "exif_aperture",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifIso",
+            "columnName": "exif_iso",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifExposureTime",
+            "columnName": "exif_exposure_time",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifWhiteBalance",
+            "columnName": "exif_white_balance",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifFlash",
+            "columnName": "exif_flash",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifMeteringMode",
+            "columnName": "exif_metering_mode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifColorSpace",
+            "columnName": "exif_color_space",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifLensMake",
+            "columnName": "exif_lens_make",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifLensModel",
+            "columnName": "exif_lens_model",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifSoftware",
+            "columnName": "exif_software",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifScanned",
+            "columnName": "exif_scanned",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "processingStatus",
+            "columnName": "processing_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletionStatus",
+            "columnName": "deletion_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "processedAt",
+            "columnName": "processed_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "deletedAt",
+            "columnName": "deleted_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "deleteError",
+            "columnName": "delete_error",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_photos_date_taken",
+            "unique": false,
+            "columnNames": [
+              "date_taken"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_date_taken` ON `${TABLE_NAME}` (`date_taken`)"
+          },
+          {
+            "name": "index_photos_folder_path",
+            "unique": false,
+            "columnNames": [
+              "folder_path"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_folder_path` ON `${TABLE_NAME}` (`folder_path`)"
+          },
+          {
+            "name": "index_photos_processing_status",
+            "unique": false,
+            "columnNames": [
+              "processing_status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_processing_status` ON `${TABLE_NAME}` (`processing_status`)"
+          },
+          {
+            "name": "index_photos_deletion_status",
+            "unique": false,
+            "columnNames": [
+              "deletion_status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_deletion_status` ON `${TABLE_NAME}` (`deletion_status`)"
+          },
+          {
+            "name": "index_photos_is_motion_photo",
+            "unique": false,
+            "columnNames": [
+              "is_motion_photo"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_is_motion_photo` ON `${TABLE_NAME}` (`is_motion_photo`)"
+          },
+          {
+            "name": "index_photos_is_screenshot",
+            "unique": false,
+            "columnNames": [
+              "is_screenshot"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_is_screenshot` ON `${TABLE_NAME}` (`is_screenshot`)"
+          },
+          {
+            "name": "index_photos_is_selfie",
+            "unique": false,
+            "columnNames": [
+              "is_selfie"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_is_selfie` ON `${TABLE_NAME}` (`is_selfie`)"
+          },
+          {
+            "name": "index_photos_is_gif",
+            "unique": false,
+            "columnNames": [
+              "is_gif"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_is_gif` ON `${TABLE_NAME}` (`is_gif`)"
+          },
+          {
+            "name": "index_photos_is_raw",
+            "unique": false,
+            "columnNames": [
+              "is_raw"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_is_raw` ON `${TABLE_NAME}` (`is_raw`)"
+          },
+          {
+            "name": "index_photos_is_long_image",
+            "unique": false,
+            "columnNames": [
+              "is_long_image"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_is_long_image` ON `${TABLE_NAME}` (`is_long_image`)"
+          },
+          {
+            "name": "index_photos_location_name",
+            "unique": false,
+            "columnNames": [
+              "location_name"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_location_name` ON `${TABLE_NAME}` (`location_name`)"
+          },
+          {
+            "name": "index_photos_stable_media_key",
+            "unique": false,
+            "columnNames": [
+              "stable_media_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_stable_media_key` ON `${TABLE_NAME}` (`stable_media_key`)"
+          },
+          {
+            "name": "index_photos_missing_since",
+            "unique": false,
+            "columnNames": [
+              "missing_since"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_missing_since` ON `${TABLE_NAME}` (`missing_since`)"
+          },
+          {
+            "name": "index_photos_media_store_id",
+            "unique": true,
+            "columnNames": [
+              "media_store_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_photos_media_store_id` ON `${TABLE_NAME}` (`media_store_id`)"
+          },
+          {
+            "name": "index_photos_processing_status_deletion_status",
+            "unique": false,
+            "columnNames": [
+              "processing_status",
+              "deletion_status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photos_processing_status_deletion_status` ON `${TABLE_NAME}` (`processing_status`, `deletion_status`)"
+          }
+        ]
+      },
+      {
+        "tableName": "videos",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `media_store_id` INTEGER NOT NULL, `stable_media_key` TEXT NOT NULL, `identity_version` INTEGER NOT NULL, `missing_since` INTEGER, `uri` TEXT NOT NULL, `display_name` TEXT NOT NULL, `size` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `date_taken` INTEGER NOT NULL, `date_added` INTEGER NOT NULL, `date_modified` INTEGER NOT NULL, `folder_path` TEXT NOT NULL, `folder_name` TEXT NOT NULL, `mime_type` TEXT NOT NULL, `width` INTEGER NOT NULL, `height` INTEGER NOT NULL, `is_motion_photo_video` INTEGER NOT NULL, `exif_latitude` REAL, `exif_longitude` REAL, `location_name` TEXT, `exif_make` TEXT, `exif_model` TEXT, `exif_scanned` INTEGER NOT NULL, `processing_status` TEXT NOT NULL, `deletion_status` TEXT NOT NULL, `processed_at` INTEGER, `deleted_at` INTEGER, `delete_error` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaStoreId",
+            "columnName": "media_store_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stableMediaKey",
+            "columnName": "stable_media_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "identityVersion",
+            "columnName": "identity_version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "missingSince",
+            "columnName": "missing_since",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "uri",
+            "columnName": "uri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "size",
+            "columnName": "size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "duration",
+            "columnName": "duration",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateTaken",
+            "columnName": "date_taken",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateAdded",
+            "columnName": "date_added",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateModified",
+            "columnName": "date_modified",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "folderPath",
+            "columnName": "folder_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "folderName",
+            "columnName": "folder_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "width",
+            "columnName": "width",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "height",
+            "columnName": "height",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isMotionPhotoVideo",
+            "columnName": "is_motion_photo_video",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exifLatitude",
+            "columnName": "exif_latitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "exifLongitude",
+            "columnName": "exif_longitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "locationName",
+            "columnName": "location_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifMake",
+            "columnName": "exif_make",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifModel",
+            "columnName": "exif_model",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exifScanned",
+            "columnName": "exif_scanned",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "processingStatus",
+            "columnName": "processing_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletionStatus",
+            "columnName": "deletion_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "processedAt",
+            "columnName": "processed_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "deletedAt",
+            "columnName": "deleted_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "deleteError",
+            "columnName": "delete_error",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_videos_date_taken",
+            "unique": false,
+            "columnNames": [
+              "date_taken"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_videos_date_taken` ON `${TABLE_NAME}` (`date_taken`)"
+          },
+          {
+            "name": "index_videos_folder_path",
+            "unique": false,
+            "columnNames": [
+              "folder_path"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_videos_folder_path` ON `${TABLE_NAME}` (`folder_path`)"
+          },
+          {
+            "name": "index_videos_processing_status",
+            "unique": false,
+            "columnNames": [
+              "processing_status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_videos_processing_status` ON `${TABLE_NAME}` (`processing_status`)"
+          },
+          {
+            "name": "index_videos_deletion_status",
+            "unique": false,
+            "columnNames": [
+              "deletion_status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_videos_deletion_status` ON `${TABLE_NAME}` (`deletion_status`)"
+          },
+          {
+            "name": "index_videos_stable_media_key",
+            "unique": false,
+            "columnNames": [
+              "stable_media_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_videos_stable_media_key` ON `${TABLE_NAME}` (`stable_media_key`)"
+          },
+          {
+            "name": "index_videos_missing_since",
+            "unique": false,
+            "columnNames": [
+              "missing_since"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_videos_missing_since` ON `${TABLE_NAME}` (`missing_since`)"
+          },
+          {
+            "name": "index_videos_media_store_id",
+            "unique": true,
+            "columnNames": [
+              "media_store_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_videos_media_store_id` ON `${TABLE_NAME}` (`media_store_id`)"
+          },
+          {
+            "name": "index_videos_processing_status_deletion_status",
+            "unique": false,
+            "columnNames": [
+              "processing_status",
+              "deletion_status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_videos_processing_status_deletion_status` ON `${TABLE_NAME}` (`processing_status`, `deletion_status`)"
+          }
+        ]
+      },
+      {
+        "tableName": "photo_fingerprints",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`photo_id` INTEGER NOT NULL, `p_hash` INTEGER NOT NULL, `d_hash` INTEGER NOT NULL, `a_hash` INTEGER NOT NULL, `color_histogram` TEXT NOT NULL, `p_hash_prefix` INTEGER NOT NULL, `quality_score` REAL NOT NULL, `sharpness` REAL NOT NULL, `exposure` REAL NOT NULL, `computed_at` INTEGER NOT NULL, PRIMARY KEY(`photo_id`), FOREIGN KEY(`photo_id`) REFERENCES `photos`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "photoId",
+            "columnName": "photo_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pHash",
+            "columnName": "p_hash",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dHash",
+            "columnName": "d_hash",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aHash",
+            "columnName": "a_hash",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "colorHistogram",
+            "columnName": "color_histogram",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pHashPrefix",
+            "columnName": "p_hash_prefix",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "qualityScore",
+            "columnName": "quality_score",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sharpness",
+            "columnName": "sharpness",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exposure",
+            "columnName": "exposure",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "computedAt",
+            "columnName": "computed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "photo_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_photo_fingerprints_photo_id",
+            "unique": false,
+            "columnNames": [
+              "photo_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photo_fingerprints_photo_id` ON `${TABLE_NAME}` (`photo_id`)"
+          },
+          {
+            "name": "index_photo_fingerprints_p_hash_prefix",
+            "unique": false,
+            "columnNames": [
+              "p_hash_prefix"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_photo_fingerprints_p_hash_prefix` ON `${TABLE_NAME}` (`p_hash_prefix`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "photos",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "photo_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "lsh_buckets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`table_index` INTEGER NOT NULL, `bucket_key` INTEGER NOT NULL, `photo_id` INTEGER NOT NULL, PRIMARY KEY(`table_index`, `bucket_key`, `photo_id`), FOREIGN KEY(`photo_id`) REFERENCES `photo_fingerprints`(`photo_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "tableIndex",
+            "columnName": "table_index",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bucketKey",
+            "columnName": "bucket_key",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "photoId",
+            "columnName": "photo_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "table_index",
+            "bucket_key",
+            "photo_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_lsh_buckets_photo_id",
+            "unique": false,
+            "columnNames": [
+              "photo_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_lsh_buckets_photo_id` ON `${TABLE_NAME}` (`photo_id`)"
+          },
+          {
+            "name": "index_lsh_buckets_table_index_bucket_key",
+            "unique": false,
+            "columnNames": [
+              "table_index",
+              "bucket_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_lsh_buckets_table_index_bucket_key` ON `${TABLE_NAME}` (`table_index`, `bucket_key`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "photo_fingerprints",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "photo_id"
+            ],
+            "referencedColumns": [
+              "photo_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "similar_groups",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `best_photo_id` INTEGER NOT NULL, `type` TEXT NOT NULL, `average_similarity` REAL NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `is_dismissed` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bestPhotoId",
+            "columnName": "best_photo_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "averageSimilarity",
+            "columnName": "average_similarity",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isDismissed",
+            "columnName": "is_dismissed",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_similar_groups_created_at",
+            "unique": false,
+            "columnNames": [
+              "created_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_similar_groups_created_at` ON `${TABLE_NAME}` (`created_at`)"
+          },
+          {
+            "name": "index_similar_groups_type",
+            "unique": false,
+            "columnNames": [
+              "type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_similar_groups_type` ON `${TABLE_NAME}` (`type`)"
+          }
+        ]
+      },
+      {
+        "tableName": "similar_group_photos",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`group_id` TEXT NOT NULL, `photo_id` INTEGER NOT NULL, `similarity` REAL NOT NULL, `is_best` INTEGER NOT NULL, PRIMARY KEY(`group_id`, `photo_id`))",
+        "fields": [
+          {
+            "fieldPath": "groupId",
+            "columnName": "group_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "photoId",
+            "columnName": "photo_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "similarity",
+            "columnName": "similarity",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isBest",
+            "columnName": "is_best",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "group_id",
+            "photo_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_similar_group_photos_group_id",
+            "unique": false,
+            "columnNames": [
+              "group_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_similar_group_photos_group_id` ON `${TABLE_NAME}` (`group_id`)"
+          },
+          {
+            "name": "index_similar_group_photos_photo_id",
+            "unique": false,
+            "columnNames": [
+              "photo_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_similar_group_photos_photo_id` ON `${TABLE_NAME}` (`photo_id`)"
+          }
+        ]
+      },
+      {
+        "tableName": "trash_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `media_id` INTEGER NOT NULL, `media_type` TEXT NOT NULL, `media_store_id` INTEGER NOT NULL, `uri` TEXT NOT NULL, `display_name` TEXT NOT NULL, `size` INTEGER NOT NULL, `date_taken` INTEGER NOT NULL, `folder_path` TEXT NOT NULL, `folder_name` TEXT NOT NULL, `mime_type` TEXT NOT NULL, `width` INTEGER NOT NULL, `height` INTEGER NOT NULL, `duration` INTEGER, `trashed_at` INTEGER NOT NULL, `auto_delete_at` INTEGER NOT NULL, `created_at` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaType",
+            "columnName": "media_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaStoreId",
+            "columnName": "media_store_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uri",
+            "columnName": "uri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "size",
+            "columnName": "size",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateTaken",
+            "columnName": "date_taken",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "folderPath",
+            "columnName": "folder_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "folderName",
+            "columnName": "folder_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "width",
+            "columnName": "width",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "height",
+            "columnName": "height",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "duration",
+            "columnName": "duration",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "trashedAt",
+            "columnName": "trashed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "autoDeleteAt",
+            "columnName": "auto_delete_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_trash_items_media_type",
+            "unique": false,
+            "columnNames": [
+              "media_type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_trash_items_media_type` ON `${TABLE_NAME}` (`media_type`)"
+          },
+          {
+            "name": "index_trash_items_trashed_at",
+            "unique": false,
+            "columnNames": [
+              "trashed_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_trash_items_trashed_at` ON `${TABLE_NAME}` (`trashed_at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "folder_filters",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `folder_path` TEXT NOT NULL, `folder_name` TEXT NOT NULL, `is_enabled` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "folderPath",
+            "columnName": "folder_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "folderName",
+            "columnName": "folder_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isEnabled",
+            "columnName": "is_enabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "folder_usage",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`folder_path` TEXT NOT NULL, `folder_name` TEXT NOT NULL, `last_used_at` INTEGER NOT NULL, `usage_count` INTEGER NOT NULL, `photo_last_used_at` INTEGER, `photo_usage_count` INTEGER NOT NULL, `video_last_used_at` INTEGER, `video_usage_count` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, PRIMARY KEY(`folder_path`))",
+        "fields": [
+          {
+            "fieldPath": "folderPath",
+            "columnName": "folder_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "folderName",
+            "columnName": "folder_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUsedAt",
+            "columnName": "last_used_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "usageCount",
+            "columnName": "usage_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "photoLastUsedAt",
+            "columnName": "photo_last_used_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "photoUsageCount",
+            "columnName": "photo_usage_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "videoLastUsedAt",
+            "columnName": "video_last_used_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "videoUsageCount",
+            "columnName": "video_usage_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "folder_path"
+          ]
+        }
+      },
+      {
+        "tableName": "swipe_statistics",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`date` TEXT NOT NULL, `swipe_count` INTEGER NOT NULL, `keep_count` INTEGER NOT NULL, `favorite_count` INTEGER NOT NULL, `delete_count` INTEGER NOT NULL, `undo_count` INTEGER NOT NULL, `session_minutes` INTEGER NOT NULL, `night_swipe_count` INTEGER NOT NULL, `deleted_size_bytes` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`date`))",
+        "fields": [
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "swipeCount",
+            "columnName": "swipe_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "keepCount",
+            "columnName": "keep_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "favoriteCount",
+            "columnName": "favorite_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deleteCount",
+            "columnName": "delete_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "undoCount",
+            "columnName": "undo_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionMinutes",
+            "columnName": "session_minutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nightSwipeCount",
+            "columnName": "night_swipe_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletedSizeBytes",
+            "columnName": "deleted_size_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "date"
+          ]
+        }
+      },
+      {
+        "tableName": "swipe_stat_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`session_id` TEXT NOT NULL, `date` TEXT NOT NULL, `source_type` TEXT NOT NULL, `created_at` INTEGER NOT NULL, PRIMARY KEY(`session_id`))",
+        "fields": [
+          {
+            "fieldPath": "sessionId",
+            "columnName": "session_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceType",
+            "columnName": "source_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "session_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_swipe_stat_sessions_date",
+            "unique": false,
+            "columnNames": [
+              "date"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_swipe_stat_sessions_date` ON `${TABLE_NAME}` (`date`)"
+          }
+        ]
+      },
+      {
+        "tableName": "user_stats",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `total_photos_cleared` INTEGER NOT NULL, `total_videos_cleared` INTEGER NOT NULL, `total_storage_freed` INTEGER NOT NULL, `current_streak` INTEGER NOT NULL, `longest_streak` INTEGER NOT NULL, `last_active_date` INTEGER, `batch_delete_count` INTEGER NOT NULL, `similar_photo_clean_count` INTEGER NOT NULL, `total_favorited` INTEGER NOT NULL, `total_undo_count` INTEGER NOT NULL, `night_cleaning_count` INTEGER NOT NULL, `total_session_minutes` INTEGER NOT NULL, `max_single_session_cleared` INTEGER NOT NULL, `max_single_session_storage` INTEGER NOT NULL, `fast_cleaning_count` INTEGER NOT NULL, `features_used` TEXT NOT NULL, `app_launch_count` INTEGER NOT NULL, `achievement_view_count` INTEGER NOT NULL, `cleaning_days_count` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalPhotosCleared",
+            "columnName": "total_photos_cleared",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalVideosCleared",
+            "columnName": "total_videos_cleared",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalStorageFreed",
+            "columnName": "total_storage_freed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentStreak",
+            "columnName": "current_streak",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longestStreak",
+            "columnName": "longest_streak",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastActiveDate",
+            "columnName": "last_active_date",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "batchDeleteCount",
+            "columnName": "batch_delete_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "similarPhotoCleanCount",
+            "columnName": "similar_photo_clean_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalFavorited",
+            "columnName": "total_favorited",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalUndoCount",
+            "columnName": "total_undo_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nightCleaningCount",
+            "columnName": "night_cleaning_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalSessionMinutes",
+            "columnName": "total_session_minutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxSingleSessionCleared",
+            "columnName": "max_single_session_cleared",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxSingleSessionStorage",
+            "columnName": "max_single_session_storage",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fastCleaningCount",
+            "columnName": "fast_cleaning_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "featuresUsed",
+            "columnName": "features_used",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "appLaunchCount",
+            "columnName": "app_launch_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "achievementViewCount",
+            "columnName": "achievement_view_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cleaningDaysCount",
+            "columnName": "cleaning_days_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "achievement_progress",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`achievement_id` TEXT NOT NULL, `current_value` INTEGER NOT NULL, `unlocked` INTEGER NOT NULL, `unlocked_at` INTEGER, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`achievement_id`))",
+        "fields": [
+          {
+            "fieldPath": "achievementId",
+            "columnName": "achievement_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentValue",
+            "columnName": "current_value",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unlocked",
+            "columnName": "unlocked",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unlockedAt",
+            "columnName": "unlocked_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "achievement_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_achievement_progress_unlocked",
+            "unique": false,
+            "columnNames": [
+              "unlocked"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_achievement_progress_unlocked` ON `${TABLE_NAME}` (`unlocked`)"
+          },
+          {
+            "name": "index_achievement_progress_unlocked_at",
+            "unique": false,
+            "columnNames": [
+              "unlocked_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_achievement_progress_unlocked_at` ON `${TABLE_NAME}` (`unlocked_at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "cleanup_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`event_id` TEXT NOT NULL, `event_type` TEXT NOT NULL, `photo_count` INTEGER NOT NULL, `video_count` INTEGER NOT NULL, `freed_bytes` INTEGER NOT NULL, `local_date` TEXT NOT NULL, `occurred_at` INTEGER NOT NULL, `source_type` TEXT NOT NULL, `source_ref` TEXT, `created_at` INTEGER NOT NULL, PRIMARY KEY(`event_id`))",
+        "fields": [
+          {
+            "fieldPath": "eventId",
+            "columnName": "event_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "event_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "photoCount",
+            "columnName": "photo_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "videoCount",
+            "columnName": "video_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "freedBytes",
+            "columnName": "freed_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localDate",
+            "columnName": "local_date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurredAt",
+            "columnName": "occurred_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceType",
+            "columnName": "source_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRef",
+            "columnName": "source_ref",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "event_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_cleanup_events_event_type",
+            "unique": false,
+            "columnNames": [
+              "event_type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_cleanup_events_event_type` ON `${TABLE_NAME}` (`event_type`)"
+          },
+          {
+            "name": "index_cleanup_events_local_date",
+            "unique": false,
+            "columnNames": [
+              "local_date"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_cleanup_events_local_date` ON `${TABLE_NAME}` (`local_date`)"
+          },
+          {
+            "name": "index_cleanup_events_occurred_at",
+            "unique": false,
+            "columnNames": [
+              "occurred_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_cleanup_events_occurred_at` ON `${TABLE_NAME}` (`occurred_at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "backup_import_audit_logs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `backup_file_id` TEXT NOT NULL, `event_type` TEXT NOT NULL, `detail` TEXT NOT NULL, `created_at` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "backupFileId",
+            "columnName": "backup_file_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "event_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "detail",
+            "columnName": "detail",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_backup_import_audit_logs_backup_file_id",
+            "unique": false,
+            "columnNames": [
+              "backup_file_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_backup_import_audit_logs_backup_file_id` ON `${TABLE_NAME}` (`backup_file_id`)"
+          },
+          {
+            "name": "index_backup_import_audit_logs_created_at",
+            "unique": false,
+            "columnNames": [
+              "created_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_backup_import_audit_logs_created_at` ON `${TABLE_NAME}` (`created_at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "device_model_cache",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`model_norm` TEXT NOT NULL, `brand_norm` TEXT NOT NULL, `language_tag` TEXT NOT NULL, `display_name` TEXT, `brand_display` TEXT, `fallback_name` TEXT, `source_type` TEXT, `confidence` REAL, `data_version` TEXT, `last_hit` INTEGER NOT NULL, `last_lookup_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`model_norm`, `brand_norm`, `language_tag`))",
+        "fields": [
+          {
+            "fieldPath": "modelNorm",
+            "columnName": "model_norm",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "brandNorm",
+            "columnName": "brand_norm",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "languageTag",
+            "columnName": "language_tag",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "brandDisplay",
+            "columnName": "brand_display",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fallbackName",
+            "columnName": "fallback_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceType",
+            "columnName": "source_type",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "dataVersion",
+            "columnName": "data_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastHit",
+            "columnName": "last_hit",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastLookupAt",
+            "columnName": "last_lookup_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "model_norm",
+            "brand_norm",
+            "language_tag"
+          ]
+        }
+      },
+      {
+        "tableName": "operation_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `media_id` INTEGER NOT NULL, `media_type` TEXT NOT NULL, `previous_processing_status` TEXT NOT NULL, `previous_deletion_status` TEXT NOT NULL, `new_processing_status` TEXT NOT NULL, `new_deletion_status` TEXT NOT NULL, `action` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `is_undone` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaId",
+            "columnName": "media_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaType",
+            "columnName": "media_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "previousProcessingStatus",
+            "columnName": "previous_processing_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "previousDeletionStatus",
+            "columnName": "previous_deletion_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "newProcessingStatus",
+            "columnName": "new_processing_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "newDeletionStatus",
+            "columnName": "new_deletion_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "action",
+            "columnName": "action",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isUndone",
+            "columnName": "is_undone",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_operation_history_created_at",
+            "unique": false,
+            "columnNames": [
+              "created_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_operation_history_created_at` ON `${TABLE_NAME}` (`created_at`)"
+          },
+          {
+            "name": "index_operation_history_media_type",
+            "unique": false,
+            "columnNames": [
+              "media_type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_operation_history_media_type` ON `${TABLE_NAME}` (`media_type`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e884a748b3928a60a407f27cd888b934')"
+    ]
+  }
+}

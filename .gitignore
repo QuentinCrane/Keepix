@@ -1,0 +1,67 @@
+# Whitelist-only repository export.
+# Everything is ignored by default; only public open-source project files below
+# are allowed into Git.
+*
+
+# Keep Git ignore rules and line-ending rules.
+!.gitignore
+!.gitattributes
+
+# Public project metadata.
+!README.md
+!LICENSE
+!NOTICE
+!CONTRIBUTING.md
+!SECURITY.md
+
+# Gradle project files.
+!settings.gradle.kts
+!build.gradle.kts
+!gradle.properties
+!gradlew
+!gradlew.bat
+!local.properties.example
+
+# Android app module.
+!app/
+app/*
+!app/build.gradle.kts
+!app/src/
+!app/src/**
+!app/schemas/
+!app/schemas/**
+
+# Gradle wrapper.
+!gradle/
+gradle/*
+!gradle/wrapper/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# GitHub repository configuration.
+!.github/
+!.github/**
+
+# Public documentation only.
+!docs/
+docs/*
+!docs/architecture.md
+!docs/build.md
+!docs/github_publishing.md
+!docs/privacy.md
+!docs/technical_overview.md
+!docs/screenshots/
+!docs/screenshots/README.md
+
+# Public helper scripts.
+!scripts/
+scripts/*
+!scripts/windows/
+!scripts/windows/*.bat
+
+# Root Windows helper scripts.
+!build_debug.bat
+!build_release.bat
+!compile_debug_apk.bat
+!一键编译Debug.bat
+!一键编译Release.bat

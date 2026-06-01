@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">看了么</string>
+    <string name="compare_share_entry_label">用看了么对比照片</string>
+    <string name="shortcut_photo">照片整理</string>
+    <string name="shortcut_video">视频整理</string>
+    <string name="shortcut_similar">相似照片</string>
+</resources>
