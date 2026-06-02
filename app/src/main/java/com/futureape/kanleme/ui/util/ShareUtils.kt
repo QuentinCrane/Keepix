@@ -33,6 +33,19 @@ fun shareVideo(context: Context, video: VideoEntity) {
 fun openPhotoInSystemGallery(context: Context, photo: PhotoEntity) {
     val mediaStoreUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, photo.mediaStoreId)
     val storedUri = runCatching { Uri.parse(photo.uri) }.getOrElse { mediaStoreUri }
+    val companionVideoUri = photo.motionVideoUri
+        ?.takeIf { photo.isSeparateVideo && it.isNotBlank() }
+        ?.let { runCatching { Uri.parse(it) }.getOrNull() }
+    if (companionVideoUri != null) {
+        openMediaInSystemGallery(
+            context = context,
+            uri = companionVideoUri,
+            mimeType = "video/*",
+            title = photo.displayName + " 动态片段",
+            fallbackUri = mediaStoreUri,
+        )
+        return
+    }
     openMediaInSystemGallery(
         context = context,
         uri = mediaStoreUri,

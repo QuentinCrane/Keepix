@@ -8,9 +8,11 @@
 - Hilt
 - Room + Flow
 - MediaStore
-- DataStore 预留
-- WorkManager 预留
-- Media3 预留
+- DataStore
+- WorkManager
+- Media3 / ExoPlayer
+- Coil GIF Decoder
+- ExifInterface
 
 ## 分层
 
@@ -20,7 +22,7 @@ app/
   KanlemeApplication.kt
   data/
     local/          Room Entity/Dao/Database
-    media/          MediaStore 扫描
+    media/          MediaStore 扫描、动态照片识别、相似图片分析
     repository/     业务仓库
   di/               Hilt 注入模块
   ui/
@@ -38,6 +40,7 @@ app/
   ├── 照片整理 PhotoClean
   ├── 视频整理 VideoClean
   ├── 相似照片 SimilarPhotos
+  ├── 当年今日 TodayInHistory
   └── 待删/收藏/回收入口
 
 我的 Me
@@ -46,6 +49,14 @@ app/
   ├── 回收站 Trash
   └── 设置 Settings
 ```
+
+## v2.2.9 架构要点
+
+- GIF 播放通过全局图片加载链路支持，整理页、收藏、回收站、当年今日和大图预览复用同一套展示能力。
+- 实况 / 动态照片识别放在媒体层，通过 MediaStore 元数据、文件线索、轻量片段检测和同名伴随视频段建立本地引用；照片整理页对当前卡片懒加载，避免拖慢首次进入。
+- 相似图片检测在本机后台执行，复用 Room 指纹缓存和候选桶，结合 pHash、dHash、aHash、颜色特征降低大相册压力。
+- 成就系统只依赖本地整理记录、统计和进度数据，不引入账号、远程授权或云同步。
+- 回收站和当年今日的照片墙布局以媒体预览为中心，文件信息收敛到必要位置。
 
 ## 液态玻璃转译原则
 

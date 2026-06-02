@@ -26,6 +26,7 @@ data class DashboardStats(
     val favoriteCount: Int = 0,
     val trashCount: Int = 0,
     val pendingDeleteCount: Int = 0,
+    val pendingDeleteBytes: Long = 0L,
     val todayPhotoCount: Int = 0,
     val todayVideoCount: Int = 0,
     val todayActionCount: Int = 0,
@@ -42,6 +43,7 @@ data class PhotoTypeStats(
     val screenshot: Int = 0,
     val selfie: Int = 0,
     val motion: Int = 0,
+    val gif: Int = 0,
     val longImage: Int = 0,
 )
 
@@ -70,9 +72,14 @@ data class AchievementUi(
     val difficulty: String,
     val target: Int,
     val current: Int,
+    val category: String = "整理",
+    val rarity: String = "普通",
+    val xp: Int = 10,
+    val iconKey: String = "trophy",
 ) {
     val unlocked: Boolean get() = current >= target
     val progress: Float get() = if (target == 0) 1f else (current.toFloat() / target).coerceIn(0f, 1f)
+    val remaining: Int get() = (target - current).coerceAtLeast(0)
 }
 
 enum class SwipeAction { Keep, Favorite, Delete }
@@ -112,6 +119,7 @@ interface AppRepository {
     suspend fun restoreTrashItem(trashId: Long)
     suspend fun permanentlyDeleteTrashItem(trashId: Long)
     suspend fun permanentlyDeleteAllTrash()
+    suspend fun restoreAllTrash()
     suspend fun undoLastAction(): Boolean
     suspend fun buildAnnualReport(year: Int): AnnualReport
     suspend fun buildAchievements(): List<AchievementUi>

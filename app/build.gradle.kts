@@ -14,8 +14,8 @@ android {
         applicationId = "com.futureape.kanleme"
         minSdk = 30
         targetSdk = 35
-        versionCode = 54
-        versionName = "2.2.8"
+        versionCode = 55
+        versionName = "2.2.9"
 
         vectorDrawables.useSupportLibrary = true
     }
@@ -23,6 +23,21 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
     }
 
     compileOptions {
@@ -34,7 +49,13 @@ android {
     packaging {
         resources.excludes += setOf(
             "/META-INF/{AL2.0,LGPL2.1}",
-            "META-INF/gradle/incremental.annotation.processors"
+            "META-INF/DEPENDENCIES",
+            "META-INF/LICENSE*",
+            "META-INF/NOTICE*",
+            "META-INF/*.version",
+            "META-INF/gradle/incremental.annotation.processors",
+            "DebugProbesKt.bin",
+            "kotlin-tooling-metadata.json"
         )
     }
 }
@@ -75,4 +96,5 @@ dependencies {
     implementation("androidx.exifinterface:exifinterface:1.4.1")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt:coil-gif:2.7.0")
 }

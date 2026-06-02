@@ -95,13 +95,13 @@ class MediaStoreActions @Inject constructor(
         fun normalizeRelativePath(path: String): String {
             val clean = path.trim().replace('\\', '/').trim('/')
             return when {
-                clean.isBlank() -> "Pictures/看了么/"
+                clean.isBlank() -> "Pictures/回留/"
                 clean.endsWith("/") -> clean
                 else -> "$clean/"
             }
         }
 
         fun folderNameOf(relativePath: String): String =
-            normalizeRelativePath(relativePath).trimEnd('/').substringAfterLast('/').ifBlank { "看了么" }
+            normalizeRelativePath(relativePath).trimEnd('/').substringAfterLast('/').ifBlank { "回留" }
     }
 }

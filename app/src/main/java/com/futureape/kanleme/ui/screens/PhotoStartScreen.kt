@@ -246,7 +246,7 @@ private fun PhotoOptionPill(icon: androidx.compose.ui.graphics.vector.ImageVecto
 private fun PhotoFilterRail(selectedType: String, selectedDate: String, onType: (String) -> Unit, onDate: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            listOf("all" to "全部", "normal" to "普通", "screenshot" to "截图", "selfie" to "自拍", "motion" to "实况", "long" to "长图").forEach { item ->
+            listOf("all" to "全部", "normal" to "普通", "screenshot" to "截图", "selfie" to "自拍", "motion" to "实况", "gif" to "GIF", "long" to "长图").forEach { item ->
                 PhotoSmallChip(label = item.second, selected = selectedType == item.first, onClick = { onType(item.first) })
             }
         }

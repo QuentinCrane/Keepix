@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -54,10 +55,13 @@ import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.components.GlassSurface
+import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
 import com.futureape.kanleme.ui.util.shareMedia
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
@@ -101,16 +105,44 @@ private fun FavoritePhotoPreviewOverlay(
     onDelete: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val canPlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
+    var motionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
+    var motionLoading by remember(photo.id) { mutableStateOf(false) }
+
+    fun playMotion() {
+        if (!canPlayMotion || motionLoading) return
+        motionLoading = true
+        scope.launch {
+            when (val source = resolveMotionPhotoPlaybackSource(context, photo)) {
+                is MotionPhotoPlaybackSource.Ready -> motionSource = source
+                is MotionPhotoPlaybackSource.Unavailable -> Unit
+            }
+            motionLoading = false
+        }
+    }
+
     BackHandler(onBack = onClose)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black),
     ) {
-        ZoomableFavoritePhoto(
-            photo = photo,
-            modifier = Modifier.fillMaxSize(),
-        )
+        val motion = motionSource
+        if (motion != null) {
+            InlineMotionPhotoPlayer(
+                uri = motion.uri,
+                modifier = Modifier.fillMaxSize(),
+                playOnce = true,
+                onEnded = { motionSource = null },
+            )
+        } else {
+            ZoomableFavoritePhoto(
+                photo = photo,
+                modifier = Modifier.fillMaxSize(),
+                onLongPressMotion = ::playMotion,
+            )
+        }
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -146,8 +178,12 @@ private fun FavoritePhotoPreviewOverlay(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                FavoritePreviewAction("相册查看", Icons.Rounded.PhotoLibrary) {
-                    openPhotoInSystemGallery(context, photo)
+                if (canPlayMotion) {
+                    FavoritePreviewAction(if (motionLoading) "准备中" else "播放实况", Icons.Rounded.PhotoLibrary, ::playMotion)
+                } else {
+                    FavoritePreviewAction("相册查看", Icons.Rounded.PhotoLibrary) {
+                        openPhotoInSystemGallery(context, photo)
+                    }
                 }
                 FavoritePreviewAction("分享", Icons.Rounded.Share) {
                     shareMedia(context, Uri.parse(photo.uri), photo.mimeType, photo.displayName)
@@ -162,6 +198,7 @@ private fun FavoritePhotoPreviewOverlay(
 private fun ZoomableFavoritePhoto(
     photo: PhotoEntity,
     modifier: Modifier = Modifier,
+    onLongPressMotion: () -> Unit = {},
 ) {
     var scale by remember(photo.id) { mutableStateOf(1f) }
     var offset by remember(photo.id) { mutableStateOf(Offset.Zero) }
@@ -182,6 +219,7 @@ private fun ZoomableFavoritePhoto(
             .onSizeChanged { containerSize = it }
             .pointerInput(photo.id) {
                 detectTapGestures(
+                    onLongPress = { onLongPressMotion() },
                     onDoubleTap = {
                         if (scale > 1.01f) {
                             scale = 1f

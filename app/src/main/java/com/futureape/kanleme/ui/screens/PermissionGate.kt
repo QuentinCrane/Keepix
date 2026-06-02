@@ -107,7 +107,7 @@ fun MediaPermissionGate(
                     Icon(Icons.Rounded.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Text("需要访问相册", style = MaterialTheme.typography.headlineSmall)
                     Text(
-                        "看了么的核心功能是全相册整理，所以需要读取照片和视频。所有扫描都在本机完成，不上传媒体文件。",
+                        "回留的核心功能是全相册整理，所以需要读取照片和视频。所有扫描都在本机完成，不上传媒体文件。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -136,7 +136,7 @@ private fun PartialAccessBanner(
             Text("当前是部分照片访问", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(4.dp))
             Text(
-                "时间轴和整理流只会显示系统允许看了么访问的照片/视频。需要全相册整理时，请重新授权并选择允许访问所有照片和视频。",
+                "时间轴和整理流只会显示系统允许回留访问的照片/视频。需要全相册整理时，请重新授权并选择允许访问所有照片和视频。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

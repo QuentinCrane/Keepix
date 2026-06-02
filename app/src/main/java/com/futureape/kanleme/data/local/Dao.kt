@@ -23,6 +23,9 @@ interface PhotoDao {
     @Query("SELECT COUNT(*) FROM photos WHERE deletion_status IN ('pending','trashed')")
     fun observeDeleteCount(): Flow<Int>
 
+    @Query("SELECT COALESCE(SUM(size), 0) FROM photos WHERE deletion_status IN ('pending','trashed')")
+    fun observeDeleteSize(): Flow<Long>
+
     @Query("SELECT * FROM photos WHERE deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
     fun observeRecent(limit: Int): Flow<List<PhotoEntity>>
 
@@ -136,6 +139,9 @@ interface VideoDao {
 
     @Query("SELECT COUNT(*) FROM videos WHERE deletion_status IN ('pending','trashed')")
     fun observeDeleteCount(): Flow<Int>
+
+    @Query("SELECT COALESCE(SUM(size), 0) FROM videos WHERE deletion_status IN ('pending','trashed')")
+    fun observeDeleteSize(): Flow<Long>
 
     @Query("SELECT * FROM videos WHERE deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
     fun observeRecent(limit: Int): Flow<List<VideoEntity>>

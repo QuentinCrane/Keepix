@@ -6,6 +6,14 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -65,6 +73,7 @@ import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 
 @Composable
@@ -84,6 +93,11 @@ fun PhotoCleanScreen(
     val context = LocalContext.current
     var showGuide by remember { mutableStateOf(false) }
     var albumPickerExpanded by remember { mutableStateOf(false) }
+    var guideTargets by remember { mutableStateOf<Map<PhotoGuideTarget, Rect>>(emptyMap()) }
+
+    fun updateGuideTarget(target: PhotoGuideTarget, rect: Rect) {
+        guideTargets = guideTargets + (target to rect)
+    }
 
     val folderPairs = remember(folders) {
         folders.mapNotNull { path ->
@@ -145,7 +159,8 @@ fun PhotoCleanScreen(
         val base = folderPairs.map { it.first }.ifEmpty { listOf("Camera (DCIM)", "Screenshots", "Downloads") }
         if (settings.folderDisplay == FolderDisplayMode.SINGLE_LINE) base.take(12) else base.take(24)
     }
-    val dimAlpha by animateFloatAsState(targetValue = if (showGuide) 0.58f else 0f, label = "guide_dim")
+    // The guide overlay now owns the scrim. Do not stack another black layer here, or the page becomes unreadable.
+    val dimAlpha by animateFloatAsState(targetValue = 0f, label = "guide_dim")
 
     fun perform(photo: PhotoEntity, action: SwipeAction) {
         haptics.success()
@@ -202,7 +217,7 @@ fun PhotoCleanScreen(
                     photos = deck.take(3),
                     settings = settings,
                     haptics = haptics,
-                    modifier = if (isExpanded) {
+                    modifier = (if (isExpanded) {
                         Modifier
                             .align(Alignment.Center)
                             .widthIn(max = 720.dp)
@@ -211,8 +226,9 @@ fun PhotoCleanScreen(
                         Modifier
                             .align(Alignment.Center)
                             .fillMaxWidth()
-                    },
+                    }),
                     onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
+                    onTopCardPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.PhotoCard, rect) },
                     onAction = { photo, action -> perform(photo, action) },
                 )
 
@@ -220,19 +236,26 @@ fun PhotoCleanScreen(
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .onGloballyPositioned { coordinates ->
+                                updateGuideTarget(PhotoGuideTarget.TopBar, coordinates.boundsInRoot())
+                            },
                     ) {
                         PhotoOrganizerTopControls(
                             remainingCount = remainingPhotos,
+                            progressPercent = if (dashboard.photoCount > 0) ((dashboard.processedPhotoCount * 100f) / dashboard.photoCount).toInt().coerceIn(0, 100) else 0,
+                            deletedCount = dashboard.pendingDeleteCount,
+                            deletedSizeBytes = dashboard.pendingDeleteBytes,
                             mediaCounts = listOf(
                                 "全部" to typeStats.all.toString(),
                                 "普通照片" to typeStats.normal.toString(),
                                 "截图" to typeStats.screenshot.toString(),
                                 "自拍" to typeStats.selfie.toString(),
                                 "实况" to typeStats.motion.toString(),
+                                "GIF" to typeStats.gif.toString(),
                                 "长图" to typeStats.longImage.toString(),
                             ),
-                            selectedMediaIndex = listOf("all", "normal", "screenshot", "selfie", "motion", "long").indexOf(scope.mediaType).coerceAtLeast(0),
+                            selectedMediaIndex = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long").indexOf(scope.mediaType).coerceAtLeast(0),
                             dateMode = scope.dateMode,
                             randomEnabled = scope.sortOrder == "random",
                             showKeep = settings.photoShowTopBar,
@@ -242,7 +265,7 @@ fun PhotoCleanScreen(
                             onKeep = { perform(currentPhoto, SwipeAction.Keep) },
                             onShuffle = { haptics.threshold(); viewModel.reshufflePhotoCleaningSession() },
                             onMediaSelected = { index ->
-                                val type = listOf("all", "normal", "screenshot", "selfie", "motion", "long").getOrElse(index) { "all" }
+                                val type = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long").getOrElse(index) { "all" }
                                 haptics.tick()
                                 viewModel.setPhotoTypeFilter(type)
                             },
@@ -265,7 +288,10 @@ fun PhotoCleanScreen(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .padding(bottom = 4.dp),
+                            .padding(bottom = 4.dp)
+                            .onGloballyPositioned { coordinates ->
+                                updateGuideTarget(PhotoGuideTarget.BottomInfo, coordinates.boundsInRoot())
+                            },
                     ) {
                         CompactPhotoInfoBar(
                             remaining = remainingPhotos,
@@ -275,6 +301,7 @@ fun PhotoCleanScreen(
                             showAlbum = settings.photoShowFolderChips,
                             onOpen = { haptics.tick(); onOpenPhoto(currentPhoto) },
                             onAlbumClick = { haptics.tick(); albumPickerExpanded = !albumPickerExpanded },
+                            onAlbumPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.AlbumButton, rect) },
                         )
                         androidx.compose.animation.AnimatedVisibility(visible = albumPickerExpanded && settings.photoShowFolderChips) {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
@@ -305,94 +332,120 @@ fun PhotoCleanScreen(
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dimAlpha)))
         }
         androidx.compose.animation.AnimatedVisibility(visible = showGuide, modifier = Modifier.fillMaxSize()) {
-            PhotoPositionGuideOverlay(onDismiss = { haptics.tick(); showGuide = false; viewModel.markPhotoGuideShown() })
+            PhotoPositionGuideOverlay(targets = guideTargets, onDismiss = { haptics.tick(); showGuide = false; viewModel.markPhotoGuideShown() })
         }
     }
 }
 
+
+
+
+private enum class PhotoGuideTarget { TopBar, PhotoCard, BottomInfo, AlbumButton }
+
 private data class PositionGuideStep(
+    val target: PhotoGuideTarget,
     val title: String,
     val body: String,
-    val targetAlignment: Alignment,
-    val cardAlignment: Alignment,
-    val targetWidth: androidx.compose.ui.unit.Dp,
-    val targetHeight: androidx.compose.ui.unit.Dp,
-    val targetPadding: androidx.compose.foundation.layout.PaddingValues = androidx.compose.foundation.layout.PaddingValues(0.dp),
 )
 
 @Composable
-private fun PhotoPositionGuideOverlay(onDismiss: () -> Unit) {
+private fun PhotoPositionGuideOverlay(
+    targets: Map<PhotoGuideTarget, Rect>,
+    onDismiss: () -> Unit,
+) {
     var stepIndex by remember { mutableIntStateOf(0) }
     val steps = listOf(
         PositionGuideStep(
+            target = PhotoGuideTarget.TopBar,
             title = "顶部操作栏",
-            body = "这里是一行核心动作：保留当前图、重新随机、图片筛选、时间筛选和剩余数量。筛选点开才展开，不会长期占行。",
-            targetAlignment = Alignment.TopCenter,
-            cardAlignment = Alignment.BottomCenter,
-            targetWidth = 356.dp,
-            targetHeight = 54.dp,
-            targetPadding = androidx.compose.foundation.layout.PaddingValues(top = 44.dp),
+            body = "这里是一行核心动作：保留、重新随机、图片筛选、时间筛选和剩余数量。筛选点开才展开。",
         ),
         PositionGuideStep(
+            target = PhotoGuideTarget.PhotoCard,
             title = "中间照片卡片",
             body = "点按图片进入大图；明显左右滑是保留，明显上下滑才会收藏或待删。斜向拖动不会轻易触发破坏性操作。",
-            targetAlignment = Alignment.Center,
-            cardAlignment = Alignment.BottomCenter,
-            targetWidth = 318.dp,
-            targetHeight = 430.dp,
         ),
         PositionGuideStep(
+            target = PhotoGuideTarget.BottomInfo,
             title = "底部图片信息",
-            body = "这里显示拍摄时间、文件夹、大小和剩余数量；点按信息条也能进入大图查看细节。",
-            targetAlignment = Alignment.BottomCenter,
-            cardAlignment = Alignment.TopCenter,
-            targetWidth = 342.dp,
-            targetHeight = 76.dp,
-            targetPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 30.dp),
+            body = "这里集中显示拍摄时间、文件夹、类型、大小和剩余数量；点按信息条也能进入大图查看细节。",
         ),
         PositionGuideStep(
-            title = "右下角相册按钮",
+            target = PhotoGuideTarget.AlbumButton,
+            title = "相册按钮",
             body = "点击相册可以展开目标文件夹，选择后保留/收藏会按设置自动归档。",
-            targetAlignment = Alignment.BottomEnd,
-            cardAlignment = Alignment.TopCenter,
-            targetWidth = 74.dp,
-            targetHeight = 74.dp,
-            targetPadding = androidx.compose.foundation.layout.PaddingValues(end = 18.dp, bottom = 30.dp),
         ),
     )
     val step = steps[stepIndex.coerceIn(0, steps.lastIndex)]
+    val density = LocalDensity.current
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)))
-        Box(
-            modifier = Modifier
-                .align(step.targetAlignment)
-                .padding(step.targetPadding)
-                .size(width = step.targetWidth, height = step.targetHeight)
-                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), RoundedCornerShape(28.dp)),
-        )
-        Surface(
-            modifier = Modifier
-                .align(step.cardAlignment)
-                .padding(horizontal = 22.dp, vertical = 40.dp)
-                .fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("步骤 " + (stepIndex + 1) + "/" + steps.size, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Text(step.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(step.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    if (stepIndex > 0) {
-                        Button(onClick = { stepIndex -= 1 }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text("上一步") }
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+            val fallbackRect = with(density) {
+                val w = maxWidth.toPx()
+                val h = maxHeight.toPx()
+                when (step.target) {
+                    PhotoGuideTarget.TopBar -> Rect(18.dp.toPx(), 44.dp.toPx(), w - 18.dp.toPx(), 106.dp.toPx())
+                    PhotoGuideTarget.PhotoCard -> Rect(28.dp.toPx(), h * 0.22f, w - 28.dp.toPx(), h * 0.73f)
+                    PhotoGuideTarget.BottomInfo -> Rect(18.dp.toPx(), h - 104.dp.toPx(), w - 18.dp.toPx(), h - 22.dp.toPx())
+                    PhotoGuideTarget.AlbumButton -> Rect(w - 92.dp.toPx(), h - 94.dp.toPx(), w - 20.dp.toPx(), h - 22.dp.toPx())
+                }
+            }
+            val rawRect = targets[step.target] ?: fallbackRect
+            val highlightRect = Rect(
+                left = (rawRect.left - 8f).coerceAtLeast(0f),
+                top = (rawRect.top - 8f).coerceAtLeast(0f),
+                right = (rawRect.right + 8f).coerceAtMost(with(density) { maxWidth.toPx() }),
+                bottom = (rawRect.bottom + 8f).coerceAtMost(with(density) { maxHeight.toPx() }),
+            )
+            val screenWidthPx = with(density) { maxWidth.toPx() }
+            val screenHeightPx = with(density) { maxHeight.toPx() }
+            Canvas(Modifier.fillMaxSize()) {
+                val scrim = Color.Black.copy(alpha = 0.18f)
+                drawRect(scrim, topLeft = Offset.Zero, size = Size(screenWidthPx, highlightRect.top))
+                drawRect(scrim, topLeft = Offset(0f, highlightRect.bottom), size = Size(screenWidthPx, screenHeightPx - highlightRect.bottom))
+                drawRect(scrim, topLeft = Offset(0f, highlightRect.top), size = Size(highlightRect.left, highlightRect.height))
+                drawRect(scrim, topLeft = Offset(highlightRect.right, highlightRect.top), size = Size(screenWidthPx - highlightRect.right, highlightRect.height))
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.92f),
+                    topLeft = Offset(highlightRect.left, highlightRect.top),
+                    size = Size(highlightRect.width, highlightRect.height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(28f, 28f),
+                    style = Stroke(width = 3f),
+                )
+                drawRoundRect(
+                    color = Color(0xFF7CC6F2).copy(alpha = 0.82f),
+                    topLeft = Offset(highlightRect.left + 2f, highlightRect.top + 2f),
+                    size = Size((highlightRect.width - 4f).coerceAtLeast(0f), (highlightRect.height - 4f).coerceAtLeast(0f)),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(26f, 26f),
+                    style = Stroke(width = 4f),
+                )
+            }
+            val cardOnTop = highlightRect.center.y > screenHeightPx * 0.56f
+            Surface(
+                modifier = Modifier
+                    .align(if (cardOnTop) Alignment.TopCenter else Alignment.BottomCenter)
+                    .padding(horizontal = 22.dp, vertical = 32.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                tonalElevation = 6.dp,
+                shadowElevation = 8.dp,
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("步骤 " + (stepIndex + 1) + "/" + steps.size, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(step.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(step.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        if (stepIndex > 0) {
+                            Button(onClick = { stepIndex -= 1 }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text("上一步") }
+                        }
+                        Button(
+                            onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(999.dp),
+                        ) { Text(if (stepIndex < steps.lastIndex) "下一步" else "知道了") }
                     }
-                    Button(
-                        onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(999.dp),
-                    ) { Text(if (stepIndex < steps.lastIndex) "下一步" else "知道了") }
                 }
             }
         }
@@ -404,6 +457,9 @@ private enum class PhotoQuickPanel { MEDIA, DATE }
 @Composable
 private fun PhotoOrganizerTopControls(
     remainingCount: Int,
+    progressPercent: Int,
+    deletedCount: Int,
+    deletedSizeBytes: Long,
     mediaCounts: List<Pair<String, String>>,
     selectedMediaIndex: Int,
     dateMode: String,
@@ -465,7 +521,11 @@ private fun PhotoOrganizerTopControls(
                     onClick = { openPanel = if (openPanel == PhotoQuickPanel.DATE) null else PhotoQuickPanel.DATE },
                 )
             }
-            if (showRemaining) RemainingCountPill(remainingCount)
+            if (showRemaining) {
+                PendingDeletePill(deletedCount, deletedSizeBytes)
+                ProgressPercentPill(progressPercent)
+                RemainingCountPill(remainingCount)
+            }
         }
 
         androidx.compose.animation.AnimatedVisibility(visible = showFilters && openPanel == PhotoQuickPanel.MEDIA) {
@@ -486,6 +546,46 @@ private fun PhotoOrganizerTopControls(
                 selectedIndex = listOf("all", "seven_days", "month", "year").indexOf(dateMode).coerceAtLeast(0),
                 onSelected = { index -> onDateSelected(index); openPanel = null },
             )
+        }
+    }
+}
+
+@Composable
+private fun PendingDeletePill(count: Int, sizeBytes: Long) {
+    Surface(
+        modifier = Modifier.height(42.dp),
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Text("可释放", style = MaterialTheme.typography.labelLarge)
+            Text(if (sizeBytes > 0L) formatSize(sizeBytes) else count.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun ProgressPercentPill(percent: Int) {
+    Surface(
+        modifier = Modifier.height(42.dp),
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.11f),
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(percent.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+            Text("%", style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -551,6 +651,7 @@ private fun CompactPhotoInfoBar(
     showAlbum: Boolean = true,
     onOpen: () -> Unit,
     onAlbumClick: () -> Unit,
+    onAlbumPositioned: (Rect) -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -573,7 +674,7 @@ private fun CompactPhotoInfoBar(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        photo.folderName + " · " + formatSize(photo.size) + " · 点按查看大图",
+                        photo.folderName + " · " + photoMediaKindLabel(photo) + " · " + formatSize(photo.size) + " · 点按查看大图",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -586,7 +687,10 @@ private fun CompactPhotoInfoBar(
         }
         if (showAlbum) {
             Surface(
-                modifier = Modifier.size(62.dp).clickable(onClick = onAlbumClick),
+                modifier = Modifier
+                    .size(62.dp)
+                    .onGloballyPositioned { coordinates -> onAlbumPositioned(coordinates.boundsInRoot()) }
+                    .clickable(onClick = onAlbumClick),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
                 contentColor = MaterialTheme.colorScheme.primary,

@@ -453,6 +453,12 @@ class KanlemeViewModel @Inject constructor(
             .onFailure { _message.value = it.message ?: "批量删除失败" }
     }
 
+    fun restoreAllTrash() = viewModelScope.launch {
+        runCatching { repository.restoreAllTrash() }
+            .onSuccess { _message.value = "已恢复全部回收站项目" }
+            .onFailure { _message.value = it.message ?: "批量恢复失败" }
+    }
+
     fun undoLastAction() = viewModelScope.launch {
         runCatching { repository.undoLastAction() }
             .onSuccess { ok -> _message.value = if (ok) "已撤销上一步操作" else "没有可撤销操作" }

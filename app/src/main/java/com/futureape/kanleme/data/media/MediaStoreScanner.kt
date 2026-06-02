@@ -45,7 +45,10 @@ class MediaStoreScanner @Inject constructor(
                 val id = cursor.getLong(idCol)
                 val relativePath = cursor.string(MediaStore.Images.Media.RELATIVE_PATH)
                 val displayName = cursor.string(MediaStore.Images.Media.DISPLAY_NAME)?.ifBlank { "IMG_" + id } ?: "IMG_" + id
-                val uri = ContentUris.withAppendedId(collection, id).toString()
+                val uriObject = ContentUris.withAppendedId(collection, id)
+                val uri = uriObject.toString()
+                val mimeType = cursor.string(MediaStore.Images.Media.MIME_TYPE) ?: "image/*"
+                val size = cursor.long(MediaStore.Images.Media.SIZE)
                 val folderName = relativePath?.trimEnd('/')?.substringAfterLast('/')?.ifBlank { "相册" } ?: "相册"
                 val dateAddedSeconds = cursor.long(MediaStore.Images.Media.DATE_ADDED)
                 val dateTaken = cursor.long(MediaStore.Images.Media.DATE_TAKEN).takeIf { it > 0 }
@@ -54,24 +57,36 @@ class MediaStoreScanner @Inject constructor(
                     ?: 0L
                 val width = cursor.int(MediaStore.Images.Media.WIDTH)
                 val height = cursor.int(MediaStore.Images.Media.HEIGHT)
+                // Keep scanning strictly lightweight: never open or sniff the media file here.
+                // The previous APK-reference build tried to parse Motion Photo XMP/MP4 during
+                // MediaStore scanning, which can block large libraries and make the app look as
+                // if no photos/videos were detected after permission was granted. Motion playback
+                // is resolved lazily only for the currently visible card.
+                val isGif = DynamicPhotoDetector.isGif(mimeType, displayName)
+                val isMotionHint = DynamicPhotoDetector.hasMotionNameHint(displayName, relativePath)
+                val needsMotionDetection = DynamicPhotoDetector.isPossiblyAnimatedStill(mimeType, displayName) || isMotionHint
                 result += PhotoEntity(
                     mediaStoreId = id,
                     stableMediaKey = "image:" + id + ":" + cursor.long(MediaStore.Images.Media.DATE_MODIFIED),
                     uri = uri,
                     displayName = displayName,
-                    size = cursor.long(MediaStore.Images.Media.SIZE),
+                    size = size,
                     dateTaken = dateTaken,
                     dateAdded = dateAddedSeconds,
                     dateModified = cursor.long(MediaStore.Images.Media.DATE_MODIFIED),
                     relativePath = relativePath,
                     folderPath = relativePath ?: "",
                     folderName = folderName,
-                    mimeType = cursor.string(MediaStore.Images.Media.MIME_TYPE) ?: "image/*",
+                    mimeType = mimeType,
                     width = width,
                     height = height,
                     isScreenshot = isScreenshot(relativePath, displayName),
                     isSelfie = isSelfie(relativePath, displayName),
-                    isGif = displayName.endsWith(".gif", ignoreCase = true),
+                    isMotionPhoto = isMotionHint,
+                    motionVideoOffset = 0L,
+                    motionVideoSize = 0L,
+                    isGif = isGif,
+                    motionPhotoNeedsDetection = needsMotionDetection,
                     isRaw = isRaw(displayName),
                     isLongImage = isLongImage(width, height),
                 )

@@ -11,8 +11,11 @@ import com.futureape.kanleme.data.local.SimilarGroupPhotoEntity
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.sqrt
 
 @Singleton
 class SimilarPhotoAnalyzer @Inject constructor(
@@ -117,12 +120,20 @@ class SimilarPhotoAnalyzer @Inject constructor(
                 val pDistance = hamming(anchor.pHash, other.pHash)
                 val dDistance = hamming(anchor.dHash, other.dHash)
                 val aDistance = hamming(anchor.aHash, other.aHash)
-                val sameSize = byId[anchor.photoId]?.let { a ->
+                val colorDistance = colorDistance(anchor.colorHistogram, other.colorHistogram) ?: 0
+                val sameSizeAndContext = byId[anchor.photoId]?.let { a ->
                     byId[other.photoId]?.let { b ->
-                        a.width == b.width && a.height == b.height && abs(a.size - b.size) < 128 * 1024
+                        a.width == b.width &&
+                            a.height == b.height &&
+                            abs(a.size - b.size) < 128 * 1024 &&
+                            a.folderPath == b.folderPath &&
+                            abs(a.dateTaken - b.dateTaken) < 2L * 60L * 60L * 1000L
                     }
                 } == true
-                if (pDistance <= 10 || dDistance <= 8 || aDistance <= 6 || sameSize) {
+                val strictNear = pDistance <= 9 && dDistance <= 10
+                val perceptualNear = pDistance <= 15 && dDistance <= 14 && colorDistance <= 72
+                val gradientNear = dDistance <= 8 && aDistance <= 12 && colorDistance <= 64
+                if (strictNear || perceptualNear || gradientNear || (sameSizeAndContext && (pDistance <= 20 || dDistance <= 18))) {
                     near += other
                 }
             }
@@ -144,9 +155,13 @@ class SimilarPhotoAnalyzer @Inject constructor(
     private fun fingerprint(photo: PhotoEntity, now: Long): PhotoFingerprintEntity? {
         val bitmap = decodeSampledBitmap(Uri.parse(photo.uri)) ?: return null
         val small = Bitmap.createScaledBitmap(bitmap, 9, 8, true)
-        if (small != bitmap) bitmap.recycle()
+        val dctBitmap = Bitmap.createScaledBitmap(bitmap, 32, 32, true)
+        if (bitmap != small && bitmap != dctBitmap) bitmap.recycle()
         val gray = IntArray(9 * 8)
         var sum = 0L
+        var redSum = 0L
+        var greenSum = 0L
+        var blueSum = 0L
         for (y in 0 until 8) {
             for (x in 0 until 9) {
                 val c = small.getPixel(x, y)
@@ -155,10 +170,18 @@ class SimilarPhotoAnalyzer @Inject constructor(
                 val b = c and 0xFF
                 val lum = (r * 299 + g * 587 + b * 114) / 1000
                 gray[y * 9 + x] = lum
-                if (x < 8) sum += lum.toLong()
+                if (x < 8) {
+                    sum += lum.toLong()
+                    redSum += r.toLong()
+                    greenSum += g.toLong()
+                    blueSum += b.toLong()
+                }
             }
         }
         val avg = (sum / 64).toInt()
+        val avgR = (redSum / 64).toInt()
+        val avgG = (greenSum / 64).toInt()
+        val avgB = (blueSum / 64).toInt()
         var aHash = 0L
         var dHash = 0L
         var bit = 0
@@ -170,7 +193,8 @@ class SimilarPhotoAnalyzer @Inject constructor(
             }
         }
         small.recycle()
-        val pHash = aHash xor java.lang.Long.rotateLeft(dHash, 17)
+        val pHash = computeDctPHash(dctBitmap)
+        dctBitmap.recycle()
         val sharpness = estimateSharpness(gray)
         val exposure = (avg / 255.0).coerceIn(0.0, 1.0)
         val exposureScore = 1.0 - abs(exposure - 0.5) * 1.6
@@ -180,7 +204,7 @@ class SimilarPhotoAnalyzer @Inject constructor(
             pHash = pHash,
             dHash = dHash,
             aHash = aHash,
-            colorHistogram = "avg=$avg",
+            colorHistogram = "avg=$avg;rgb=$avgR,$avgG,$avgB",
             pHashPrefix = pHash ushr 48,
             qualityScore = quality,
             sharpness = sharpness,
@@ -226,12 +250,62 @@ class SimilarPhotoAnalyzer @Inject constructor(
     }
 
     private fun hashBucketKeys(fp: PhotoFingerprintEntity): List<String> = listOf(
-        "p16:${fp.pHash ushr 48}",
-        "p12:${fp.pHash ushr 52}",
-        "d16:${fp.dHash ushr 48}",
-        "d12:${fp.dHash ushr 52}",
+        "p16a:${fp.pHash ushr 48}",
+        "p16b:${(fp.pHash ushr 32) and 0xFFFF}",
+        "p16c:${(fp.pHash ushr 16) and 0xFFFF}",
+        "d16a:${fp.dHash ushr 48}",
+        "d16b:${(fp.dHash ushr 32) and 0xFFFF}",
         "a16:${fp.aHash ushr 48}",
     )
+
+    private fun computeDctPHash(bitmap: Bitmap): Long {
+        val pixels = DoubleArray(32 * 32)
+        for (y in 0 until 32) {
+            for (x in 0 until 32) {
+                val c = bitmap.getPixel(x, y)
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                pixels[y * 32 + x] = ((r * 299 + g * 587 + b * 114) / 1000).toDouble() - 128.0
+            }
+        }
+        val coeffs = DoubleArray(64)
+        var index = 0
+        for (v in 0 until 8) {
+            for (u in 0 until 8) {
+                var sum = 0.0
+                for (y in 0 until 32) {
+                    val cy = cos(((2 * y + 1) * v * PI) / 64.0)
+                    for (x in 0 until 32) {
+                        val cx = cos(((2 * x + 1) * u * PI) / 64.0)
+                        sum += pixels[y * 32 + x] * cx * cy
+                    }
+                }
+                val au = if (u == 0) 1.0 / sqrt(2.0) else 1.0
+                val av = if (v == 0) 1.0 / sqrt(2.0) else 1.0
+                coeffs[index++] = 0.25 * au * av * sum
+            }
+        }
+        val median = coeffs.drop(1).sorted()[31]
+        var hash = 0L
+        for (i in 1 until coeffs.size) {
+            if (coeffs[i] > median) hash = hash or (1L shl i)
+        }
+        return hash
+    }
+
+    private fun colorDistance(a: String, b: String): Int? {
+        val first = parseRgb(a) ?: return null
+        val second = parseRgb(b) ?: return null
+        return abs(first[0] - second[0]) + abs(first[1] - second[1]) + abs(first[2] - second[2])
+    }
+
+    private fun parseRgb(value: String): IntArray? {
+        val rgb = value.substringAfter("rgb=", "").substringBefore(';')
+        if (rgb.isBlank()) return null
+        val parts = rgb.split(',').mapNotNull { it.toIntOrNull() }
+        return if (parts.size == 3) intArrayOf(parts[0], parts[1], parts[2]) else null
+    }
 
     private fun hamming(a: Long, b: Long): Int = java.lang.Long.bitCount(a xor b)
 }

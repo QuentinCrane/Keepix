@@ -1,6 +1,7 @@
 package com.futureape.kanleme.ui.screens
 
 import android.net.Uri
+import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Swipe
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -53,6 +55,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -67,6 +70,9 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -78,6 +84,7 @@ import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -93,8 +100,16 @@ import com.futureape.kanleme.ui.util.HapticKit
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.photoMediaBadges
+import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
+import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.components.GlassSurface
 import kotlinx.coroutines.launch
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -246,6 +261,20 @@ private fun GlassCircleIcon(icon: ImageVector, contentColor: Color = MaterialThe
     }
 }
 
+private object MotionPreviewAutoplayMemory {
+    private val playedIds = linkedSetOf<Long>()
+
+    fun hasPlayed(photoId: Long): Boolean = playedIds.contains(photoId)
+
+    fun markPlayed(photoId: Long) {
+        playedIds.add(photoId)
+        if (playedIds.size > 800) {
+            val iterator = playedIds.iterator()
+            repeat(playedIds.size - 800) { if (iterator.hasNext()) { iterator.next(); iterator.remove() } }
+        }
+    }
+}
+
 @Composable
 fun PhotoDeckStage(
     photos: List<PhotoEntity>,
@@ -253,6 +282,7 @@ fun PhotoDeckStage(
     haptics: HapticKit,
     modifier: Modifier = Modifier,
     onOpen: (PhotoEntity) -> Unit = {},
+    onTopCardPositioned: (Rect) -> Unit = {},
     onAction: (PhotoEntity, SwipeAction) -> Unit,
 ) {
     val top = photos.firstOrNull() ?: return
@@ -295,7 +325,9 @@ fun PhotoDeckStage(
             haptics = haptics,
             onOpen = { onOpen(top) },
             onAction = { onAction(top, it) },
-            modifier = Modifier.fillMaxWidth(0.96f),
+            modifier = Modifier
+                .fillMaxWidth(0.96f)
+                .onGloballyPositioned { coordinates -> onTopCardPositioned(coordinates.boundsInRoot()) },
         )
     }
 }
@@ -312,6 +344,11 @@ fun SwipePhotoCard(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val photoRatio = remember(photo.id, photo.width, photo.height, photo.exifWidth, photo.exifHeight) { photoDisplayAspectRatio(photo) }
+    val canInlinePlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
+    var inlineMotionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
+    var inlineMotionLoading by remember(photo.id) { mutableStateOf(false) }
+    var inlineMotionUnavailable by remember(photo.id) { mutableStateOf(false) }
+    var inlineMotionManualHint by remember(photo.id) { mutableStateOf(false) }
     val offsetX = remember(photo.id) { Animatable(0f) }
     val offsetY = remember(photo.id) { Animatable(0f) }
     // Do not fade the incoming photo from transparent; that exposes the backdrop and reads as a flash.
@@ -341,6 +378,36 @@ fun SwipePhotoCard(
     LaunchedEffect(photo.id) {
         launch { entryScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) }
         entryOffsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+    }
+
+    suspend fun startInlineMotionPreview(manual: Boolean) {
+        if (!canInlinePlayMotion) return
+        if (!manual && MotionPreviewAutoplayMemory.hasPlayed(photo.id)) {
+            inlineMotionManualHint = true
+            return
+        }
+        inlineMotionLoading = true
+        inlineMotionUnavailable = false
+        inlineMotionManualHint = manual
+        when (val source = resolveMotionPhotoPlaybackSource(context, photo)) {
+            is MotionPhotoPlaybackSource.Ready -> {
+                inlineMotionSource = source
+                MotionPreviewAutoplayMemory.markPlayed(photo.id)
+            }
+            is MotionPhotoPlaybackSource.Unavailable -> {
+                inlineMotionUnavailable = true
+                inlineMotionManualHint = true
+            }
+        }
+        inlineMotionLoading = false
+    }
+
+    LaunchedEffect(photo.id, canInlinePlayMotion) {
+        inlineMotionSource = null
+        inlineMotionUnavailable = false
+        inlineMotionLoading = false
+        inlineMotionManualHint = false
+        if (canInlinePlayMotion) startInlineMotionPreview(manual = false)
     }
 
     fun verticalAction(y: Float): SwipeAction {
@@ -384,6 +451,17 @@ fun SwipePhotoCard(
                     val slop = viewConfiguration.touchSlop
                     val dragStartSlop = slop * 1.35f
                     val tapSlop = slop * 1.10f
+                    val fastLongPressTimeout = 300L
+                    var longPressHandled = false
+                    val longPressStartMillis = SystemClock.uptimeMillis()
+                    val longPressJob = scope.launch {
+                        kotlinx.coroutines.delay(fastLongPressTimeout)
+                        if (canInlinePlayMotion && !dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop) {
+                            longPressHandled = true
+                            haptics.threshold()
+                            startInlineMotionPreview(manual = true)
+                        }
+                    }
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
@@ -392,8 +470,15 @@ fun SwipePhotoCard(
                         if (delta.x != 0f || delta.y != 0f) {
                             totalX += delta.x
                             totalY += delta.y
+                            if (canInlinePlayMotion && !dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop && SystemClock.uptimeMillis() - longPressStartMillis >= fastLongPressTimeout) {
+                                longPressHandled = true
+                                longPressJob.cancel()
+                                haptics.threshold()
+                                scope.launch { startInlineMotionPreview(manual = true) }
+                            }
                             if (!dragging && max(abs(totalX), abs(totalY)) > dragStartSlop) {
                                 dragging = true
+                                longPressJob.cancel()
                                 haptics.tick()
                             }
                             if (dragging) {
@@ -417,7 +502,9 @@ fun SwipePhotoCard(
                         }
                     }
 
-                    if (!dragging && max(abs(totalX), abs(totalY)) <= tapSlop) {
+                    longPressJob.cancel()
+
+                    if (!dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop) {
                         haptics.tick()
                         onOpen()
                     } else {
@@ -460,24 +547,46 @@ fun SwipePhotoCard(
                 .background(Color.Black.copy(alpha = 0.96f))
                 .border(1.dp, adaptiveWhiteBorder(0.38f), RoundedCornerShape(32.dp))
         ) {
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(Uri.parse(photo.uri))
-                    .memoryCacheKey(photo.uri)
-                    .diskCacheKey(photo.uri)
-                    .placeholderMemoryCacheKey(photo.uri)
-                    .crossfade(false)
-                    .build(),
-                contentDescription = photo.displayName,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
+            val motionPreview = inlineMotionSource
+            if (motionPreview != null) {
+                InlineMotionPhotoPlayer(
+                    uri = motionPreview.uri,
+                    modifier = Modifier.fillMaxSize(),
+                    playOnce = true,
+                    onEnded = { inlineMotionSource = null; inlineMotionManualHint = true },
+                )
+            } else {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(Uri.parse(photo.uri))
+                        .memoryCacheKey(photo.uri)
+                        .diskCacheKey(photo.uri)
+                        .placeholderMemoryCacheKey(photo.uri)
+                        .crossfade(false)
+                        .build(),
+                    contentDescription = photo.displayName,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            PhotoDynamicBadgeRow(
+                photo = photo,
+                modifier = Modifier.align(Alignment.TopStart).padding(14.dp),
             )
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.10f), Color.Black.copy(alpha = 0.28f))
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.04f), Color.Black.copy(alpha = 0.16f))
                     )
                 )
+            )
+            InlineMotionStatusPill(
+                isVisible = canInlinePlayMotion,
+                isPlaying = motionPreview != null,
+                isLoading = inlineMotionLoading,
+                isUnavailable = inlineMotionUnavailable,
+                manualHint = inlineMotionManualHint,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp),
             )
             val actionHint = activeHint
             if (actionHint != null && feedbackAlpha > 0.18f) {
@@ -495,6 +604,138 @@ fun SwipePhotoCard(
                     EdgeSwipeHint(actionHint)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PhotoCardMetaOverlay(
+    photo: PhotoEntity,
+    modifier: Modifier = Modifier,
+) {
+    val location = photo.locationName?.takeIf { it.isNotBlank() }
+    Surface(
+        modifier = modifier.fillMaxWidth(0.88f),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.Black.copy(alpha = 0.42f),
+        contentColor = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 11.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                photo.folderName.ifBlank { "Camera" },
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White.copy(alpha = 0.90f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                listOfNotNull(
+                    formatDate(photo.dateTaken),
+                    photoMediaBadges(photo).take(2).joinToString(" · ").ifBlank { null },
+                    location,
+                    formatSize(photo.size),
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.72f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+fun InlineMotionPhotoPlayer(
+    uri: Uri,
+    modifier: Modifier = Modifier,
+    playOnce: Boolean = true,
+    onEnded: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    val player = remember(uri, playOnce) {
+        ExoPlayer.Builder(context).build().apply {
+            repeatMode = if (playOnce) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ONE
+            playWhenReady = true
+            volume = 0f
+            setMediaItem(MediaItem.fromUri(uri))
+            prepare()
+        }
+    }
+    DisposableEffect(player, onEnded) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playOnce && playbackState == Player.STATE_ENDED) onEnded()
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+
+    AndroidView(
+        modifier = modifier.background(Color.Black),
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                useController = false
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                this.player = player
+            }
+        },
+        update = { view ->
+            view.player = player
+            view.useController = false
+            view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+        },
+    )
+}
+
+@Composable
+private fun InlineMotionStatusPill(
+    isVisible: Boolean,
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    isUnavailable: Boolean,
+    manualHint: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (!isVisible) return
+    val text = when {
+        isPlaying -> "实况播放 · 一次"
+        isLoading -> "准备实况"
+        isUnavailable -> "实况 · 系统查看"
+        manualHint -> "长按实况"
+        else -> "实况"
+    }
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = Color.Black.copy(alpha = 0.34f),
+        contentColor = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(12.dp),
+                    strokeWidth = 1.8.dp,
+                    color = Color.White,
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .background(if (isPlaying) Color(0xFF76E0A2) else Color.White.copy(alpha = 0.70f), CircleShape),
+                )
+            }
+            Text(text, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }
@@ -795,6 +1036,8 @@ private fun ActionBubble(icon: ImageVector, label: String, onClick: () -> Unit, 
 @Composable
 fun PhotoGrid(photos: List<PhotoEntity>, modifier: Modifier = Modifier, onPhotoClick: ((PhotoEntity) -> Unit)? = null) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var playingMotionPhotoId by remember { mutableStateOf<Long?>(null) }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(112.dp),
         modifier = modifier,
@@ -803,26 +1046,99 @@ fun PhotoGrid(photos: List<PhotoEntity>, modifier: Modifier = Modifier, onPhotoC
     ) {
         items(photos, key = { it.id }) { photo ->
             val shape = RoundedCornerShape(22.dp)
+            val canPlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
+            var motionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
+            var motionLoading by remember(photo.id) { mutableStateOf(false) }
             Surface(
                 modifier = Modifier.aspectRatio(photoDisplayAspectRatio(photo).coerceIn(0.72f, 1.38f)),
                 shape = shape,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.42f),
                 shadowElevation = 3.dp,
             ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(Uri.parse(photo.uri))
-                        .memoryCacheKey(photo.uri)
-                        .diskCacheKey(photo.uri)
-                        .placeholderMemoryCacheKey(photo.uri)
-                        .crossfade(false)
-                        .build(),
-                    contentDescription = photo.displayName,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(shape)
-                        .then(if (onPhotoClick != null) Modifier.clickable { onPhotoClick?.invoke(photo) } else Modifier),
-                    contentScale = ContentScale.Fit,
+                Box(Modifier.fillMaxSize()) {
+                    val preview = motionSource.takeIf { playingMotionPhotoId == photo.id }
+                    if (preview != null) {
+                        InlineMotionPhotoPlayer(
+                            uri = preview.uri,
+                            modifier = Modifier.fillMaxSize().clip(shape),
+                            playOnce = true,
+                            onEnded = { motionSource = null; if (playingMotionPhotoId == photo.id) playingMotionPhotoId = null },
+                        )
+                    } else {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(Uri.parse(photo.uri))
+                                .memoryCacheKey(photo.uri)
+                                .diskCacheKey(photo.uri)
+                                .placeholderMemoryCacheKey(photo.uri)
+                                .crossfade(false)
+                                .build(),
+                            contentDescription = photo.displayName,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(shape)
+                                .then(
+                                    Modifier.pointerInput(photo.id, canPlayMotion) {
+                                        detectTapGestures(
+                                            onLongPress = {
+                                                if (canPlayMotion && !motionLoading) {
+                                                    motionLoading = true
+                                                    scope.launch {
+                                                        when (val source = resolveMotionPhotoPlaybackSource(context, photo)) {
+                                                            is MotionPhotoPlaybackSource.Ready -> {
+                                                                playingMotionPhotoId = photo.id
+                                                                motionSource = source
+                                                            }
+                                                            is MotionPhotoPlaybackSource.Unavailable -> Unit
+                                                        }
+                                                        motionLoading = false
+                                                    }
+                                                }
+                                            },
+                                            onTap = { onPhotoClick?.invoke(photo) },
+                                        )
+                                    }
+                                ),
+                            contentScale = ContentScale.Fit,
+                        )
+                    }
+                    PhotoDynamicBadgeRow(
+                        photo = photo,
+                        modifier = Modifier.align(Alignment.TopStart).padding(7.dp),
+                        compact = true,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhotoDynamicBadgeRow(
+    photo: PhotoEntity,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
+    val labels = photoMediaBadges(photo)
+    if (labels.isEmpty()) return
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        labels.take(2).forEach { label ->
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Color.Black.copy(alpha = 0.58f),
+                contentColor = Color.White,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+            ) {
+                Text(
+                    text = label,
+                    modifier = Modifier.padding(horizontal = if (compact) 7.dp else 10.dp, vertical = if (compact) 3.dp else 5.dp),
+                    style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
                 )
             }
         }

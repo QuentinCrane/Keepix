@@ -1,12 +1,14 @@
 package com.futureape.kanleme.ui.screens
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,6 +30,7 @@ import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material3.Icon
@@ -43,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
@@ -52,6 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.GlassSurface
+import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 
@@ -75,146 +81,190 @@ fun CleanHomeScreen(
     val selectedProcessed = if (selectedIsPhoto) dashboard.processedPhotoCount else dashboard.processedVideoCount
     val selectedProgress = if (selectedCount == 0) 0f else selectedProcessed.toFloat() / selectedCount.toFloat()
     val selectedTitle = if (selectedIsPhoto) "照片整理" else "视频整理"
-    val selectedSubtitle = if (selectedIsPhoto) "卡片滑动 · 点击放大 · 可归档" else "上下刷视频 · 横滑进度 · 长按倍速"
+    val selectedSubtitle = if (selectedIsPhoto) "卡片滑动 · 点击放大 · 可归档" else "上下刷视频 · 横滑进度 · 侧边暂停"
     val selectedIcon = if (selectedIsPhoto) Icons.Rounded.PhotoLibrary else Icons.Rounded.PlayCircle
     val startSelected = if (selectedIsPhoto) onPhoto else onVideo
 
     AdaptiveWidthInfo { _, isExpanded ->
         AdaptiveCenter(maxWidth = if (isExpanded) 1180.dp else 720.dp) {
             LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 18.dp,
-            end = 18.dp,
-            top = 54.dp,
-            bottom = contentPadding.calculateBottomPadding(),
-        ),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("整理", style = MaterialTheme.typography.displaySmall, modifier = Modifier.weight(1f))
-                Surface(
-                    modifier = Modifier.clickable(onClick = onToday),
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)),
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = 15.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(Icons.Rounded.CalendarToday, contentDescription = null, modifier = Modifier.size(19.dp))
-                        Text("当年今日", style = MaterialTheme.typography.titleMedium)
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 18.dp,
+                    end = 18.dp,
+                    top = 54.dp,
+                    bottom = contentPadding.calculateBottomPadding(),
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                item {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("整理", style = MaterialTheme.typography.displaySmall, modifier = Modifier.weight(1f))
+                        Surface(
+                            modifier = Modifier.clickable(onClick = onToday),
+                            shape = RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)),
+                        ) {
+                            Row(
+                                Modifier.padding(horizontal = 15.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(Icons.Rounded.CalendarToday, contentDescription = null, modifier = Modifier.size(19.dp))
+                                Text("当年今日", style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    HomeMediaSegment(
+                        selectedIsPhoto = selectedIsPhoto,
+                        photoCount = dashboard.photoCount,
+                        videoCount = dashboard.videoCount,
+                        onPhoto = {
+                            haptics.tick()
+                            viewModel.setHomeMediaTab("photo")
+                        },
+                        onVideo = {
+                            haptics.tick()
+                            viewModel.setHomeMediaTab("video")
+                        },
+                    )
+                }
+
+                if (isExpanded) {
+                    item {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            MainOrganizeCard(
+                                title = selectedTitle,
+                                subtitle = selectedSubtitle,
+                                count = selectedCount,
+                                processed = selectedProcessed,
+                                progress = selectedProgress,
+                                icon = selectedIcon,
+                                actionText = if (selectedIsPhoto) "开始整理照片" else "开始整理视频",
+                                releasableBytes = dashboard.pendingDeleteBytes,
+                                modifier = Modifier.weight(1.55f),
+                                onNumberPulse = { haptics.threshold() },
+                                onClick = startSelected,
+                            )
+                            TodayStatsCard(
+                                todayPhotos = dashboard.todayPhotoCount,
+                                todayVideos = dashboard.todayVideoCount,
+                                todayActions = dashboard.todayActionCount,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                } else {
+                    item {
+                        TodayStatsCard(
+                            todayPhotos = dashboard.todayPhotoCount,
+                            todayVideos = dashboard.todayVideoCount,
+                            todayActions = dashboard.todayActionCount,
+                        )
+                    }
+
+                    item {
+                        MainOrganizeCard(
+                            title = selectedTitle,
+                            subtitle = selectedSubtitle,
+                            count = selectedCount,
+                            processed = selectedProcessed,
+                            progress = selectedProgress,
+                            icon = selectedIcon,
+                            actionText = if (selectedIsPhoto) "开始整理照片" else "开始整理视频",
+                            releasableBytes = dashboard.pendingDeleteBytes,
+                            modifier = Modifier.fillMaxWidth(),
+                            onNumberPulse = { haptics.threshold() },
+                            onClick = startSelected,
+                        )
+                    }
+                }
+
+                item {
+                    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.64f) {
+                        Row(
+                            Modifier.padding(14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            HomePill("随机排序", modifier = Modifier.weight(1f))
+                            HomePill("全部时间", modifier = Modifier.weight(1f))
+                            HomePill(if (dashboard.pendingDeleteBytes > 0L) "可释放 " + formatSize(dashboard.pendingDeleteBytes) else "排除文件夹", modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+
+                item {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SmallFeatureCard("相似照片", "智能检测", "检测连拍、截图和相似照片", Icons.Rounded.AutoAwesome, modifier = Modifier.weight(1f), onClick = onSimilar)
+                        SmallFeatureCard("最近新增照片", "最近 7 天", "快速查看新进入相册的内容", Icons.Rounded.AccessTime, modifier = Modifier.weight(1f), onClick = onTimeline)
+                    }
+                }
+
+                item {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlineHomeButton("回收站", dashboard.trashCount, Icons.Rounded.Delete, modifier = Modifier.weight(1f), onClick = onTrash)
+                        OutlineHomeButton("我的收藏", dashboard.favoriteCount, Icons.Rounded.FavoriteBorder, modifier = Modifier.weight(1f), onClick = onFavorites)
+                    }
+                }
+
+                item {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        QuickEntry("全相册时间轴", "按日期浏览、打开大图、移动文件夹", Icons.Rounded.Image, modifier = Modifier.weight(1f), onClick = onTimeline)
+                        QuickEntry("当年今日", "回看往年今天的照片", Icons.Rounded.CalendarToday, modifier = Modifier.weight(1f), onClick = onToday)
                     }
                 }
             }
         }
+    }
+}
 
-        item {
-            GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.68f) {
-                Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SegmentTab(
-                        label = "照片",
-                        value = dashboard.photoCount,
-                        selected = selectedIsPhoto,
-                        modifier = Modifier.weight(1f),
-                        onClick = { viewModel.setHomeMediaTab("photo") },
-                    )
-                    SegmentTab(
-                        label = "视频",
-                        value = dashboard.videoCount,
-                        selected = !selectedIsPhoto,
-                        modifier = Modifier.weight(1f),
-                        onClick = { viewModel.setHomeMediaTab("video") },
-                    )
-                }
-            }
-        }
-
-        if (isExpanded) {
-            item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MainOrganizeCard(
-                        title = selectedTitle,
-                        subtitle = selectedSubtitle,
-                        count = selectedCount,
-                        processed = selectedProcessed,
-                        progress = selectedProgress,
-                        icon = selectedIcon,
-                        actionText = if (selectedIsPhoto) "开始整理照片" else "开始整理视频",
-                        modifier = Modifier.weight(1.55f),
-                        onNumberPulse = { haptics.threshold() },
-                        onClick = startSelected,
-                    )
-                    TodayStatsCard(
-                        todayPhotos = dashboard.todayPhotoCount,
-                        todayVideos = dashboard.todayVideoCount,
-                        todayActions = dashboard.todayActionCount,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        } else {
-            item {
-                TodayStatsCard(
-                    todayPhotos = dashboard.todayPhotoCount,
-                    todayVideos = dashboard.todayVideoCount,
-                    todayActions = dashboard.todayActionCount,
+@Composable
+private fun HomeMediaSegment(
+    selectedIsPhoto: Boolean,
+    photoCount: Int,
+    videoCount: Int,
+    onPhoto: () -> Unit,
+    onVideo: () -> Unit,
+) {
+    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.68f) {
+        BoxWithConstraints(Modifier.fillMaxWidth().height(90.dp).padding(8.dp)) {
+            val tabWidth = (maxWidth - 16.dp) / 2
+            val indicatorOffset by animateDpAsState(
+                targetValue = if (selectedIsPhoto) 0.dp else tabWidth + 8.dp,
+                animationSpec = tween(durationMillis = 260),
+                label = "home_segment_indicator",
+            )
+            Surface(
+                modifier = Modifier
+                    .width(tabWidth)
+                    .height(74.dp)
+                    .offset(x = indicatorOffset),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
+            ) {}
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SegmentTab(
+                    label = "照片",
+                    value = photoCount,
+                    selected = selectedIsPhoto,
+                    icon = Icons.Rounded.PhotoLibrary,
+                    modifier = Modifier.weight(1f),
+                    onClick = onPhoto,
                 )
-            }
-
-            item {
-                MainOrganizeCard(
-                    title = selectedTitle,
-                    subtitle = selectedSubtitle,
-                    count = selectedCount,
-                    processed = selectedProcessed,
-                    progress = selectedProgress,
-                    icon = selectedIcon,
-                    actionText = if (selectedIsPhoto) "开始整理照片" else "开始整理视频",
-                    modifier = Modifier.fillMaxWidth(),
-                    onNumberPulse = { haptics.threshold() },
-                    onClick = startSelected,
+                SegmentTab(
+                    label = "视频",
+                    value = videoCount,
+                    selected = !selectedIsPhoto,
+                    icon = Icons.Rounded.Movie,
+                    modifier = Modifier.weight(1f),
+                    onClick = onVideo,
                 )
-            }
-        }
-
-        item {
-            GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.64f) {
-                Row(
-                    Modifier.padding(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    HomePill("随机排序", modifier = Modifier.weight(1f))
-                    HomePill("全部时间", modifier = Modifier.weight(1f))
-                    HomePill("排除文件夹", modifier = Modifier.weight(1f))
-                }
-            }
-        }
-
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SmallFeatureCard("相似照片", "智能检测", "检测连拍、截图和相似照片", Icons.Rounded.AutoAwesome, modifier = Modifier.weight(1f), onClick = onSimilar)
-                SmallFeatureCard("最近新增照片", "最近 7 天", "快速查看新进入相册的内容", Icons.Rounded.AccessTime, modifier = Modifier.weight(1f), onClick = onTimeline)
-            }
-        }
-
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlineHomeButton("回收站", dashboard.trashCount, Icons.Rounded.Delete, modifier = Modifier.weight(1f), onClick = onTrash)
-                OutlineHomeButton("我的收藏", dashboard.favoriteCount, Icons.Rounded.FavoriteBorder, modifier = Modifier.weight(1f), onClick = onFavorites)
-            }
-        }
-
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                QuickEntry("全相册时间轴", "按日期浏览、打开大图、移动文件夹", Icons.Rounded.Image, modifier = Modifier.weight(1f), onClick = onTimeline)
-                QuickEntry("当年今日", "回看往年今天的照片", Icons.Rounded.CalendarToday, modifier = Modifier.weight(1f), onClick = onToday)
-            }
-        }
             }
         }
     }
@@ -271,6 +321,7 @@ private fun MainOrganizeCard(
     progress: Float,
     icon: ImageVector,
     actionText: String,
+    releasableBytes: Long,
     modifier: Modifier,
     onNumberPulse: (() -> Unit)? = null,
     onClick: () -> Unit,
@@ -295,7 +346,7 @@ private fun MainOrganizeCard(
     }
     Box(
         modifier = modifier
-            .height(268.dp)
+            .height(282.dp)
             .clip(RoundedCornerShape(34.dp))
             .background(cardBrush)
             .clickable(onClick = onClick)
@@ -333,12 +384,28 @@ private fun MainOrganizeCard(
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.78f),
                     trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                 )
-                Surface(
-                    modifier = Modifier.fillMaxWidth().height(68.dp),
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                ) {
-                    Box(contentAlignment = Alignment.Center) { Text(actionText, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Surface(
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = if (releasableBytes > 0L) 0.13f else 0.08f),
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                if (releasableBytes > 0L) "整理后可释放 " + formatSize(releasableBytes) else "暂无待释放空间",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier.weight(1.2f).height(58.dp),
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) { Text(actionText, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold) }
+                    }
                 }
             }
         }
@@ -346,23 +413,28 @@ private fun MainOrganizeCard(
 }
 
 @Composable
-private fun SegmentTab(label: String, value: Int, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Surface(
-        modifier = modifier.height(74.dp).clickable(onClick = onClick),
-        shape = RoundedCornerShape(24.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
-        border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)) else null,
+private fun SegmentTab(label: String, value: Int, selected: Boolean, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    val contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = modifier
+            .height(74.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, style = MaterialTheme.typography.titleLarge, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-            RollingNumberText(
-                value = value,
-                compact = true,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(20.dp))
+            Text(label, style = MaterialTheme.typography.titleLarge, color = contentColor)
         }
+        RollingNumberText(
+            value = value,
+            compact = true,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = contentColor,
+        )
     }
 }
 
@@ -455,7 +527,7 @@ private fun RollingNumberText(
     val shown = animated.value.toInt().coerceIn(0, target)
     Text(
         text = if (compact) shown.toDisplayCount() else shown.toString(),
-        modifier = modifier,
+        modifier = modifier.graphicsLayer { alpha = if (target == 0) 0.72f else 1f },
         style = style,
         color = color,
         fontWeight = fontWeight,

@@ -55,6 +55,8 @@ class AppRepositoryImpl @Inject constructor(
         trashDao.observeCount().map { it as Any? },
         photoDao.observeDeleteCount().map { it as Any? },
         videoDao.observeDeleteCount().map { it as Any? },
+        photoDao.observeDeleteSize().map { it as Any? },
+        videoDao.observeDeleteSize().map { it as Any? },
         statsDao.observeTodayPhotoCount(todayLocalDate()).map { it as Any? },
         statsDao.observeTodayVideoCount(todayLocalDate()).map { it as Any? },
         statsDao.observeTodayActionCount(todayLocalDate()).map { it as Any? },
@@ -64,6 +66,8 @@ class AppRepositoryImpl @Inject constructor(
         val videoFavorites = values[5] as Int
         val photoPendingDelete = values[7] as Int
         val videoPendingDelete = values[8] as Int
+        val photoPendingDeleteBytes = values[9] as Long
+        val videoPendingDeleteBytes = values[10] as Long
         DashboardStats(
             photoCount = values[0] as Int,
             videoCount = values[1] as Int,
@@ -72,10 +76,11 @@ class AppRepositoryImpl @Inject constructor(
             favoriteCount = photoFavorites + videoFavorites,
             trashCount = values[6] as Int,
             pendingDeleteCount = photoPendingDelete + videoPendingDelete,
-            todayPhotoCount = values[9] as Int,
-            todayVideoCount = values[10] as Int,
-            todayActionCount = values[11] as Int,
-            userStats = values[12] as? UserStatsEntity,
+            pendingDeleteBytes = photoPendingDeleteBytes + videoPendingDeleteBytes,
+            todayPhotoCount = values[11] as Int,
+            todayVideoCount = values[12] as Int,
+            todayActionCount = values[13] as Int,
+            userStats = values[14] as? UserStatsEntity,
         )
     }
 
@@ -85,6 +90,7 @@ class AppRepositoryImpl @Inject constructor(
         photoDao.observeTypeCount("screenshot"),
         photoDao.observeTypeCount("selfie"),
         photoDao.observeTypeCount("motion"),
+        photoDao.observeTypeCount("gif"),
         photoDao.observeTypeCount("long"),
     ) { values ->
         PhotoTypeStats(
@@ -93,7 +99,8 @@ class AppRepositoryImpl @Inject constructor(
             screenshot = values[2] as Int,
             selfie = values[3] as Int,
             motion = values[4] as Int,
-            longImage = values[5] as Int,
+            gif = values[5] as Int,
+            longImage = values[6] as Int,
         )
     }
 
@@ -114,8 +121,17 @@ class AppRepositoryImpl @Inject constructor(
     override fun observeSimilarGroups(): Flow<List<SimilarGroupEntity>> = similarDao.observeGroups()
 
     override suspend fun refreshMediaLibrary(): Pair<Int, Int> = withContext(Dispatchers.IO) {
-        val scannedPhotos = scanner.scanImages().distinctBy { it.mediaStoreId }
-        val scannedVideos = scanner.scanVideos().distinctBy { it.mediaStoreId }
+        // Scan images and videos independently. A slow or failing image provider row should not
+        // prevent the video library from being discovered, and vice versa. This also protects the
+        // first permission sync from showing an empty library just because one MediaStore query failed.
+        val photoScan = runCatching { scanner.scanImages().distinctBy { it.mediaStoreId } }
+        val videoScan = runCatching { scanner.scanVideos().distinctBy { it.mediaStoreId } }
+        if (photoScan.isFailure && videoScan.isFailure) {
+            throw photoScan.exceptionOrNull() ?: videoScan.exceptionOrNull() ?: IllegalStateException("媒体库同步失败")
+        }
+        val scannedPhotosRaw = photoScan.getOrElse { emptyList() }
+        val scannedVideosRaw = videoScan.getOrElse { emptyList() }
+        val (scannedPhotos, scannedVideos) = linkSeparateDynamicPhotoPairs(scannedPhotosRaw, scannedVideosRaw)
 
         val existingPhotos = if (scannedPhotos.isEmpty()) {
             emptyMap()
@@ -166,6 +182,54 @@ class AppRepositoryImpl @Inject constructor(
         photoDao.upsertAll(mergedPhotos)
         videoDao.upsertAll(mergedVideos)
         mergedPhotos.size to mergedVideos.size
+    }
+
+
+    private fun linkSeparateDynamicPhotoPairs(
+        photos: List<PhotoEntity>,
+        videos: List<VideoEntity>,
+    ): Pair<List<PhotoEntity>, List<VideoEntity>> {
+        if (photos.isEmpty() || videos.isEmpty()) return photos to videos
+        val shortVideosByKey = videos
+            .filter { video -> video.duration in 500L..12_000L && video.size in 1L..80L * 1024L * 1024L }
+            .groupBy { video -> dynamicPairKey(video.folderPath, video.displayName) }
+
+        val pairedVideoIds = mutableSetOf<Long>()
+        val patchedPhotos = photos.map { photo ->
+            val key = dynamicPairKey(photo.folderPath, photo.displayName)
+            val companion = shortVideosByKey[key]
+                ?.firstOrNull { video -> video.folderPath == photo.folderPath || video.folderName == photo.folderName }
+            if (companion != null) {
+                pairedVideoIds += companion.mediaStoreId
+                photo.copy(
+                    isMotionPhoto = true,
+                    motionVideoUri = companion.uri,
+                    isSeparateVideo = true,
+                    motionPhotoNeedsDetection = true,
+                )
+            } else {
+                photo
+            }
+        }
+        val patchedVideos = videos.map { video ->
+            if (video.mediaStoreId in pairedVideoIds) video.copy(isMotionPhotoVideo = true) else video
+        }
+        return patchedPhotos to patchedVideos
+    }
+
+    private fun dynamicPairKey(folderPath: String?, displayName: String): String {
+        val folder = folderPath.orEmpty().trim('/').lowercase(Locale.ROOT)
+        val rawStem = displayName.substringBeforeLast('.', displayName).lowercase(Locale.ROOT)
+        val stem = rawStem
+            .removeSuffix("_mp")
+            .removeSuffix("_motion")
+            .removeSuffix("_live")
+            .removeSuffix("_dynamic")
+            .removeSuffix("_video")
+            .removeSuffix("-motion")
+            .removeSuffix("-live")
+            .removeSuffix("-video")
+        return folder + "|" + stem
     }
 
     override suspend fun loadPhotoDeck(scope: CleaningScope): List<PhotoEntity> = withContext(Dispatchers.IO) {
@@ -307,7 +371,7 @@ class AppRepositoryImpl @Inject constructor(
 
         val activeIds = photos.map { it.id }.toHashSet()
         val cachedFingerprints = similarDao.allFingerprints()
-            .filter { it.photoId in activeIds }
+            .filter { it.photoId in activeIds && it.colorHistogram.contains("rgb=") }
             .associateBy { it.photoId }
         val missingPhotos = photos.filterNot { it.id in cachedFingerprints }
         val now = System.currentTimeMillis()
@@ -332,7 +396,7 @@ class AppRepositoryImpl @Inject constructor(
             pendingFingerprints.clear()
         }
 
-        val fingerprints = similarDao.allFingerprints().filter { it.photoId in activeIds }
+        val fingerprints = similarDao.allFingerprints().filter { it.photoId in activeIds && it.colorHistogram.contains("rgb=") }
         onProgress(total, total, "正在聚类相似照片")
         yield()
         val result = similarPhotoAnalyzer.buildGroups(photos = photos, fingerprints = fingerprints, now = now)
@@ -367,6 +431,10 @@ class AppRepositoryImpl @Inject constructor(
 
     override suspend fun permanentlyDeleteAllTrash() = withContext(Dispatchers.IO) {
         observeTrash().first().forEach { permanentlyDeleteTrashItem(it.id) }
+    }
+
+    override suspend fun restoreAllTrash() = withContext(Dispatchers.IO) {
+        observeTrash().first().forEach { restoreTrashItem(it.id) }
     }
 
     override suspend fun undoLastAction(): Boolean = withContext(Dispatchers.IO) {
@@ -417,7 +485,18 @@ class AppRepositoryImpl @Inject constructor(
                 "undo" -> stats.totalUndoCount
                 else -> dashboard.processedCount
             }
-            AchievementUi(spec.id, spec.title, spec.description, spec.difficulty, spec.target, current)
+            AchievementUi(
+                id = spec.id,
+                title = spec.title,
+                description = spec.description,
+                difficulty = spec.difficulty,
+                target = spec.target,
+                current = current,
+                category = spec.category,
+                rarity = spec.rarity,
+                xp = spec.xp,
+                iconKey = spec.iconKey,
+            )
         }
     }
 
@@ -561,38 +640,70 @@ class AppRepositoryImpl @Inject constructor(
         autoDeleteAt = System.currentTimeMillis() + 30L * 24L * 60L * 60L * 1000L,
     )
 
-    private data class AchievementSpec(val id: String, val title: String, val description: String, val difficulty: String, val target: Int, val metric: String)
+    private data class AchievementSpec(
+        val id: String,
+        val title: String,
+        val description: String,
+        val difficulty: String,
+        val target: Int,
+        val metric: String,
+        val category: String,
+        val rarity: String,
+        val xp: Int,
+        val iconKey: String,
+    )
+
+    private data class AchievementMetricSpec(
+        val metric: String,
+        val label: String,
+        val category: String,
+        val iconKey: String,
+        val descriptionBuilder: (Int) -> String,
+    )
+
+    private data class AchievementTierSpec(
+        val key: String,
+        val label: String,
+        val target: Int,
+        val rarity: String,
+        val difficulty: String,
+        val xp: Int,
+    )
 
     private fun achievementSpecs(): List<AchievementSpec> {
-        val bases = listOf(
-            "clear" to "整理",
-            "favorite" to "珍藏",
-            "delete" to "断舍离",
-            "storage" to "释放空间",
-            "streak" to "连续整理",
-            "undo" to "谨慎撤销",
+        val metrics = listOf(
+            AchievementMetricSpec("clear", "整理家", "整理", "clean", { "累计整理 $it 个媒体文件" }),
+            AchievementMetricSpec("favorite", "收藏家", "珍藏", "favorite", { "累计收藏 $it 张值得留下的照片或视频" }),
+            AchievementMetricSpec("delete", "空间清道夫", "断舍离", "delete", { "累计放入回收站 $it 个不再需要的媒体" }),
+            AchievementMetricSpec("storage", "腾挪大师", "空间", "storage", { "累计释放或标记释放 $it MB 空间" }),
+            AchievementMetricSpec("streak", "连续打卡", "习惯", "streak", { "连续 $it 天打开 Keepix 整理媒体" }),
+            AchievementMetricSpec("undo", "谨慎大师", "修正", "undo", { "累计撤销 $it 次操作，保住重要回忆" }),
         )
         val tiers = listOf(
-            Triple("bronze", "青铜", 5),
-            Triple("silver", "白银", 30),
-            Triple("gold", "黄金", 100),
-            Triple("diamond", "钻石", 500),
-            Triple("master", "大师", 1500),
-            Triple("legend", "传说", 5000),
-            Triple("myth", "神话", 12000),
-            Triple("cosmic", "星河", 30000),
-            Triple("eternal", "永恒", 60000),
-            Triple("apex", "极境", 100000),
+            AchievementTierSpec("starter", "初见", 5, "普通", "普通", 10),
+            AchievementTierSpec("bronze", "青铜", 30, "普通", "普通", 20),
+            AchievementTierSpec("silver", "白银", 100, "稀有", "稀有", 35),
+            AchievementTierSpec("gold", "黄金", 500, "稀有", "稀有", 50),
+            AchievementTierSpec("platinum", "白金", 1500, "史诗", "史诗", 75),
+            AchievementTierSpec("diamond", "钻石", 5000, "史诗", "史诗", 100),
+            AchievementTierSpec("master", "大师", 12000, "传奇", "传奇", 150),
+            AchievementTierSpec("apex", "极境", 30000, "传奇", "传奇", 220),
+            AchievementTierSpec("eternal", "永恒", 60000, "神话", "传奇", 320),
+            AchievementTierSpec("immortal", "不朽", 100000, "神话", "传奇", 500),
         )
-        return bases.flatMap { (metric, label) ->
-            tiers.mapIndexed { index, tier ->
+        return metrics.flatMap { metric ->
+            tiers.map { tier ->
                 AchievementSpec(
-                    id = "$metric-${tier.first}",
-                    title = "$label · ${tier.second}",
-                    description = "累计达成 ${tier.third} 次${label}相关行为",
-                    difficulty = when (index) { 0, 1 -> "普通"; 2, 3, 4 -> "稀有"; 5, 6 -> "史诗"; else -> "传奇" },
-                    target = tier.third,
-                    metric = metric,
+                    id = "${metric.metric}-${tier.key}",
+                    title = "${metric.label} · ${tier.label}",
+                    description = metric.descriptionBuilder(tier.target),
+                    difficulty = tier.difficulty,
+                    target = tier.target,
+                    metric = metric.metric,
+                    category = metric.category,
+                    rarity = tier.rarity,
+                    xp = tier.xp,
+                    iconKey = metric.iconKey,
                 )
             }
         }

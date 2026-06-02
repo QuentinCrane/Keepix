@@ -181,7 +181,7 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                         isCurrent = page == pagerState.currentPage,
                         pageIndex = (dashboard.processedVideoCount + page + 1).coerceAtLeast(1),
                         total = dashboard.videoCount.coerceAtLeast(videos.size),
-                        deletedCount = dashboard.trashCount,
+                        deletedCount = dashboard.pendingDeleteCount,
                         onKeep = { performVideoAction(video, SwipeAction.Keep) },
                         onFavorite = { performVideoAction(video, SwipeAction.Favorite) },
                         onDelete = { performVideoAction(video, SwipeAction.Delete) },
@@ -194,7 +194,8 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
             VideoOrganizerTopRow(
                 current = (dashboard.processedVideoCount + pagerState.currentPage + 1).coerceAtMost(dashboard.videoCount.coerceAtLeast(videos.size)),
                 total = dashboard.videoCount.coerceAtLeast(videos.size),
-                deletedCount = dashboard.trashCount,
+                deletedCount = dashboard.pendingDeleteCount,
+                deletedSizeBytes = dashboard.pendingDeleteBytes,
                 showShuffle = settings.videoShowShuffleButton,
                 onShuffle = { haptics.threshold(); viewModel.reshuffleVideoCleaningSession() },
                 modifier = Modifier.align(Alignment.TopCenter),
@@ -285,6 +286,7 @@ private fun VideoOrganizerTopRow(
     current: Int,
     total: Int,
     deletedCount: Int,
+    deletedSizeBytes: Long,
     showShuffle: Boolean,
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
@@ -299,7 +301,7 @@ private fun VideoOrganizerTopRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         VideoTopPill(label = current.toString() + "/" + total.toString(), emphasized = true)
-        VideoTopPill(label = "待删 " + deletedCount.toString())
+        VideoTopPill(label = if (deletedSizeBytes > 0L) "可释放 " + formatSize(deletedSizeBytes) else "待删 " + deletedCount.toString())
         if (showShuffle) {
             ShuffleSessionButton(
                 label = "重新随机",

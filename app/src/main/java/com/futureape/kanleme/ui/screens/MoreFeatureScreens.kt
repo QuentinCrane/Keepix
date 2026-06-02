@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +47,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -142,13 +148,13 @@ fun TodayInHistoryScreen(
                         videoCount = videos.size,
                     )
                 }
-                grouped.forEach { (year, items) ->
+                grouped.forEach { (year, yearItems) ->
                     item(key = "year-$year") {
                         TodayYearHeader(
                             year = year,
-                            count = items.size,
-                            photoCount = items.count { !it.isVideo },
-                            videoCount = items.count { it.isVideo },
+                            count = yearItems.size,
+                            photoCount = yearItems.count { !it.isVideo },
+                            videoCount = yearItems.count { it.isVideo },
                             expanded = year in expandedYears,
                             onToggle = {
                                 expandedYears = if (year in expandedYears) expandedYears - year else expandedYears + year
@@ -156,10 +162,10 @@ fun TodayInHistoryScreen(
                         )
                     }
                     if (year in expandedYears) {
-                        items(items, key = { it.stableId }) { item ->
-                            TodayMemoryRow(
-                                item = item,
-                                onClick = {
+                        items(yearItems.chunked(3), key = { row -> row.joinToString("-") { it.stableId } }) { row ->
+                            TodayMemoryGridRow(
+                                row = row,
+                                onClick = { item ->
                                     when (item) {
                                         is TodayMemoryItem.PhotoItem -> onOpenPhoto(item.photo)
                                         is TodayMemoryItem.VideoItem -> openVideoInSystemGallery(context, item.video)
@@ -206,6 +212,78 @@ private fun TodayYearHeader(
                 Text("$count 个媒体 · $photoCount 张照片 · $videoCount 个视频", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(if (expanded) "收起" else "展开", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+
+@Composable
+private fun TodayMemoryGridRow(
+    row: List<TodayMemoryItem>,
+    onClick: (TodayMemoryItem) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        row.forEach { item ->
+            TodayMemoryTile(
+                item = item,
+                onClick = { onClick(item) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        repeat(3 - row.size) { Spacer(Modifier.weight(1f).height(0.dp)) }
+    }
+}
+
+@Composable
+private fun TodayMemoryTile(
+    item: TodayMemoryItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .aspectRatio(0.76f)
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick),
+    ) {
+        AsyncImage(
+            model = Uri.parse(item.uri),
+            contentDescription = item.displayName,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.22f), Color.Transparent, Color.Black.copy(alpha = 0.42f)))))
+        Surface(
+            modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
+            shape = RoundedCornerShape(999.dp),
+            color = Color.Black.copy(alpha = 0.46f),
+            contentColor = Color.White,
+        ) {
+            Text(formatTodayMemoryDateShort(item.dateTaken), modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall)
+        }
+        Icon(
+            if (item.isVideo) Icons.Rounded.Movie else Icons.Rounded.Photo,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(6.dp)
+                .background(Color.Black.copy(alpha = 0.42f), CircleShape)
+                .padding(4.dp)
+                .size(16.dp),
+        )
+        if (item.status != ProcessingStatus.UNPROCESSED) {
+            Surface(
+                modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
+                shape = RoundedCornerShape(999.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.88f),
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ) {
+                Text(todayStatusText(item.status), modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall)
+            }
         }
     }
 }
@@ -258,6 +336,13 @@ private fun TodayStatusPill(status: String, isVideo: Boolean) {
 
 private fun yearOf(timeMillis: Long): Int = Calendar.getInstance().apply { timeInMillis = timeMillis }.get(Calendar.YEAR)
 private fun formatTodayMemoryDate(timeMillis: Long): String = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timeMillis))
+private fun formatTodayMemoryDateShort(timeMillis: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timeMillis))
+private fun todayStatusText(status: String): String = when (status) {
+    ProcessingStatus.KEPT -> "已保留"
+    ProcessingStatus.FAVORITED -> "已收藏"
+    ProcessingStatus.UNPROCESSED -> "未整理"
+    else -> status
+}
 
 @Composable
 fun AnnualReportScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
@@ -274,7 +359,7 @@ fun AnnualReportScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                     GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.74f) {
                         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             Icon(Icons.Rounded.AutoGraph, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(42.dp))
-                            Text("${r.year} 看了么年度整理报告", style = MaterialTheme.typography.headlineMedium)
+                            Text("${r.year} 回留年度整理报告", style = MaterialTheme.typography.headlineMedium)
                             Text(r.styleTitle, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
                             Text(r.styleDescription, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -313,11 +398,44 @@ private fun ReportLine(icon: androidx.compose.ui.graphics.vector.ImageVector, la
 @Composable
 fun AchievementsScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
     val achievements by viewModel.achievements.collectAsStateWithLifecycle()
+    var selectedFilter by remember { mutableStateOf("全部") }
     LaunchedEffect(Unit) { viewModel.loadAchievements() }
+    val unlocked = achievements.count { it.unlocked }
+    val totalXp = achievements.filter { it.unlocked }.sumOf { it.xp }
+    val completion = if (achievements.isEmpty()) 0f else unlocked.toFloat() / achievements.size.toFloat()
+    val filters = remember(achievements) { listOf("全部", "已解锁", "未完成") + achievements.map { it.category }.distinct() }
+    val visibleAchievements = remember(achievements, selectedFilter) {
+        when (selectedFilter) {
+            "已解锁" -> achievements.filter { it.unlocked }
+            "未完成" -> achievements.filterNot { it.unlocked }
+            "全部" -> achievements
+            else -> achievements.filter { it.category == selectedFilter }
+        }.sortedWith(compareByDescending<AchievementUi> { it.unlocked }.thenByDescending { it.progress }.thenBy { it.target })
+    }
+
     Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-        ScreenHeader("成就系统", "60+ 个成就，四级难度，本地计算", onBack)
+        ScreenHeader("成就库", "像 Steam 一样记录整理进度、稀有度和解锁状态", onBack)
         LazyColumn(contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(achievements, key = { it.id }) { achievement ->
+            item {
+                AchievementHeroCard(
+                    unlocked = unlocked,
+                    total = achievements.size,
+                    totalXp = totalXp,
+                    completion = completion,
+                )
+            }
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(filters, key = { it }) { filter ->
+                        AchievementFilterChip(
+                            label = filter,
+                            selected = filter == selectedFilter,
+                            onClick = { selectedFilter = filter },
+                        )
+                    }
+                }
+            }
+            items(visibleAchievements, key = { it.id }) { achievement ->
                 AchievementRow(achievement)
             }
         }
@@ -325,21 +443,99 @@ fun AchievementsScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun AchievementRow(item: AchievementUi) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), tonalAlpha = if (item.unlocked) 0.82f else 0.58f) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(50.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = if (item.unlocked) 0.24f else 0.10f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.EmojiEvents, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(item.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    Text(item.difficulty, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+private fun AchievementHeroCard(
+    unlocked: Int,
+    total: Int,
+    totalXp: Int,
+    completion: Float,
+) {
+    GlassSurface(modifier = Modifier.fillMaxWidth(), tonalAlpha = 0.78f) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(
+                    Modifier
+                        .size(62.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.EmojiEvents, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
                 }
-                Text(item.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                LinearProgressIndicator(progress = { item.progress }, modifier = Modifier.fillMaxWidth().height(7.dp), color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.surfaceVariant)
-                Text("${item.current}/${item.target}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Keepix 成就陈列柜", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("$unlocked / $total 已解锁 · $totalXp XP", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("${(completion * 100).toInt()}%", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            }
+            LinearProgressIndicator(
+                progress = { completion.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(8.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MetricPill("已解锁", unlocked.toString(), modifier = Modifier.weight(1f))
+                MetricPill("未完成", (total - unlocked).coerceAtLeast(0).toString(), modifier = Modifier.weight(1f))
+                MetricPill("总 XP", totalXp.toString(), modifier = Modifier.weight(1f))
             }
         }
     }
+}
+
+@Composable
+private fun AchievementFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun AchievementRow(item: AchievementUi) {
+    val alpha = if (item.unlocked) 0.84f else 0.52f
+    GlassSurface(modifier = Modifier.fillMaxWidth(), tonalAlpha = alpha) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(
+                Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = if (item.unlocked) 0.24f else 0.08f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(achievementIcon(item.iconKey, item.unlocked), contentDescription = null, tint = if (item.unlocked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${item.category} · ${item.rarity} · ${item.xp} XP", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Text(if (item.unlocked) "已解锁" else "还差 ${item.remaining}", style = MaterialTheme.typography.labelMedium, color = if (item.unlocked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(item.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                LinearProgressIndicator(
+                    progress = { item.progress },
+                    modifier = Modifier.fillMaxWidth().height(7.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
+                Text("${item.current.coerceAtMost(item.target)}/${item.target}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+private fun achievementIcon(key: String, unlocked: Boolean): ImageVector = when {
+    !unlocked -> Icons.Rounded.EmojiEvents
+    key == "favorite" -> Icons.Rounded.Favorite
+    key == "delete" -> Icons.Rounded.Delete
+    key == "storage" -> Icons.Rounded.Storage
+    key == "streak" -> Icons.Rounded.CalendarToday
+    key == "undo" -> Icons.Rounded.CheckCircle
+    else -> Icons.Rounded.EmojiEvents
 }

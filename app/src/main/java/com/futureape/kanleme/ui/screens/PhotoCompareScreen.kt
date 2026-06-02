@@ -24,7 +24,7 @@ fun PhotoCompareScreen(uris: List<Uri>, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(top = 36.dp, start = 18.dp, end = 18.dp)) {
         ScreenHeader("照片对比", "从系统分享菜单进入，适合 2-4 张图快速比较", onBack)
         if (uris.isEmpty()) {
-            EmptyState("没有收到图片", "请从系统相册选择 2-4 张图片，然后分享到看了么。", "返回", onBack)
+            EmptyState("没有收到图片", "请从系统相册选择 2-4 张图片，然后分享到回留。", "返回", onBack)
         } else {
             Text("已接收 ${uris.size} 张", style = MaterialTheme.typography.titleMedium)
             LazyVerticalGrid(
