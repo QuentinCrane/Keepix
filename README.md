@@ -22,9 +22,11 @@
 
 Keepix turns a crowded camera roll into a clean, swipeable workflow. It scans local media through Android `MediaStore`, keeps cleanup state on the device, and stays focused on fast review instead of cloud features or account friction.
 
+Official Website:[Keepix — Organize your gallery like swiping short videos](https://www.quentincrane.cn/work/keepix/)
+
 ### Start here
 
-1. Open the app and grant photo or video access.
+1. Open the app（Download in release or the official website） and grant photo or video access.
 2. Pick the cleanup flow you want to work through.
 3. Swipe to keep, favorite, or delete.
 4. Return later for trash, favorites, similar shots, and history views.
@@ -54,17 +56,77 @@ Keepix turns a crowded camera roll into a clean, swipeable workflow. It scans lo
 
 ### Screenshots
 
-Screenshot slots are reserved here. Add your own captures later and keep the filenames stable so the README can grow with the app.
+<p align="center">
+  <img src="./docs/screenshots/home-light.jpg" width="240" alt="Home screen — light mode">
+  &nbsp;&nbsp;
+  <img src="./docs/screenshots/home-dark.jpg" width="240" alt="Home screen — dark mode">
+</p>
 
-<!-- Suggested files in docs/screenshots/
-home.png
-photo-clean.png
-video-clean.png
-favorites-trash.png
-settings.png
-tablet.png
-dark-mode.png
--->
+<p align="center">
+  <em>Home — daily cleanup stats, photo &amp; video entry points, similar photo detection</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./docs/screenshots/photo-clean.jpg" width="240" alt="Photo cleaning — swipe card">
+  &nbsp;&nbsp;
+  <img src="./docs/screenshots/video-clean.jpg" width="240" alt="Video cleaning — player">
+</p>
+
+<p align="center">
+  <em>Swipeable cleanup — keep, favorite, or delete photos and videos</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./docs/screenshots/favorites.jpg" width="240" alt="Favorites">
+  &nbsp;&nbsp;
+  <img src="./docs/screenshots/trash.jpg" width="240" alt="Trash">
+</p>
+
+<p align="center">
+  <em>Favorites &amp; Trash — 30-day recovery window before permanent deletion</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./docs/screenshots/similar-photos.jpg" width="240" alt="Similar photos detection">
+  &nbsp;&nbsp;
+  <img src="./docs/screenshots/today-history.jpg" width="240" alt="Today in history">
+</p>
+
+<p align="center">
+  <em>Similar photo detection &amp; Today in History</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./docs/screenshots/settings.jpg" width="240" alt="Settings">
+  &nbsp;&nbsp;
+  <img src="./docs/screenshots/me.jpg" width="240" alt="Me — profile and stats">
+</p>
+
+<p align="center">
+  <em>Settings &amp; Profile — customize behavior, view media statistics</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./docs/screenshots/tablet-light.jpg" width="480" alt="Tablet — light mode">
+</p>
+
+<p align="center">
+  <img src="./docs/screenshots/tablet-dark.jpg" width="480" alt="Tablet — dark mode">
+</p>
+
+<p align="center">
+  <em>Adaptive tablet layout with floating rail navigation</em>
+</p>
 
 ### More for builders
 

@@ -22,9 +22,11 @@
 
 看了么会把杂乱的相册变成可以连续刷选的整理工作流。它通过 Android `MediaStore` 读取本机媒体，所有整理状态都留在设备上，不依赖云端，也不需要账号。
 
+官方网站：[看了么 — 像刷短视频一样整理照片和视频](https://www.quentincrane.cn/work/keepix/)
+
 ### 先从这里开始
 
-1. 打开 App 并授权照片或视频访问。
+1. 打开 App（在Release里面下载或从官方网站下载） 并授权照片或视频访问。
 2. 选择要整理的照片或视频入口。
 3. 左右滑动完成保留、收藏或删除。
 4. 之后可以回到回收站、收藏、相似照片和历史视图继续查看。
@@ -54,17 +56,77 @@
 
 ### 截图
 
-这里先预留截图位。你后面补充真实截图时，保持文件名稳定就行，这样 README 可以跟着一起升级。
+<p align="center">
+  <img src="./docs/screenshots/home-light.jpg" width="240" alt="首页 — 浅色模式">
+  &nbsp;&nbsp;
+  <img src="./docs/screenshots/home-dark.jpg" width="240" alt="首页 — 深色模式">
+</p>
 
-<!-- 建议放在 docs/screenshots/ 下
-home.png
-photo-clean.png
-video-clean.png
-favorites-trash.png
-settings.png
-tablet.png
-dark-mode.png
--->
+<p align="center">
+  <em>首页 — 每日整理统计、照片与视频入口、相似照片检测</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./docs/screenshots/photo-clean.jpg" width="240" alt="照片整理 — 滑动卡片">
+  &nbsp;&nbsp;
+  <img src="./docs/screenshots/video-clean.jpg" width="240" alt="视频整理 — 播放器">
+</p>
+
+<p align="center">
+  <em>滑动式整理 — 保留、收藏或删除照片与视频</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./docs/screenshots/favorites.jpg" width="240" alt="收藏">
+  &nbsp;&nbsp;
+  <img src="./docs/screenshots/trash.jpg" width="240" alt="回收站">
+</p>
+
+<p align="center">
+  <em>收藏与回收站 — 30 天安全期内可恢复</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./docs/screenshots/similar-photos.jpg" width="240" alt="相似照片检测">
+  &nbsp;&nbsp;
+  <img src="./docs/screenshots/today-history.jpg" width="240" alt="当年今日">
+</p>
+
+<p align="center">
+  <em>相似照片检测与当年今日</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./docs/screenshots/settings.jpg" width="240" alt="设置">
+  &nbsp;&nbsp;
+  <img src="./docs/screenshots/me.jpg" width="240" alt="我的 — 个人页与统计">
+</p>
+
+<p align="center">
+  <em>设置与个人页 — 自定义行为、查看媒体统计</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="./docs/screenshots/tablet-light.jpg" width="480" alt="平板 — 浅色模式">
+</p>
+
+<p align="center">
+  <img src="./docs/screenshots/tablet-dark.jpg" width="480" alt="平板 — 深色模式">
+</p>
+
+<p align="center">
+  <em>自适应平板布局，浮动侧边导航</em>
+</p>
 
 ### 更多说明
 
