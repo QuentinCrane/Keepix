@@ -42,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -94,9 +93,7 @@ fun PhotoStartScreen(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .background(
-                            startHeroBrush()
-                        )
+                        .background(startHeroColor())
                         .padding(22.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -371,18 +368,12 @@ private fun PhotoFeatureLine(title: String, body: String) {
 }
 
 @Composable
-private fun startHeroBrush(): Brush {
+private fun startHeroColor(): Color {
     val oledDark = MaterialTheme.colorScheme.background.luminance() < 0.03f
     return if (oledDark) {
-        Brush.linearGradient(listOf(Color(0xFF050505), Color(0xFF000000)))
+        Color(0xFF050505)
     } else {
-        Brush.linearGradient(
-            listOf(
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.70f),
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.16f),
-            )
-        )
+        MaterialTheme.colorScheme.surface
     }
 }
 

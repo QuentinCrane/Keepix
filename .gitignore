@@ -9,6 +9,7 @@
 
 # Public project metadata.
 !README.md
+!README.zh-CN.md
 !LICENSE
 !NOTICE
 !CONTRIBUTING.md
@@ -49,9 +50,13 @@ docs/*
 !docs/build.md
 !docs/github_publishing.md
 !docs/privacy.md
+!docs/release_notes.md
 !docs/technical_overview.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md
+!docs/en/
+docs/en/*
+!docs/en/*.md
 !docs/website/
 !docs/website/*.md
 !docs/screenshots/

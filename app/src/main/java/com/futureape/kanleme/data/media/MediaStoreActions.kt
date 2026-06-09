@@ -17,6 +17,10 @@ class MediaStoreActions @Inject constructor(
     private val resolver: ContentResolver,
 ) {
     fun moveImageToFolder(mediaUri: String, targetRelativePath: String): MediaOperationResult {
+        return moveMediaToFolder(mediaUri, targetRelativePath)
+    }
+
+    fun moveMediaToFolder(mediaUri: String, targetRelativePath: String): MediaOperationResult {
         val normalizedPath = normalizeRelativePath(targetRelativePath)
         val uri = runCatching { Uri.parse(mediaUri) }.getOrNull()
             ?: return MediaOperationResult.Failed("媒体地址无效")
@@ -32,7 +36,7 @@ class MediaStoreActions @Inject constructor(
                 MediaOperationResult.Failed("系统没有移动该媒体，可能需要先授予完整照片权限")
             }
         } catch (security: SecurityException) {
-            MediaOperationResult.Failed("系统要求单独授权修改这张照片。当前版本已保留接口位置，后续可接入 MediaStore 写入授权弹窗")
+            MediaOperationResult.Failed("系统要求单独授权修改这个媒体文件。当前版本已保留接口位置，后续可接入 MediaStore 写入授权弹窗")
         } catch (throwable: Throwable) {
             MediaOperationResult.Failed(throwable.message ?: "移动文件夹失败")
         }

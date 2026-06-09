@@ -106,6 +106,7 @@ class AppRepositoryImpl @Inject constructor(
 
     override fun observeRecentPhotos(limit: Int): Flow<List<PhotoEntity>> = photoDao.observeRecent(limit)
     override fun observeTimelinePhotos(limit: Int): Flow<List<PhotoEntity>> = photoDao.observeTimeline(limit)
+    override fun observeTimelineVideos(limit: Int): Flow<List<VideoEntity>> = videoDao.observeTimeline(limit)
     override fun observeTodayInHistory(limit: Int): Flow<List<PhotoEntity>> = photoDao.observeTodayInHistory(limit = limit)
     override fun observeTodayInHistoryVideos(limit: Int): Flow<List<VideoEntity>> = videoDao.observeTodayInHistory(limit = limit)
     override fun observeRecentlyAddedPhotos(days: Int, limit: Int): Flow<List<PhotoEntity>> {
@@ -235,9 +236,10 @@ class AppRepositoryImpl @Inject constructor(
     override suspend fun loadPhotoDeck(scope: CleaningScope): List<PhotoEntity> = withContext(Dispatchers.IO) {
         val settings = settingsRepository.settings.first()
         val range = rangeFor(scope.dateMode)
+        val requiresPostDateFilter = scope.dateMode.startsWith("multiym:")
         val targetLimit = scope.batchSize.takeIf { it > 0 } ?: settings.photoBatchSize
         val queryLimit = if (settings.excludedFolderPaths.isEmpty()) {
-            (targetLimit * 6).coerceAtLeast(120)
+            if (requiresPostDateFilter) 5000 else (targetLimit * 6).coerceAtLeast(120)
         } else {
             20000
         }
@@ -250,15 +252,19 @@ class AppRepositoryImpl @Inject constructor(
             randomSeed = scope.randomSeed,
             todayOnly = scope.todayInHistory,
             limit = queryLimit,
-        ).filterNot { isExcludedFolder(it.folderPath, settings.excludedFolderPaths) }.take(targetLimit)
+        )
+            .filter { dateModeMatches(it.dateTaken, scope.dateMode) }
+            .filterNot { isExcludedFolder(it.folderPath, settings.excludedFolderPaths) }
+            .take(targetLimit)
     }
 
     override suspend fun loadVideoDeck(scope: CleaningScope): List<VideoEntity> = withContext(Dispatchers.IO) {
         val settings = settingsRepository.settings.first()
         val range = rangeFor(scope.dateMode)
+        val requiresPostDateFilter = scope.dateMode.startsWith("multiym:")
         val targetLimit = scope.batchSize.takeIf { it > 0 } ?: settings.videoBatchSize
         val queryLimit = if (settings.excludedFolderPaths.isEmpty()) {
-            (targetLimit * 6).coerceAtLeast(120)
+            if (requiresPostDateFilter) 5000 else (targetLimit * 6).coerceAtLeast(120)
         } else {
             5000
         }
@@ -269,7 +275,10 @@ class AppRepositoryImpl @Inject constructor(
             randomOrder = scope.sortOrder == "random",
             randomSeed = scope.randomSeed,
             limit = queryLimit,
-        ).filterNot { isExcludedFolder(it.folderPath, settings.excludedFolderPaths) }.take(targetLimit)
+        )
+            .filter { dateModeMatches(it.dateTaken, scope.dateMode) }
+            .filterNot { isExcludedFolder(it.folderPath, settings.excludedFolderPaths) }
+            .take(targetLimit)
     }
 
     override suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction) = withContext(Dispatchers.IO) {
@@ -340,10 +349,25 @@ class AppRepositoryImpl @Inject constructor(
 
     override suspend fun movePhotoToFolder(photo: PhotoEntity, targetRelativePath: String): MovePhotoResult = withContext(Dispatchers.IO) {
         val normalizedPath = MediaStoreActions.normalizeRelativePath(targetRelativePath)
-        when (val result = mediaStoreActions.moveImageToFolder(photo.uri, normalizedPath)) {
+        when (val result = mediaStoreActions.moveMediaToFolder(photo.uri, normalizedPath)) {
             MediaOperationResult.Success -> {
                 photoDao.updateFolder(
                     id = photo.id,
+                    relativePath = normalizedPath,
+                    folderName = MediaStoreActions.folderNameOf(normalizedPath),
+                )
+                MovePhotoResult(true, "已移动到 ${MediaStoreActions.folderNameOf(normalizedPath)}")
+            }
+            is MediaOperationResult.Failed -> MovePhotoResult(false, result.reason)
+        }
+    }
+
+    override suspend fun moveVideoToFolder(video: VideoEntity, targetRelativePath: String): MovePhotoResult = withContext(Dispatchers.IO) {
+        val normalizedPath = MediaStoreActions.normalizeRelativePath(targetRelativePath)
+        when (val result = mediaStoreActions.moveMediaToFolder(video.uri, normalizedPath)) {
+            MediaOperationResult.Success -> {
+                videoDao.updateFolder(
+                    id = video.id,
                     relativePath = normalizedPath,
                     folderName = MediaStoreActions.folderNameOf(normalizedPath),
                 )
@@ -591,6 +615,35 @@ class AppRepositoryImpl @Inject constructor(
     private fun rangeFor(mode: String): Pair<Long, Long>? {
         val cal = Calendar.getInstance()
         val end = cal.timeInMillis
+        fun yearRange(year: Int): Pair<Long, Long> {
+            val startCal = Calendar.getInstance().apply {
+                clear()
+                set(Calendar.YEAR, year)
+                set(Calendar.DAY_OF_YEAR, 1)
+            }
+            val endCal = Calendar.getInstance().apply {
+                clear()
+                set(Calendar.YEAR, year + 1)
+                set(Calendar.DAY_OF_YEAR, 1)
+            }
+            return startCal.timeInMillis to endCal.timeInMillis
+        }
+        fun monthRange(year: Int, month: Int): Pair<Long, Long> {
+            val startCal = Calendar.getInstance().apply {
+                clear()
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, 1)
+            }
+            val endCal = Calendar.getInstance().apply {
+                clear()
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, 1)
+                add(Calendar.MONTH, 1)
+            }
+            return startCal.timeInMillis to endCal.timeInMillis
+        }
         return when (mode) {
             "seven_days" -> end - 7L * 24L * 60L * 60L * 1000L to end
             "month" -> {
@@ -601,8 +654,29 @@ class AppRepositoryImpl @Inject constructor(
                 cal.set(Calendar.DAY_OF_YEAR, 1); cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
                 cal.timeInMillis to end
             }
-            else -> null
+            else -> {
+                when {
+                    mode.startsWith("y:") -> mode.removePrefix("y:").toIntOrNull()?.let(::yearRange)
+                    mode.startsWith("ym:") -> {
+                        val parts = mode.removePrefix("ym:").split("-")
+                        val year = parts.getOrNull(0)?.toIntOrNull()
+                        val month = parts.getOrNull(1)?.toIntOrNull()
+                        if (year != null && month != null && month in 1..12) monthRange(year, month) else null
+                    }
+                    mode.startsWith("multiym:") -> null
+                    else -> null
+                }
+            }
         }
+    }
+
+    private fun dateModeMatches(timeMillis: Long, mode: String): Boolean {
+        if (!mode.startsWith("multiym:")) return true
+        val tokens = mode.removePrefix("multiym:").split(",").filter { it.isNotBlank() }.toSet()
+        if (tokens.isEmpty() || timeMillis <= 0L) return true
+        val cal = Calendar.getInstance().apply { timeInMillis = timeMillis }
+        val token = cal.get(Calendar.YEAR).toString() + "-" + (cal.get(Calendar.MONTH) + 1).toString().padStart(2, '0')
+        return token in tokens
     }
 
     private fun PhotoEntity.toTrashItem(): TrashItemEntity = TrashItemEntity(

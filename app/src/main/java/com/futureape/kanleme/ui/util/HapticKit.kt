@@ -17,32 +17,51 @@ class HapticKit(
 ) {
     fun tick() {
         if (settings.swipeSound) view.playSoundEffect(SoundEffectConstants.CLICK)
-        when (settings.hapticLevel) {
-            HapticLevel.OFF -> Unit
-            HapticLevel.LIGHT -> view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            HapticLevel.MEDIUM -> view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-            HapticLevel.STRONG -> view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-        }
+        performLevel(settings.hapticLevel)
     }
 
     fun threshold() {
-        when (settings.hapticLevel) {
-            HapticLevel.OFF -> Unit
-            HapticLevel.LIGHT -> view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            HapticLevel.MEDIUM -> view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-            HapticLevel.STRONG -> view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-        }
+        performLevel(settings.hapticLevel, mediumConstant = HapticFeedbackConstants.KEYBOARD_TAP)
     }
 
     fun success() {
         if (settings.swipeSound) view.playSoundEffect(SoundEffectConstants.CLICK)
-        when (settings.hapticLevel) {
+        performLevel(settings.hapticLevel, strongDouble = true)
+    }
+
+    fun keep() {
+        action(settings.keepHapticLevel)
+    }
+
+    fun delete() {
+        action(settings.deleteHapticLevel)
+    }
+
+    fun favorite() {
+        action(settings.favoriteHapticLevel)
+    }
+
+    fun undo() {
+        action(settings.undoHapticLevel)
+    }
+
+    private fun action(level: HapticLevel) {
+        if (settings.swipeSound) view.playSoundEffect(SoundEffectConstants.CLICK)
+        performLevel(level, strongDouble = true)
+    }
+
+    private fun performLevel(
+        level: HapticLevel,
+        mediumConstant: Int = HapticFeedbackConstants.VIRTUAL_KEY,
+        strongDouble: Boolean = false,
+    ) {
+        when (level) {
             HapticLevel.OFF -> Unit
             HapticLevel.LIGHT -> view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            HapticLevel.MEDIUM -> view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            HapticLevel.MEDIUM -> view.performHapticFeedback(mediumConstant)
             HapticLevel.STRONG -> {
                 view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                view.postDelayed({ view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK) }, 42L)
+                if (strongDouble) view.postDelayed({ view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK) }, 42L)
             }
         }
     }

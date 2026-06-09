@@ -1,6 +1,7 @@
 package com.futureape.kanleme.ui.components
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,8 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.luminance
@@ -51,42 +50,7 @@ fun LiquidBackground(modifier: Modifier = Modifier, content: @Composable () -> U
             }
             return@CompositionLocalProvider
         }
-        val baseBrush = Brush.linearGradient(
-            colors = listOf(
-                scheme.primary.copy(alpha = 0.16f),
-                scheme.surface,
-                scheme.surfaceVariant.copy(alpha = 0.72f),
-                scheme.background,
-            )
-        )
-        Box(modifier = modifier.background(baseBrush)) {
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.radialGradient(
-                        colors = listOf(scheme.primary.copy(alpha = 0.26f), Color.Transparent),
-                        center = Offset(120f, 160f),
-                        radius = 760f,
-                    )
-                )
-            )
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.radialGradient(
-                        colors = listOf(scheme.tertiary.copy(alpha = 0.18f), Color.Transparent),
-                        center = Offset(920f, 320f),
-                        radius = 820f,
-                    )
-                )
-            )
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.radialGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.22f), Color.Transparent),
-                        center = Offset(520f, 980f),
-                        radius = 900f,
-                    )
-                )
-            )
+        Box(modifier = modifier.background(scheme.background)) {
             content()
         }
     }
@@ -101,25 +65,18 @@ fun GlassSurface(
 ) {
     val scheme = MaterialTheme.colorScheme
     val oledDark = scheme.background.luminance() < 0.03f
-    val glassColors = if (oledDark) {
-        listOf(
-            Color(0xFF050505).copy(alpha = 0.96f),
-            Color(0xFF080808).copy(alpha = 0.96f),
-            Color(0xFF000000).copy(alpha = 0.96f),
-        )
+    val containerColor = if (oledDark) {
+        Color(0xFF050505).copy(alpha = 0.96f)
     } else {
-        listOf(
-            Color.White.copy(alpha = 0.42f),
-            scheme.surface.copy(alpha = tonalAlpha),
-            scheme.surfaceVariant.copy(alpha = (tonalAlpha * 0.72f).coerceIn(0f, 1f)),
-        )
+        scheme.surface.copy(alpha = tonalAlpha.coerceIn(0.88f, 1f))
     }
+    val borderColor = if (oledDark) Color.White.copy(alpha = 0.10f) else scheme.primaryContainer.copy(alpha = 0.74f)
     Surface(
         modifier = modifier
-            .shadow(if (oledDark) 0.dp else 24.dp, shape, clip = false, ambientColor = scheme.primary.copy(alpha = if (oledDark) 0.00f else 0.18f), spotColor = scheme.primary.copy(alpha = if (oledDark) 0.00f else 0.16f))
+            .shadow(if (oledDark) 0.dp else 10.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = if (oledDark) 0.00f else 0.06f), spotColor = Color.Black.copy(alpha = if (oledDark) 0.00f else 0.04f))
             .clip(shape)
-            .background(Brush.linearGradient(colors = glassColors), shape)
-            .border(BorderStroke(1.dp, if (oledDark) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.52f)), shape),
+            .background(containerColor, shape)
+            .border(BorderStroke(1.dp, borderColor), shape),
         color = Color.Transparent,
         contentColor = scheme.onSurface,
         shape = shape,
@@ -195,6 +152,10 @@ fun FloatingGlassRail(
 
 @Composable
 private fun RailBubble(selected: Boolean, label: String, icon: ImageVector, onClick: () -> Unit) {
+    val selectedColor by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f) else Color.Transparent,
+        label = "rail_selected_color",
+    )
     Surface(
         modifier = Modifier
             .width(56.dp)
@@ -202,7 +163,7 @@ private fun RailBubble(selected: Boolean, label: String, icon: ImageVector, onCl
             .clip(RoundedCornerShape(28.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(28.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
+        color = selectedColor,
         contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
     ) {
         Column(
@@ -221,6 +182,10 @@ private fun RailBubble(selected: Boolean, label: String, icon: ImageVector, onCl
 @Composable
 private fun RowScope.NavBubble(selected: Boolean, label: String, icon: ImageVector, onClick: () -> Unit) {
     val width by animateDpAsState(if (selected) 120.dp else 62.dp, label = "nav_width")
+    val selectedColor by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.88f) else Color.Transparent,
+        label = "nav_selected_color",
+    )
     Surface(
         modifier = Modifier
             .height(48.dp)
@@ -228,7 +193,7 @@ private fun RowScope.NavBubble(selected: Boolean, label: String, icon: ImageVect
             .clip(RoundedCornerShape(999.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(999.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent,
+        color = selectedColor,
         contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
     ) {
         Row(

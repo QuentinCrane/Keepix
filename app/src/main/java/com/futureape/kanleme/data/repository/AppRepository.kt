@@ -94,6 +94,7 @@ interface AppRepository {
     fun observePhotoTypeStats(): Flow<PhotoTypeStats>
     fun observeRecentPhotos(limit: Int = 50): Flow<List<PhotoEntity>>
     fun observeTimelinePhotos(limit: Int = 5000): Flow<List<PhotoEntity>>
+    fun observeTimelineVideos(limit: Int = 5000): Flow<List<VideoEntity>>
     fun observeTodayInHistory(limit: Int = 400): Flow<List<PhotoEntity>>
     fun observeTodayInHistoryVideos(limit: Int = 400): Flow<List<VideoEntity>>
     fun observeRecentlyAddedPhotos(days: Int = 7, limit: Int = 120): Flow<List<PhotoEntity>>
@@ -111,6 +112,7 @@ interface AppRepository {
     suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction)
     suspend fun handleVideoAction(video: VideoEntity, action: SwipeAction)
     suspend fun movePhotoToFolder(photo: PhotoEntity, targetRelativePath: String): MovePhotoResult
+    suspend fun moveVideoToFolder(video: VideoEntity, targetRelativePath: String): MovePhotoResult
     suspend fun generateSimilarGroups(
         limit: Int = 1200,
         onProgress: (processed: Int, total: Int, stage: String) -> Unit = { _, _, _ -> },

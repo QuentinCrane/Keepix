@@ -67,6 +67,8 @@ class KanlemeViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val timelinePhotos = repository.observeTimelinePhotos()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val timelineVideos = repository.observeTimelineVideos()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val todayInHistoryPhotos = repository.observeTodayInHistory()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -117,6 +119,21 @@ class KanlemeViewModel @Inject constructor(
 
     private val _videoDeckPreparing = MutableStateFlow(false)
     val videoDeckPreparing = _videoDeckPreparing.asStateFlow()
+
+    private val _photoSessionActionCount = MutableStateFlow(0)
+    val photoSessionActionCount = _photoSessionActionCount.asStateFlow()
+
+    private val _lastPhotoAction = MutableStateFlow<SwipeAction?>(null)
+    val lastPhotoAction = _lastPhotoAction.asStateFlow()
+
+    private val _videoSessionActionCount = MutableStateFlow(0)
+    val videoSessionActionCount = _videoSessionActionCount.asStateFlow()
+
+    private val _lastVideoAction = MutableStateFlow<SwipeAction?>(null)
+    val lastVideoAction = _lastVideoAction.asStateFlow()
+
+    private val _pendingVideoKeeps = MutableStateFlow<Map<Long, VideoEntity>>(emptyMap())
+    val pendingVideoKeeps = _pendingVideoKeeps.asStateFlow()
 
     private val _message = MutableStateFlow<String?>(null)
     val message = _message.asStateFlow()
@@ -203,6 +220,8 @@ class KanlemeViewModel @Inject constructor(
         }
         _photoScope.value = session
         _photoDeckPreparing.value = true
+        _photoSessionActionCount.value = 0
+        _lastPhotoAction.value = null
         _photoDeck.value = emptyList()
         viewModelScope.launch {
             if (session.sortOrder == "random") settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed)
@@ -223,6 +242,9 @@ class KanlemeViewModel @Inject constructor(
         }
         _videoScope.value = session
         _videoDeckPreparing.value = true
+        _videoSessionActionCount.value = 0
+        _lastVideoAction.value = null
+        _pendingVideoKeeps.value = emptyMap()
         _videoDeck.value = emptyList()
         viewModelScope.launch {
             if (session.sortOrder == "random") settingsRepository.setVideoSortOrderWithSeed("random", session.randomSeed)
@@ -241,6 +263,8 @@ class KanlemeViewModel @Inject constructor(
         val session = _photoScope.value.copy(sortOrder = "random", randomSeed = nextRandomSeed())
         _photoScope.value = session
         _photoDeckPreparing.value = true
+        _photoSessionActionCount.value = 0
+        _lastPhotoAction.value = null
         _photoDeck.value = emptyList()
         viewModelScope.launch {
             settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed)
@@ -258,6 +282,9 @@ class KanlemeViewModel @Inject constructor(
         val session = _videoScope.value.copy(sortOrder = "random", randomSeed = nextRandomSeed())
         _videoScope.value = session
         _videoDeckPreparing.value = true
+        _videoSessionActionCount.value = 0
+        _lastVideoAction.value = null
+        _pendingVideoKeeps.value = emptyMap()
         _videoDeck.value = emptyList()
         viewModelScope.launch {
             settingsRepository.setVideoSortOrderWithSeed("random", session.randomSeed)
@@ -315,6 +342,27 @@ class KanlemeViewModel @Inject constructor(
         loadPhotoDeck(_photoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
     }
 
+    fun setPhotoSessionDateMode(mode: String) {
+        loadPhotoDeck(_photoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
+    }
+
+    fun resetPhotoSessionDateMode() {
+        _photoScope.value = _photoScope.value.copy(dateMode = "all", todayInHistory = false)
+    }
+
+    fun setVideoDateMode(mode: String) = viewModelScope.launch {
+        settingsRepository.setVideoDateMode(mode)
+        loadVideoDeck(_videoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
+    }
+
+    fun setVideoSessionDateMode(mode: String) {
+        loadVideoDeck(_videoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
+    }
+
+    fun resetVideoSessionDateMode() {
+        _videoScope.value = _videoScope.value.copy(dateMode = "all", todayInHistory = false)
+    }
+
     fun setPhotoFolder(path: String?) = viewModelScope.launch {
         settingsRepository.setPhotoFolderPath(path)
         loadPhotoDeck(_photoScope.value.copy(folderPaths = path?.let { setOf(it) } ?: emptySet()))
@@ -342,6 +390,8 @@ class KanlemeViewModel @Inject constructor(
     fun onPhotoAction(photo: PhotoEntity, action: SwipeAction) = viewModelScope.launch {
         repository.handlePhotoAction(photo, action)
         _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
+        _photoSessionActionCount.value += 1
+        _lastPhotoAction.value = action
         refillPhotoDeckIfNeeded()
     }
 
@@ -352,19 +402,115 @@ class KanlemeViewModel @Inject constructor(
         }
         repository.handlePhotoAction(photo, action)
         _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
+        _photoSessionActionCount.value += 1
+        _lastPhotoAction.value = action
         refillPhotoDeckIfNeeded()
     }
 
     fun onVideoAction(video: VideoEntity, action: SwipeAction) = viewModelScope.launch {
+        val wasPending = removePendingVideoKeep(video)
         repository.handleVideoAction(video, action)
         _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == video.mediaStoreId }
+        if (!wasPending) _videoSessionActionCount.value += 1
+        _lastVideoAction.value = action
         refillVideoDeckIfNeeded()
+    }
+
+    fun markVideoPendingKeep(video: VideoEntity) {
+        if (video.processingStatus != com.futureape.kanleme.data.local.ProcessingStatus.UNPROCESSED) return
+        if (video.mediaStoreId !in _videoDeck.value.map { it.mediaStoreId }) return
+        val pending = _pendingVideoKeeps.value
+        if (video.mediaStoreId in pending) return
+        _pendingVideoKeeps.value = pending + (video.mediaStoreId to video)
+        _videoSessionActionCount.value += 1
+        _lastVideoAction.value = SwipeAction.Keep
+    }
+
+    private fun removePendingVideoKeep(video: VideoEntity): Boolean {
+        val pending = _pendingVideoKeeps.value
+        if (video.mediaStoreId !in pending) return false
+        _pendingVideoKeeps.value = pending - video.mediaStoreId
+        return true
+    }
+
+    fun finishVideoCleaningSession(currentVideo: VideoEntity?) = viewModelScope.launch {
+        currentVideo?.let { markVideoPendingKeep(it) }
+        val pending = _pendingVideoKeeps.value
+        if (pending.isEmpty()) return@launch
+        val pendingIds = pending.keys
+        pending.values.forEach { video ->
+            repository.handleVideoAction(video, SwipeAction.Keep)
+        }
+        _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId in pendingIds }
+        _pendingVideoKeeps.value = emptyMap()
+        refillVideoDeckIfNeeded()
+    }
+
+    fun undoVideoCleaningAction(): Long? {
+        val pending = _pendingVideoKeeps.value
+        if (pending.isNotEmpty()) {
+            val mediaStoreId = pending.keys.last()
+            _pendingVideoKeeps.value = pending - mediaStoreId
+            _videoSessionActionCount.value = (_videoSessionActionCount.value - 1).coerceAtLeast(0)
+            _lastVideoAction.value = SwipeAction.Keep
+            _message.value = "已回到上一条视频"
+            return mediaStoreId
+        }
+        viewModelScope.launch {
+            runCatching { repository.undoLastAction() }
+                .onSuccess { ok ->
+                    if (ok) {
+                        _videoSessionActionCount.value = (_videoSessionActionCount.value - 1).coerceAtLeast(0)
+                        _message.value = "已撤回上一条视频"
+                    } else {
+                        _message.value = "没有可撤回的视频"
+                    }
+                }
+                .onFailure { _message.value = it.message ?: "撤回失败" }
+            loadVideoDeck()
+        }
+        return null
     }
 
     fun movePhotoToFolder(photo: PhotoEntity, relativePath: String) = viewModelScope.launch {
         runCatching { repository.movePhotoToFolder(photo, relativePath) }
             .onSuccess { _message.value = it.message }
             .onFailure { _message.value = it.message ?: "移动文件夹失败" }
+    }
+
+    fun archivePhotoToFolder(photo: PhotoEntity, relativePath: String) = viewModelScope.launch {
+        runCatching {
+            val result = repository.movePhotoToFolder(photo, relativePath)
+            if (!result.success) error(result.message)
+            repository.handlePhotoAction(photo, SwipeAction.Keep)
+            result.message
+        }.onSuccess { message ->
+            _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
+            _photoSessionActionCount.value += 1
+            _lastPhotoAction.value = SwipeAction.Keep
+            _message.value = message
+            refillPhotoDeckIfNeeded()
+        }.onFailure {
+            _message.value = it.message ?: "归档失败"
+        }
+    }
+
+    fun archiveVideoToFolder(video: VideoEntity, relativePath: String) = viewModelScope.launch {
+        runCatching {
+            val result = repository.moveVideoToFolder(video, relativePath)
+            if (!result.success) error(result.message)
+            repository.handleVideoAction(video, SwipeAction.Keep)
+            result.message
+        }.onSuccess { message ->
+            val wasPending = removePendingVideoKeep(video)
+            _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == video.mediaStoreId }
+            if (!wasPending) _videoSessionActionCount.value += 1
+            _lastVideoAction.value = SwipeAction.Keep
+            _message.value = message
+            refillVideoDeckIfNeeded()
+        }.onFailure {
+            _message.value = it.message ?: "归档失败"
+        }
     }
 
     fun seedSimilarGroups(limit: Int = 3600) {
@@ -466,6 +612,20 @@ class KanlemeViewModel @Inject constructor(
         loadPhotoDeck(); loadVideoDeck()
     }
 
+    fun undoPhotoCleaningAction() = viewModelScope.launch {
+        runCatching { repository.undoLastAction() }
+            .onSuccess { ok ->
+                if (ok) {
+                    _photoSessionActionCount.value = (_photoSessionActionCount.value - 1).coerceAtLeast(0)
+                    _message.value = "已回到上一张照片"
+                } else {
+                    _message.value = "没有可撤回的照片"
+                }
+            }
+            .onFailure { _message.value = it.message ?: "撤回失败" }
+        loadPhotoDeck()
+    }
+
     fun buildAnnualReport(year: Int = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)) = viewModelScope.launch {
         _annualReport.value = repository.buildAnnualReport(year)
     }
@@ -513,9 +673,38 @@ class KanlemeViewModel @Inject constructor(
         settingsRepository.setVideoDisplayMode(values[(values.indexOf(settings.value.videoDisplayMode) + 1) % values.size])
     }
 
+    fun toggleVideoDisplayModeQuick() = viewModelScope.launch {
+        val next = if (settings.value.videoDisplayMode == VideoDisplayMode.FIT_SCREEN) {
+            VideoDisplayMode.IMMERSIVE_CROP
+        } else {
+            VideoDisplayMode.FIT_SCREEN
+        }
+        settingsRepository.setVideoDisplayMode(next)
+    }
+
     fun cycleHapticLevel() = viewModelScope.launch {
         val values = HapticLevel.entries
         settingsRepository.setHapticLevel(values[(values.indexOf(settings.value.hapticLevel) + 1) % values.size])
+    }
+
+    fun setHapticLevel(value: HapticLevel) = viewModelScope.launch {
+        settingsRepository.setHapticLevel(value)
+    }
+
+    fun setKeepHapticLevel(value: HapticLevel) = viewModelScope.launch {
+        settingsRepository.setKeepHapticLevel(value)
+    }
+
+    fun setDeleteHapticLevel(value: HapticLevel) = viewModelScope.launch {
+        settingsRepository.setDeleteHapticLevel(value)
+    }
+
+    fun setFavoriteHapticLevel(value: HapticLevel) = viewModelScope.launch {
+        settingsRepository.setFavoriteHapticLevel(value)
+    }
+
+    fun setUndoHapticLevel(value: HapticLevel) = viewModelScope.launch {
+        settingsRepository.setUndoHapticLevel(value)
     }
 
     fun cycleThemeMode() = viewModelScope.launch {
@@ -575,8 +764,13 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun cyclePhotoCleanMode() = viewModelScope.launch {
-        val next = if (settings.value.photoCleanMode == PhotoCleanMode.NORMAL) PhotoCleanMode.CONSERVATIVE else PhotoCleanMode.NORMAL
+        val values = PhotoCleanMode.entries
+        val next = values[(values.indexOf(settings.value.photoCleanMode) + 1) % values.size]
         settingsRepository.setPhotoCleanMode(next)
+    }
+
+    fun setPhotoCleanMode(value: PhotoCleanMode) = viewModelScope.launch {
+        settingsRepository.setPhotoCleanMode(value)
     }
 
     private fun AppSettings.toPhotoCleaningScope(): CleaningScope = CleaningScope(
@@ -589,8 +783,10 @@ class KanlemeViewModel @Inject constructor(
     )
 
     private fun AppSettings.toVideoCleaningScope(): CleaningScope = CleaningScope(
+        dateMode = videoDateMode,
         folderPaths = videoFolderPath.takeIf { it.isNotBlank() }?.let { setOf(it) } ?: emptySet(),
         sortOrder = videoSortOrder,
+        todayInHistory = videoDateMode == "today_history",
         randomSeed = videoRandomSeed,
     )
 }

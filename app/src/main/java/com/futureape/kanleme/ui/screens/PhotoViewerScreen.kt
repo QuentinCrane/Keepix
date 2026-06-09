@@ -3,11 +3,14 @@ package com.futureape.kanleme.ui.screens
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,13 +23,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -55,6 +61,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -70,8 +77,8 @@ import coil.compose.AsyncImage
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.ui.components.GlassSurface
+import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
-import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.util.shareMedia
@@ -81,6 +88,9 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -93,7 +103,9 @@ fun PhotoViewerScreen(
     val cleaningDeck by viewModel.photoDeck.collectAsStateWithLifecycle()
     val folders by viewModel.photoFolders.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val uiScope = rememberCoroutineScope()
     var showMoveSheet by remember { mutableStateOf(false) }
+    var showExifSheet by remember { mutableStateOf(false) }
 
     val photos = remember(cleaningDeck, timelinePhotos, initialPhotoId) {
         if (cleaningDeck.any { it.id == initialPhotoId }) cleaningDeck else timelinePhotos
@@ -139,62 +151,69 @@ fun PhotoViewerScreen(
             )
         }
 
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(top = 36.dp, start = 10.dp, end = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "返回", tint = Color.White)
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = currentPhoto?.displayName ?: "照片",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                )
-                Text(
-                    text = "${pagerState.currentPage + 1} / ${photos.size} · ${currentPhoto?.folderName.orEmpty()} · ${currentPhoto?.let { photoMediaKindLabel(it) }.orEmpty()}",
-                    color = Color.White.copy(alpha = 0.72f),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-
         currentPhoto?.let { photo ->
-            Surface(
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(top = 34.dp, start = 10.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "返回", tint = Color.White, modifier = Modifier.size(34.dp))
+                }
+                Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                    Text(
+                        text = formatViewerDateTime(photo.dateTaken),
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = photo.displayName + "  ·  " + photo.folderName,
+                        color = Color.White.copy(alpha = 0.72f),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                    )
+                }
+                IconButton(onClick = { shareMedia(context, Uri.parse(photo.uri), photo.mimeType, photo.displayName) }) {
+                    Icon(Icons.Rounded.Share, contentDescription = "分享", tint = Color.White, modifier = Modifier.size(30.dp))
+                }
+            }
+
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(14.dp),
-                shape = RoundedCornerShape(30.dp),
-                color = Color(0xFF0B2431).copy(alpha = 0.92f),
-                contentColor = Color(0xFFBEEBFF),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7CC6F2).copy(alpha = 0.34f)),
-                tonalElevation = 0.dp,
-                shadowElevation = 8.dp,
+                    .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
+                ViewerThumbnailRail(
+                    photos = photos,
+                    currentPage = pagerState.currentPage,
+                    onSelected = { index -> uiScope.launch { pagerState.animateScrollToPage(index) } },
+                )
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    ViewerAction(icon = Icons.Rounded.PhotoLibrary, label = if (photo.isMotionPhoto || photo.isGif) "系统查看" else "相册查看") {
-                        openPhotoInSystemGallery(context, photo)
-                    }
-                    ViewerAction(icon = Icons.Rounded.Folder, label = "移动") { showMoveSheet = true }
-                    ViewerAction(icon = Icons.Rounded.Favorite, label = "收藏") { viewModel.onPhotoAction(photo, SwipeAction.Favorite) }
-                    ViewerAction(icon = Icons.Rounded.Delete, label = "待删") { viewModel.onPhotoAction(photo, SwipeAction.Delete) }
-                    ViewerAction(icon = Icons.Rounded.Share, label = "分享") {
-                        shareMedia(context, Uri.parse(photo.uri), photo.mimeType, photo.displayName)
-                    }
+                    ViewerAction(icon = Icons.Rounded.FavoriteBorder, label = "收藏照片", modifier = Modifier.weight(1f)) { viewModel.onPhotoAction(photo, SwipeAction.Favorite) }
+                    ViewerAction(icon = Icons.Rounded.Folder, label = "移动", modifier = Modifier.weight(1f)) { showMoveSheet = true }
+                    ViewerAction(icon = Icons.Rounded.Delete, label = "加入待删区", modifier = Modifier.weight(1f)) { viewModel.onPhotoAction(photo, SwipeAction.Delete) }
+                    ViewerAction(icon = Icons.Rounded.Info, label = "EXIF信息", modifier = Modifier.weight(1f)) { showExifSheet = true }
+                    ViewerAction(icon = Icons.Rounded.PhotoLibrary, label = "回到整理照片", modifier = Modifier.weight(1f)) { onBack() }
                 }
             }
         }
+    }
+
+    if (showExifSheet && currentPhoto != null) {
+        PhotoExifSheet(
+            photo = currentPhoto!!,
+            onDismiss = { showExifSheet = false },
+        )
     }
 
     if (showMoveSheet && currentPhoto != null) {
@@ -210,6 +229,122 @@ fun PhotoViewerScreen(
     }
 }
 
+
+@Composable
+private fun ViewerThumbnailRail(
+    photos: List<PhotoEntity>,
+    currentPage: Int,
+    onSelected: (Int) -> Unit,
+) {
+    if (photos.size <= 1) return
+    val end = (currentPage + 5).coerceAtMost(photos.size)
+    val start = (end - 8).coerceAtLeast(0).coerceAtMost(currentPage.coerceAtLeast(0))
+    val visible = photos.subList(start, end)
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        visible.forEachIndexed { offset, photo ->
+            val index = start + offset
+            ViewerThumbnail(
+                photo = photo,
+                selected = index == currentPage,
+                onClick = { onSelected(index) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ViewerThumbnail(
+    photo: PhotoEntity,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(8.dp)
+    AsyncImage(
+        model = Uri.parse(photo.uri),
+        contentDescription = photo.displayName,
+        modifier = Modifier
+            .size(width = 66.dp, height = 66.dp)
+            .clip(shape)
+            .border(
+                width = if (selected) 3.dp else 1.dp,
+                color = if (selected) Color.White else Color.White.copy(alpha = 0.18f),
+                shape = shape,
+            )
+            .clickable(onClick = onClick),
+        contentScale = ContentScale.Crop,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PhotoExifSheet(photo: PhotoEntity, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("EXIF 信息", style = MaterialTheme.typography.headlineSmall)
+            ExifLine("文件名", photo.displayName)
+            ExifLine("相册", photo.folderName)
+            ExifLine("类型", photoMediaKindLabel(photo))
+            ExifLine("尺寸", photo.width.toString() + " x " + photo.height.toString())
+            ExifLine("大小", formatSize(photo.size))
+            ExifLine("设备", listOfNotNull(photo.exifMake, photo.exifModel).joinToString(" ").ifBlank { "未知" })
+            ExifLine("镜头", photo.exifLensModel ?: "未知")
+            ExifLine("焦距", photo.exifFocalLength ?: "未知")
+            ExifLine("光圈", photo.exifAperture ?: "未知")
+            ExifLine("ISO", photo.exifIso ?: "未知")
+            ExifLine("快门", photo.exifExposureTime ?: "未知")
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun ExifLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.28f))
+        Text(value.ifBlank { "未知" }, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(0.72f))
+    }
+}
+
+private fun formatViewerDateTime(timeMillis: Long): String {
+    if (timeMillis <= 0L) return "未知时间"
+    return SimpleDateFormat("yyyy年M月d日 HH:mm", Locale.CHINA).format(Date(timeMillis))
+}
+
+@Composable
+private fun ViewerAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = modifier.clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(46.dp).background(Color.Transparent, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(31.dp))
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.White.copy(alpha = 0.78f),
+            maxLines = 2,
+        )
+    }
+}
 
 @Composable
 private fun ZoomableViewerPhoto(
@@ -424,21 +559,6 @@ private fun MotionPhotoVideoPlayer(
         ) {
             Icon(Icons.Rounded.Close, contentDescription = "关闭实况")
         }
-    }
-}
-
-@Composable
-private fun ViewerAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit,
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(52.dp)) {
-            Icon(icon, contentDescription = label)
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color(0xFFBEEBFF))
     }
 }
 

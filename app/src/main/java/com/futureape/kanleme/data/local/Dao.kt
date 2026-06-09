@@ -146,6 +146,9 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
     fun observeRecent(limit: Int): Flow<List<VideoEntity>>
 
+    @Query("SELECT * FROM videos WHERE deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
+    fun observeTimeline(limit: Int): Flow<List<VideoEntity>>
+
     @Query("SELECT * FROM videos WHERE deletion_status = 'none' AND strftime('%m-%d', date_taken / 1000, 'unixepoch', 'localtime') = strftime('%m-%d', :now / 1000, 'unixepoch', 'localtime') AND strftime('%Y', date_taken / 1000, 'unixepoch', 'localtime') != strftime('%Y', :now / 1000, 'unixepoch', 'localtime') ORDER BY date_taken DESC LIMIT :limit")
     fun observeTodayInHistory(now: Long = System.currentTimeMillis(), limit: Int = 400): Flow<List<VideoEntity>>
 
@@ -195,6 +198,9 @@ interface VideoDao {
 
     @Query("UPDATE videos SET processing_status = :processing, deletion_status = :deletion, updated_at = :now WHERE id = :id")
     suspend fun restoreStatus(id: Long, processing: String, deletion: String, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE videos SET folder_path = :relativePath, folder_name = :folderName, updated_at = :now WHERE id = :id")
+    suspend fun updateFolder(id: Long, relativePath: String, folderName: String, now: Long = System.currentTimeMillis())
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(items: List<VideoEntity>)

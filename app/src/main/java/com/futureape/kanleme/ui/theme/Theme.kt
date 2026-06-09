@@ -12,22 +12,32 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.futureape.kanleme.data.settings.ThemeMode
 
+private val LightAccent = Color(0xFFC7ECFE)
+private val LightAccentInk = Color(0xFF256E8E)
+
 private fun lightScheme(primary: Color) = lightColorScheme(
-    primary = primary,
+    primary = LightAccentInk,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD8EEFB),
-    onPrimaryContainer = Color(0xFF14394C),
-    secondary = Color(0xFF7CC6F2),
-    onSecondary = Color(0xFF0B2D40),
-    tertiary = Color(0xFF5D5AA7),
-    onTertiary = Color.White,
-    background = Color(0xFFF3F7FB),
-    onBackground = Color(0xFF17232B),
+    primaryContainer = LightAccent,
+    onPrimaryContainer = Color(0xFF103548),
+    secondary = LightAccent,
+    onSecondary = Color(0xFF103548),
+    secondaryContainer = Color(0xFFEAF8FF),
+    onSecondaryContainer = Color(0xFF263F4D),
+    tertiary = Color(0xFF8ECBEA),
+    onTertiary = Color(0xFF12384A),
+    tertiaryContainer = Color(0xFFF0FAFF),
+    onTertiaryContainer = Color(0xFF263F4D),
+    background = Color.White,
+    onBackground = Color(0xFF171D21),
     surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF17232B),
-    surfaceVariant = Color(0xFFE8F0F7),
-    onSurfaceVariant = Color(0xFF5D6D78),
-    outline = Color(0xFFC5D2DB),
+    onSurface = Color(0xFF171D21),
+    surfaceVariant = Color(0xFFF3F7FA),
+    onSurfaceVariant = Color(0xFF606C73),
+    outline = Color(0xFFD9E2E7),
+    outlineVariant = Color(0xFFEAF0F4),
+    inverseSurface = Color(0xFF1D252A),
+    inverseOnSurface = Color.White,
 )
 
 private fun darkScheme(primary: Color) = darkColorScheme(
@@ -63,7 +73,7 @@ private fun darkScheme(primary: Color) = darkColorScheme(
 @Composable
 fun KanlemeTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
-    accentColor: Long = 0xFF2F6886,
+    accentColor: Long = 0xFFC7ECFE,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {

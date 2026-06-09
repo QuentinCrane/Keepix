@@ -129,10 +129,10 @@ fun KanlemeApp(initialShortcutTarget: String?, viewModel: KanlemeViewModel = hil
                         onPhoto = { navController.navigate(Destinations.PHOTO_START) },
                         onVideo = { navController.navigate(Destinations.VIDEO_START) },
                         onTimeline = { navController.navigate(Destinations.TIMELINE) },
-                        onSimilar = { navController.navigate(Destinations.SIMILAR) },
                         onTrash = { navController.navigate(Destinations.TRASH) },
                         onFavorites = { navController.navigate(Destinations.FAVORITES) },
                         onToday = { navController.navigate(Destinations.TODAY) },
+                        onReport = { navController.navigate(Destinations.ANNUAL) },
                     )
                 }
                 composable(Destinations.PHOTO_START) {

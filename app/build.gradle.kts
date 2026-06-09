@@ -14,8 +14,8 @@ android {
         applicationId = "com.futureape.kanleme"
         minSdk = 30
         targetSdk = 35
-        versionCode = 55
-        versionName = "2.2.9"
+        versionCode = 56
+        versionName = "2.3.0"
 
         vectorDrawables.useSupportLibrary = true
     }
@@ -23,6 +23,15 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("${rootProject.projectDir}/keepix-release.p12")
+            storePassword = "kanleme2026"
+            keyAlias = "keepix-release"
+            keyPassword = "kanleme2026"
+        }
     }
 
     buildTypes {
@@ -33,6 +42,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isMinifyEnabled = false

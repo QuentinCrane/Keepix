@@ -275,6 +275,13 @@ private object MotionPreviewAutoplayMemory {
     }
 }
 
+data class PhotoSwipeFeedback(
+    val action: SwipeAction? = null,
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f,
+    val intensity: Float = 0f,
+)
+
 @Composable
 fun PhotoDeckStage(
     photos: List<PhotoEntity>,
@@ -283,6 +290,7 @@ fun PhotoDeckStage(
     modifier: Modifier = Modifier,
     onOpen: (PhotoEntity) -> Unit = {},
     onTopCardPositioned: (Rect) -> Unit = {},
+    onSwipeFeedbackChanged: (PhotoSwipeFeedback) -> Unit = {},
     onAction: (PhotoEntity, SwipeAction) -> Unit,
 ) {
     val top = photos.firstOrNull() ?: return
@@ -324,6 +332,7 @@ fun PhotoDeckStage(
             settings = settings,
             haptics = haptics,
             onOpen = { onOpen(top) },
+            onSwipeFeedbackChanged = onSwipeFeedbackChanged,
             onAction = { onAction(top, it) },
             modifier = Modifier
                 .fillMaxWidth(0.96f)
@@ -338,6 +347,7 @@ fun SwipePhotoCard(
     settings: AppSettings,
     haptics: HapticKit,
     onOpen: () -> Unit = {},
+    onSwipeFeedbackChanged: (PhotoSwipeFeedback) -> Unit = {},
     onAction: (SwipeAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -379,7 +389,6 @@ fun SwipePhotoCard(
         launch { entryScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) }
         entryOffsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
     }
-
     suspend fun startInlineMotionPreview(manual: Boolean) {
         if (!canInlinePlayMotion) return
         if (!manual && MotionPreviewAutoplayMemory.hasPlayed(photo.id)) {
@@ -429,6 +438,24 @@ fun SwipePhotoCard(
         }
         if (horizontalDominant && absX > horizontalThreshold) return SwipeAction.Keep
         return null
+    }
+
+    fun visualFeedback(x: Float, y: Float): PhotoSwipeFeedback {
+        val absX = abs(x)
+        val absY = abs(y)
+        val verticalDominant = absY >= absX * verticalDominanceRatio
+        val horizontalDominant = absX >= absY * horizontalDominanceRatio
+        if (verticalDominant) {
+            val action = verticalAction(y)
+            val needed = if (action == SwipeAction.Delete) deleteVerticalThreshold else favoriteVerticalThreshold
+            val progress = (absY / needed).coerceIn(0f, 1f)
+            return PhotoSwipeFeedback(action = action, offsetX = x, offsetY = y, intensity = progress)
+        }
+        if (horizontalDominant) {
+            val progress = (absX / horizontalThreshold).coerceIn(0f, 1f)
+            return PhotoSwipeFeedback(action = SwipeAction.Keep, offsetX = x, offsetY = y, intensity = progress)
+        }
+        return PhotoSwipeFeedback()
     }
 
     Box(
@@ -487,6 +514,7 @@ fun SwipePhotoCard(
                                 val nextY = offsetY.value + delta.y
                                 val zoneAction = classify(nextX, nextY)
                                 activeHint = zoneAction
+                                onSwipeFeedbackChanged(visualFeedback(nextX, nextY))
                                 val zone = zoneAction?.name.orEmpty()
                                 if (zone.isNotEmpty() && zone != lastZone) {
                                     lastZone = zone
@@ -511,6 +539,7 @@ fun SwipePhotoCard(
                         val action = if (dragging) classify(offsetX.value, offsetY.value) else null
                         if (action == null) {
                             activeHint = null
+                            onSwipeFeedbackChanged(PhotoSwipeFeedback())
                             scope.launch { offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) }
                             scope.launch { offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) }
                         } else {
@@ -532,6 +561,7 @@ fun SwipePhotoCard(
                                 // Keep the old card off-screen until the deck state swaps.
                                 // Snapping it back to 0 here caused a one-frame jump/flash before the next photo appeared.
                                 activeHint = null
+                                onSwipeFeedbackChanged(PhotoSwipeFeedback())
                                 lastZone = ""
                             }
                         }
@@ -588,22 +618,6 @@ fun SwipePhotoCard(
                 manualHint = inlineMotionManualHint,
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp),
             )
-            val actionHint = activeHint
-            if (actionHint != null && feedbackAlpha > 0.18f) {
-                val hintAlignment = when (actionHint) {
-                    SwipeAction.Delete -> Alignment.TopCenter
-                    SwipeAction.Favorite -> Alignment.BottomCenter
-                    SwipeAction.Keep -> if (offsetX.value < 0f) Alignment.CenterStart else Alignment.CenterEnd
-                }
-                Box(
-                    modifier = Modifier
-                        .align(hintAlignment)
-                        .padding(18.dp)
-                        .graphicsLayer { alpha = feedbackAlpha },
-                ) {
-                    EdgeSwipeHint(actionHint)
-                }
-            }
         }
     }
 }

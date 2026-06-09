@@ -1,6 +1,7 @@
 package com.futureape.kanleme.ui.screens
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -20,11 +21,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -34,10 +38,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Swipe
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -56,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +72,6 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
-import com.futureape.kanleme.data.settings.FolderDisplayMode
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.util.rememberHapticKit
@@ -89,24 +93,26 @@ fun PhotoCleanScreen(
     val scope by viewModel.photoScope.collectAsStateWithLifecycle()
     val folders by viewModel.photoFolders.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val sessionActionCount by viewModel.photoSessionActionCount.collectAsStateWithLifecycle()
+    val lastPhotoAction by viewModel.lastPhotoAction.collectAsStateWithLifecycle()
     val haptics = rememberHapticKit(settings)
     val context = LocalContext.current
     var showGuide by remember { mutableStateOf(false) }
-    var albumPickerExpanded by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showFolderPicker by remember { mutableStateOf(false) }
+    var photoSwipeFeedback by remember { mutableStateOf(PhotoSwipeFeedback()) }
     var guideTargets by remember { mutableStateOf<Map<PhotoGuideTarget, Rect>>(emptyMap()) }
+
+    fun leaveCleaning() {
+        viewModel.resetPhotoSessionDateMode()
+        onBack()
+    }
+
+    BackHandler(onBack = ::leaveCleaning)
 
     fun updateGuideTarget(target: PhotoGuideTarget, rect: Rect) {
         guideTargets = guideTargets + (target to rect)
     }
-
-    val folderPairs = remember(folders) {
-        folders.mapNotNull { path ->
-            val label = path.trim('/').substringAfterLast('/').ifBlank { return@mapNotNull null }
-            label to path
-        }.distinctBy { it.first }.take(18)
-    }
-    var selectedFolder by remember(folderPairs) { mutableStateOf("指定归档") }
-    val selectedTargetPath = folderPairs.firstOrNull { it.first == selectedFolder }?.second
 
     LaunchedEffect(Unit) {
         // Do not reload a non-empty deck when returning from the viewer.
@@ -132,7 +138,7 @@ fun PhotoCleanScreen(
 
     if (deck.isEmpty()) {
         Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-            ScreenHeader("照片整理", "连续整理模式，不按固定轮次停止", onBack)
+            ScreenHeader("照片整理", "连续整理模式，不按固定轮次停止", ::leaveCleaning)
             Box(Modifier.fillMaxSize().padding(18.dp), contentAlignment = Alignment.Center) {
                 if (deckPreparing) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -155,56 +161,54 @@ fun PhotoCleanScreen(
 
     val currentPhoto = deck.first()
     val remainingPhotos = (dashboard.photoCount - dashboard.processedPhotoCount).coerceAtLeast(deck.size)
-    val folderLabels = remember(folderPairs, settings.folderDisplay) {
-        val base = folderPairs.map { it.first }.ifEmpty { listOf("Camera (DCIM)", "Screenshots", "Downloads") }
-        if (settings.folderDisplay == FolderDisplayMode.SINGLE_LINE) base.take(12) else base.take(24)
-    }
-    // The guide overlay now owns the scrim. Do not stack another black layer here, or the page becomes unreadable.
-    val dimAlpha by animateFloatAsState(targetValue = 0f, label = "guide_dim")
+    val dimAlpha by animateFloatAsState(targetValue = if (showGuide) 0.46f else 0f, label = "guide_dim")
 
     fun perform(photo: PhotoEntity, action: SwipeAction) {
-        haptics.success()
-        viewModel.onPhotoActionWithOptionalMove(photo, action, selectedTargetPath)
+        when (action) {
+            SwipeAction.Keep -> haptics.keep()
+            SwipeAction.Delete -> haptics.delete()
+            SwipeAction.Favorite -> haptics.favorite()
+        }
+        viewModel.onPhotoAction(photo, action)
     }
 
     Box(Modifier.fillMaxSize()) {
-        if (settings.immersiveBackground) {
-            Crossfade(
-                targetState = currentPhoto.uri,
-                animationSpec = tween(durationMillis = 560),
-                label = "photo_background_crossfade",
-            ) { photoUri ->
-                Box(Modifier.fillMaxSize().background(Color.Black)) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(Uri.parse(photoUri))
-                            .memoryCacheKey(photoUri)
-                            .diskCacheKey(photoUri)
-                            .placeholderMemoryCacheKey(photoUri)
-                            .crossfade(false)
-                            .build(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize().blur(22.dp),
-                        contentScale = ContentScale.Crop,
-                    )
-                }
+        Crossfade(
+            targetState = currentPhoto.uri,
+            animationSpec = tween(durationMillis = 560),
+            label = "photo_background_crossfade",
+        ) { photoUri ->
+            Box(Modifier.fillMaxSize().background(Color.Black)) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(Uri.parse(photoUri))
+                        .memoryCacheKey(photoUri)
+                        .diskCacheKey(photoUri)
+                        .placeholderMemoryCacheKey(photoUri)
+                        .crossfade(false)
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().blur(18.dp),
+                    contentScale = ContentScale.Crop,
+                )
             }
         }
-        val oledDark = MaterialTheme.colorScheme.background == Color.Black
-        val scrimColors = if (oledDark) {
-            listOf(
-                Color.Black.copy(alpha = if (settings.immersiveBackground) 0.30f else 1.00f),
-                Color.Black.copy(alpha = if (settings.immersiveBackground) 0.22f else 1.00f),
-                Color.Black.copy(alpha = if (settings.immersiveBackground) 0.45f else 1.00f),
-            )
-        } else {
-            listOf(
-                Color.White.copy(alpha = if (settings.immersiveBackground) 0.40f else 0.90f),
-                MaterialTheme.colorScheme.primary.copy(alpha = if (settings.immersiveBackground) 0.16f else 0.07f),
-                Color.Black.copy(alpha = if (settings.immersiveBackground) 0.26f else 0.02f),
-            )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.32f),
+                            Color.Black.copy(alpha = 0.18f),
+                            Color.Black.copy(alpha = 0.38f),
+                        )
+                    )
+                )
+        )
+        if (settings.photoShowGestureHint) {
+            PhotoEdgeGlow(feedback = photoSwipeFeedback)
         }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(scrimColors)))
 
         AdaptiveWidthInfo { _, isExpanded ->
             Box(
@@ -229,58 +233,9 @@ fun PhotoCleanScreen(
                     }),
                     onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
                     onTopCardPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.PhotoCard, rect) },
+                    onSwipeFeedbackChanged = { photoSwipeFeedback = it },
                     onAction = { photo, action -> perform(photo, action) },
                 )
-
-                if (settings.photoShowTopBar || settings.photoShowShuffleButton || settings.photoShowFilterChips) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .onGloballyPositioned { coordinates ->
-                                updateGuideTarget(PhotoGuideTarget.TopBar, coordinates.boundsInRoot())
-                            },
-                    ) {
-                        PhotoOrganizerTopControls(
-                            remainingCount = remainingPhotos,
-                            progressPercent = if (dashboard.photoCount > 0) ((dashboard.processedPhotoCount * 100f) / dashboard.photoCount).toInt().coerceIn(0, 100) else 0,
-                            deletedCount = dashboard.pendingDeleteCount,
-                            deletedSizeBytes = dashboard.pendingDeleteBytes,
-                            mediaCounts = listOf(
-                                "全部" to typeStats.all.toString(),
-                                "普通照片" to typeStats.normal.toString(),
-                                "截图" to typeStats.screenshot.toString(),
-                                "自拍" to typeStats.selfie.toString(),
-                                "实况" to typeStats.motion.toString(),
-                                "GIF" to typeStats.gif.toString(),
-                                "长图" to typeStats.longImage.toString(),
-                            ),
-                            selectedMediaIndex = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long").indexOf(scope.mediaType).coerceAtLeast(0),
-                            dateMode = scope.dateMode,
-                            randomEnabled = scope.sortOrder == "random",
-                            showKeep = settings.photoShowTopBar,
-                            showShuffle = settings.photoShowShuffleButton,
-                            showFilters = settings.photoShowFilterChips,
-                            showRemaining = settings.photoShowTopBar,
-                            onKeep = { perform(currentPhoto, SwipeAction.Keep) },
-                            onShuffle = { haptics.threshold(); viewModel.reshufflePhotoCleaningSession() },
-                            onMediaSelected = { index ->
-                                val type = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long").getOrElse(index) { "all" }
-                                haptics.tick()
-                                viewModel.setPhotoTypeFilter(type)
-                            },
-                            onDateSelected = { index ->
-                                haptics.tick()
-                                when (index) {
-                                    0 -> viewModel.setPhotoDateMode("all")
-                                    1 -> viewModel.setPhotoDateMode("seven_days")
-                                    2 -> viewModel.setPhotoDateMode("month")
-                                    3 -> viewModel.setPhotoDateMode("year")
-                                }
-                            },
-                        )
-                    }
-                }
 
                 if (settings.photoShowInfoBar || settings.photoShowFolderChips) {
                     Column(
@@ -296,43 +251,83 @@ fun PhotoCleanScreen(
                         CompactPhotoInfoBar(
                             remaining = remainingPhotos,
                             photo = currentPhoto,
-                            selectedAlbum = selectedFolder,
+                            selectedAlbum = "指定归档",
+                            sessionActionCount = sessionActionCount,
+                            lastAction = lastPhotoAction,
                             showInfo = settings.photoShowInfoBar,
                             showAlbum = settings.photoShowFolderChips,
                             onOpen = { haptics.tick(); onOpenPhoto(currentPhoto) },
-                            onAlbumClick = { haptics.tick(); albumPickerExpanded = !albumPickerExpanded },
+                            onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
+                            onAlbumClick = { haptics.tick(); showFolderPicker = true },
                             onAlbumPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.AlbumButton, rect) },
                         )
-                        androidx.compose.animation.AnimatedVisibility(visible = albumPickerExpanded && settings.photoShowFolderChips) {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                                FolderChipRail(
-                                    folders = listOf("指定归档") + folderLabels,
-                                    selected = selectedFolder,
-                                    onSelected = {
-                                        haptics.tick(); selectedFolder = it; albumPickerExpanded = false
-                                        if (it != "指定归档") viewModel.setPhotoFolder(folderPairs.firstOrNull { pair -> pair.first == it }?.second) else viewModel.setPhotoFolder(null)
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                if (settings.excludedFolderPaths.isNotEmpty()) {
-                                    Text(
-                                        "已排除 " + settings.excludedFolderPaths.size + " 个文件夹",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }
+        }
+        if (settings.photoShowTopBar || settings.photoShowShuffleButton || settings.photoShowFilterChips) {
+            PhotoOrganizerTopControls(
+                remainingCount = remainingPhotos,
+                progressPercent = if (dashboard.photoCount > 0) ((dashboard.processedPhotoCount * 100f) / dashboard.photoCount).toInt().coerceIn(0, 100) else 0,
+                deletedSizeBytes = dashboard.pendingDeleteBytes,
+                mediaCounts = listOf(
+                    "全部" to typeStats.all.toString(),
+                    "普通照片" to typeStats.normal.toString(),
+                    "截图" to typeStats.screenshot.toString(),
+                    "自拍" to typeStats.selfie.toString(),
+                    "实况" to typeStats.motion.toString(),
+                    "GIF" to typeStats.gif.toString(),
+                    "长图" to typeStats.longImage.toString(),
+                ),
+                selectedMediaIndex = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long").indexOf(scope.mediaType).coerceAtLeast(0),
+                dateMode = scope.dateMode,
+                randomEnabled = scope.sortOrder == "random",
+                showShuffle = settings.photoShowShuffleButton,
+                showFilters = settings.photoShowFilterChips,
+                showRemaining = settings.photoShowTopBar,
+                onShuffle = { haptics.threshold(); viewModel.reshufflePhotoCleaningSession() },
+                onMediaSelected = { index ->
+                    val type = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long").getOrElse(index) { "all" }
+                    haptics.tick()
+                    viewModel.setPhotoTypeFilter(type)
+                },
+                onDateClick = { haptics.tick(); showDatePicker = true },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(top = 10.dp)
+                    .onGloballyPositioned { coordinates ->
+                        updateGuideTarget(PhotoGuideTarget.TopBar, coordinates.boundsInRoot())
+                    },
+            )
+        }
+        if (settings.photoShowGestureHint) {
+            PhotoFloatingActionHint(feedback = photoSwipeFeedback)
         }
 
         if (dimAlpha > 0.01f) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dimAlpha)))
         }
         androidx.compose.animation.AnimatedVisibility(visible = showGuide, modifier = Modifier.fillMaxSize()) {
-            PhotoPositionGuideOverlay(targets = guideTargets, onDismiss = { haptics.tick(); showGuide = false; viewModel.markPhotoGuideShown() })
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                PhotoGuideDialog(onDismiss = { haptics.tick(); showGuide = false; viewModel.markPhotoGuideShown() })
+            }
+        }
+        OrganizerDatePickerAnimatedOverlay(
+            visible = showDatePicker,
+            title = "照片时间筛选",
+            currentMode = scope.dateMode,
+            onApply = { mode -> haptics.tick(); viewModel.setPhotoSessionDateMode(mode) },
+            onDismiss = { showDatePicker = false },
+        )
+        if (showFolderPicker) {
+            OrganizerFolderPickerOverlay(
+                title = "归档当前照片",
+                folders = folders.ifEmpty { listOf("DCIM/Camera/", "Pictures/", "Download/") },
+                onArchive = { path -> haptics.keep(); viewModel.archivePhotoToFolder(currentPhoto, path) },
+                onDismiss = { showFolderPicker = false },
+            )
         }
     }
 }
@@ -458,44 +453,29 @@ private enum class PhotoQuickPanel { MEDIA, DATE }
 private fun PhotoOrganizerTopControls(
     remainingCount: Int,
     progressPercent: Int,
-    deletedCount: Int,
     deletedSizeBytes: Long,
     mediaCounts: List<Pair<String, String>>,
     selectedMediaIndex: Int,
     dateMode: String,
     randomEnabled: Boolean,
-    showKeep: Boolean = true,
     showShuffle: Boolean = true,
     showFilters: Boolean = true,
     showRemaining: Boolean = true,
-    onKeep: () -> Unit,
     onShuffle: () -> Unit,
     onMediaSelected: (Int) -> Unit,
-    onDateSelected: (Int) -> Unit,
+    onDateClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var openPanel by remember { mutableStateOf<PhotoQuickPanel?>(null) }
-    val dateLabel = when (dateMode) {
-        "seven_days" -> "最近7天"
-        "month" -> "本月"
-        "year" -> "今年"
-        else -> "全部时间"
-    }
+    val dateLabel = organizerDateModeLabel(dateMode)
     val mediaLabel = mediaCounts.getOrNull(selectedMediaIndex)?.first ?: "全部"
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (showKeep) {
-                CompactControlPill(
-                    title = "保留",
-                    subtitle = "当前图",
-                    icon = Icons.Rounded.CheckCircle,
-                    onClick = onKeep,
-                )
-            }
             if (showShuffle) {
                 CompactControlPill(
                     title = "重新随机",
@@ -517,14 +497,19 @@ private fun PhotoOrganizerTopControls(
                     title = "时间筛选",
                     subtitle = dateLabel,
                     icon = Icons.Rounded.CalendarToday,
-                    selected = openPanel == PhotoQuickPanel.DATE,
-                    onClick = { openPanel = if (openPanel == PhotoQuickPanel.DATE) null else PhotoQuickPanel.DATE },
+                    selected = dateMode != "all",
+                    onClick = onDateClick,
                 )
             }
             if (showRemaining) {
-                PendingDeletePill(deletedCount, deletedSizeBytes)
-                ProgressPercentPill(progressPercent)
-                RemainingCountPill(remainingCount)
+                OrganizerProgressPill(
+                    progressPercent = progressPercent,
+                    remainingCount = remainingCount,
+                    remainingLabel = "张",
+                    releasableBytes = deletedSizeBytes,
+                    modifier = Modifier.width(94.dp),
+                    compact = true,
+                )
             }
         }
 
@@ -533,18 +518,6 @@ private fun PhotoOrganizerTopControls(
                 chips = mediaCounts,
                 selectedIndex = selectedMediaIndex,
                 onSelected = { index -> onMediaSelected(index); openPanel = null },
-            )
-        }
-        androidx.compose.animation.AnimatedVisibility(visible = showFilters && openPanel == PhotoQuickPanel.DATE) {
-            FilterChipRail(
-                chips = listOf(
-                    "全部时间" to "",
-                    "最近7天" to "",
-                    "本月" to "",
-                    "今年" to "",
-                ),
-                selectedIndex = listOf("all", "seven_days", "month", "year").indexOf(dateMode).coerceAtLeast(0),
-                onSelected = { index -> onDateSelected(index); openPanel = null },
             )
         }
     }
@@ -647,17 +620,34 @@ private fun CompactPhotoInfoBar(
     remaining: Int,
     photo: PhotoEntity,
     selectedAlbum: String,
+    sessionActionCount: Int,
+    lastAction: SwipeAction?,
     showInfo: Boolean = true,
     showAlbum: Boolean = true,
     onOpen: () -> Unit,
+    onUndo: () -> Unit,
     onAlbumClick: () -> Unit,
     onAlbumPositioned: (Rect) -> Unit = {},
 ) {
+    val actionColor = actionFeedbackColor(lastAction, MaterialTheme.colorScheme.primary)
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        Surface(
+            modifier = Modifier.size(62.dp),
+            shape = CircleShape,
+            color = actionColor.copy(alpha = 0.20f),
+            contentColor = Color.White,
+            border = BorderStroke(1.5.dp, actionColor.copy(alpha = 0.72f)),
+            onClick = onUndo,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Text(sessionActionCount.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, maxLines = 1)
+                Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "回到上一张照片", modifier = Modifier.size(16.dp), tint = Color.White.copy(alpha = 0.88f))
+            }
+        }
         if (showInfo) {
             Surface(
                 modifier = Modifier.weight(1f).height(66.dp).clickable(onClick = onOpen),
@@ -705,3 +695,128 @@ private fun CompactPhotoInfoBar(
     }
 }
 
+private fun photoGestureColor(action: SwipeAction): Color = when (action) {
+    SwipeAction.Keep -> Color(0xFF4A9CF6)
+    SwipeAction.Favorite -> Color(0xFF58B96A)
+    SwipeAction.Delete -> Color(0xFFE74C4C)
+}
+
+@Composable
+private fun PhotoEdgeGlow(feedback: PhotoSwipeFeedback) {
+    val action = feedback.action ?: return
+    val activeColor = photoGestureColor(action)
+    val edgeAlpha by animateFloatAsState(
+        targetValue = (0.18f + feedback.intensity * 0.82f).coerceIn(0f, 1f),
+        animationSpec = tween(100),
+        label = "photo_edge_feedback",
+    )
+    Box(Modifier.fillMaxSize()) {
+        when (action) {
+            SwipeAction.Keep -> {
+                val draggingRight = feedback.offsetX >= 0f
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            if (draggingRight) {
+                                Brush.horizontalGradient(
+                                    0.0f to Color.Transparent,
+                                    0.48f to Color.Transparent,
+                                    0.72f to activeColor.copy(alpha = edgeAlpha * 0.10f),
+                                    0.90f to activeColor.copy(alpha = edgeAlpha * 0.30f),
+                                    1.0f to activeColor.copy(alpha = edgeAlpha * 0.72f),
+                                )
+                            } else {
+                                Brush.horizontalGradient(
+                                    0.0f to activeColor.copy(alpha = edgeAlpha * 0.72f),
+                                    0.10f to activeColor.copy(alpha = edgeAlpha * 0.30f),
+                                    0.28f to activeColor.copy(alpha = edgeAlpha * 0.10f),
+                                    0.52f to Color.Transparent,
+                                    1.0f to Color.Transparent,
+                                )
+                            }
+                        ),
+                )
+            }
+            SwipeAction.Delete -> Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to activeColor.copy(alpha = edgeAlpha * 0.68f),
+                            0.14f to activeColor.copy(alpha = edgeAlpha * 0.28f),
+                            0.34f to activeColor.copy(alpha = edgeAlpha * 0.10f),
+                            0.56f to Color.Transparent,
+                            1.0f to Color.Transparent,
+                        )
+                    ),
+            )
+            SwipeAction.Favorite -> Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to Color.Transparent,
+                            0.44f to Color.Transparent,
+                            0.66f to activeColor.copy(alpha = edgeAlpha * 0.10f),
+                            0.86f to activeColor.copy(alpha = edgeAlpha * 0.28f),
+                            1.0f to activeColor.copy(alpha = edgeAlpha * 0.68f),
+                        )
+                    ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.PhotoFloatingActionHint(feedback: PhotoSwipeFeedback) {
+    val action = feedback.action ?: return
+    val color = photoGestureColor(action)
+    val intensity = feedback.intensity.coerceIn(0f, 1f)
+    val entrance = 2.dp + 130.dp * intensity
+    val alpha = (0.10f + intensity * 0.90f).coerceIn(0f, 1f)
+    val modifier = when (action) {
+        SwipeAction.Keep -> {
+            if (feedback.offsetX >= 0f) {
+                Modifier.align(Alignment.CenterEnd).padding(end = entrance)
+            } else {
+                Modifier.align(Alignment.CenterStart).padding(start = entrance)
+            }
+        }
+        SwipeAction.Delete -> Modifier.align(Alignment.TopCenter).padding(top = 28.dp + 112.dp * intensity)
+        SwipeAction.Favorite -> Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp + 110.dp * intensity)
+    }
+    val arrow = when (action) {
+        SwipeAction.Keep -> if (feedback.offsetX >= 0f) "›" else "‹"
+        SwipeAction.Delete -> "×"
+        SwipeAction.Favorite -> "♥"
+    }
+    val label = when (action) {
+        SwipeAction.Keep -> "保留"
+        SwipeAction.Delete -> "待删"
+        SwipeAction.Favorite -> "收藏"
+    }
+    Column(
+        modifier = modifier.graphicsLayer {
+            this.alpha = alpha
+            val scale = 0.82f + 0.18f * intensity
+            scaleX = scale
+            scaleY = scale
+        },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Surface(
+            modifier = Modifier.size(70.dp),
+            shape = CircleShape,
+            color = color,
+            contentColor = Color.White,
+            shadowElevation = 8.dp,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(arrow, style = MaterialTheme.typography.displaySmall, color = Color.White, fontWeight = FontWeight.Black)
+            }
+        }
+        Text(label, style = MaterialTheme.typography.titleLarge, color = color, fontWeight = FontWeight.Black)
+    }
+}

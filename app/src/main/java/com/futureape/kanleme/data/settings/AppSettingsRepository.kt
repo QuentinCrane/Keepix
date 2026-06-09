@@ -34,6 +34,10 @@ class AppSettingsRepository @Inject constructor(
         val videoDefaultMuted = booleanPreferencesKey("video_default_muted")
         val videoDisplayMode = stringPreferencesKey("video_display_mode")
         val hapticLevel = stringPreferencesKey("haptic_level")
+        val keepHapticLevel = stringPreferencesKey("keep_haptic_level")
+        val deleteHapticLevel = stringPreferencesKey("delete_haptic_level")
+        val favoriteHapticLevel = stringPreferencesKey("favorite_haptic_level")
+        val undoHapticLevel = stringPreferencesKey("undo_haptic_level")
         val themeMode = stringPreferencesKey("theme_mode")
         val accentColor = longPreferencesKey("accent_color")
         val folderDisplay = stringPreferencesKey("folder_display")
@@ -45,6 +49,7 @@ class AppSettingsRepository @Inject constructor(
         val photoSortOrder = stringPreferencesKey("photo_sort_order")
         val photoRandomSeed = longPreferencesKey("photo_random_seed")
         val photoFolderPath = stringPreferencesKey("photo_folder_path")
+        val videoDateMode = stringPreferencesKey("video_date_mode")
         val videoSortOrder = stringPreferencesKey("video_sort_order")
         val videoRandomSeed = longPreferencesKey("video_random_seed")
         val videoFolderPath = stringPreferencesKey("video_folder_path")
@@ -82,17 +87,22 @@ class AppSettingsRepository @Inject constructor(
             videoDefaultMuted = p[Keys.videoDefaultMuted] ?: false,
             videoDisplayMode = p[Keys.videoDisplayMode].toEnum(VideoDisplayMode.IMMERSIVE_CROP),
             hapticLevel = p[Keys.hapticLevel].toEnum(HapticLevel.MEDIUM),
+            keepHapticLevel = p[Keys.keepHapticLevel].toEnum(HapticLevel.MEDIUM),
+            deleteHapticLevel = p[Keys.deleteHapticLevel].toEnum(HapticLevel.MEDIUM),
+            favoriteHapticLevel = p[Keys.favoriteHapticLevel].toEnum(HapticLevel.MEDIUM),
+            undoHapticLevel = p[Keys.undoHapticLevel].toEnum(HapticLevel.MEDIUM),
             themeMode = p[Keys.themeMode].toEnum(ThemeMode.SYSTEM),
-            accentColor = p[Keys.accentColor] ?: 0xFF2F6886,
+            accentColor = p[Keys.accentColor] ?: 0xFFC7ECFE,
             folderDisplay = p[Keys.folderDisplay].toEnum(FolderDisplayMode.SINGLE_LINE),
             immersiveBackground = p[Keys.immersiveBackground] ?: true,
             photoCleanMode = p[Keys.photoCleanMode].toEnum(PhotoCleanMode.NORMAL),
             homeMediaTab = sanitizeTab(p[Keys.homeMediaTab]),
-            photoDateMode = sanitizePhotoDateMode(p[Keys.photoDateMode]),
+            photoDateMode = sanitizeDateMode(p[Keys.photoDateMode]),
             photoMediaType = sanitizePhotoMediaType(p[Keys.photoMediaType]),
             photoSortOrder = sanitizeSortOrder(p[Keys.photoSortOrder]),
             photoRandomSeed = p[Keys.photoRandomSeed] ?: 1L,
             photoFolderPath = p[Keys.photoFolderPath].orEmpty(),
+            videoDateMode = sanitizeDateMode(p[Keys.videoDateMode]),
             videoSortOrder = sanitizeSortOrder(p[Keys.videoSortOrder]),
             videoRandomSeed = p[Keys.videoRandomSeed] ?: 1L,
             videoFolderPath = p[Keys.videoFolderPath].orEmpty(),
@@ -129,13 +139,17 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setVideoDefaultMuted(value: Boolean) = editBoolean(Keys.videoDefaultMuted, value)
     suspend fun setVideoDisplayMode(value: VideoDisplayMode) = editString(Keys.videoDisplayMode, value.name)
     suspend fun setHapticLevel(value: HapticLevel) = editString(Keys.hapticLevel, value.name)
+    suspend fun setKeepHapticLevel(value: HapticLevel) = editString(Keys.keepHapticLevel, value.name)
+    suspend fun setDeleteHapticLevel(value: HapticLevel) = editString(Keys.deleteHapticLevel, value.name)
+    suspend fun setFavoriteHapticLevel(value: HapticLevel) = editString(Keys.favoriteHapticLevel, value.name)
+    suspend fun setUndoHapticLevel(value: HapticLevel) = editString(Keys.undoHapticLevel, value.name)
     suspend fun setThemeMode(value: ThemeMode) = editString(Keys.themeMode, value.name)
     suspend fun setAccentColor(value: Long) = context.kanlemeSettingsDataStore.edit { it[Keys.accentColor] = value }
     suspend fun setFolderDisplay(value: FolderDisplayMode) = editString(Keys.folderDisplay, value.name)
     suspend fun setImmersiveBackground(value: Boolean) = editBoolean(Keys.immersiveBackground, value)
     suspend fun setPhotoCleanMode(value: PhotoCleanMode) = editString(Keys.photoCleanMode, value.name)
     suspend fun setHomeMediaTab(value: String) = editString(Keys.homeMediaTab, sanitizeTab(value))
-    suspend fun setPhotoDateMode(value: String) = editString(Keys.photoDateMode, sanitizePhotoDateMode(value))
+    suspend fun setPhotoDateMode(value: String) = editString(Keys.photoDateMode, sanitizeDateMode(value))
     suspend fun setPhotoMediaType(value: String) = editString(Keys.photoMediaType, sanitizePhotoMediaType(value))
     suspend fun setPhotoSortOrder(value: String) = editString(Keys.photoSortOrder, sanitizeSortOrder(value))
     suspend fun setPhotoSortOrderWithSeed(value: String, seed: Long) = context.kanlemeSettingsDataStore.edit { prefs ->
@@ -143,6 +157,7 @@ class AppSettingsRepository @Inject constructor(
         if (value == "random") prefs[Keys.photoRandomSeed] = seed
     }
     suspend fun setPhotoFolderPath(value: String?) = editString(Keys.photoFolderPath, value.orEmpty())
+    suspend fun setVideoDateMode(value: String) = editString(Keys.videoDateMode, sanitizeDateMode(value))
     suspend fun setVideoSortOrder(value: String) = editString(Keys.videoSortOrder, sanitizeSortOrder(value))
     suspend fun setVideoSortOrderWithSeed(value: String, seed: Long) = context.kanlemeSettingsDataStore.edit { prefs ->
         prefs[Keys.videoSortOrder] = sanitizeSortOrder(value)
@@ -192,9 +207,13 @@ class AppSettingsRepository @Inject constructor(
 
     private fun sanitizeSortOrder(value: String?): String = if (value == "newest") "newest" else "random"
 
-    private fun sanitizePhotoDateMode(value: String?): String = when (value) {
-        "seven_days", "month", "year", "today_history" -> value
-        else -> "all"
+    private fun sanitizeDateMode(value: String?): String {
+        val safe = value.orEmpty().trim()
+        if (safe in setOf("all", "seven_days", "month", "year", "today_history")) return safe
+        if (Regex("""y:\d{4}""").matches(safe)) return safe
+        if (Regex("""ym:\d{4}-\d{2}""").matches(safe)) return safe
+        if (Regex("""multiym:(\d{4}-\d{2})(,\d{4}-\d{2})*""").matches(safe)) return safe
+        return "all"
     }
 
     private fun sanitizePhotoMediaType(value: String?): String = when (value) {

@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -31,15 +32,18 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Photo
+import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Restore
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,7 +73,11 @@ import coil.compose.AsyncImage
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.components.GlassSurface
+import com.futureape.kanleme.ui.util.formatDate
+import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.openMediaInSystemGallery
+import com.futureape.kanleme.ui.util.shareMedia
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlin.math.ceil
 
@@ -77,6 +85,7 @@ import kotlin.math.ceil
 fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
     val trashItems by viewModel.trashItems.collectAsStateWithLifecycle()
     var previewItem by remember { mutableStateOf<TrashItemEntity?>(null) }
+    var selectedMediaType by remember { mutableStateOf("photo") }
     val context = LocalContext.current
     var pendingDeleteAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val systemDeleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -100,49 +109,68 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
         }
     }
 
+    val photoTrashItems = trashItems.filter { it.mediaType != "video" }
+    val videoTrashItems = trashItems.filter { it.mediaType == "video" }
+    val visibleTrashItems = if (selectedMediaType == "video") videoTrashItems else photoTrashItems
+
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-            ScreenHeader("系统回收站", "以照片墙查看待恢复内容，30 天安全期内可处理", onBack)
+            ScreenHeader(if (selectedMediaType == "video") "视频回收站" else "照片回收站", "照片和视频分开处理，30 天安全期内可恢复", onBack)
             if (trashItems.isEmpty()) {
                 EmptyState("回收站为空", "上滑待删或删除视频后，会先进入这里；你可以恢复或永久删除。", "返回整理", onBack, modifier = Modifier.padding(18.dp))
             } else {
-                TrashGalleryHeader(items = trashItems)
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(104.dp),
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 104.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(trashItems, key = { it.id }) { item ->
-                        TrashGridTile(
-                            item = item,
-                            onPreview = { previewItem = item },
-                        )
+                TrashGalleryHeader(
+                    items = trashItems,
+                    selectedMediaType = selectedMediaType,
+                    onTypeSelected = { selectedMediaType = it; previewItem = null },
+                )
+                if (visibleTrashItems.isEmpty()) {
+                    EmptyState(
+                        title = if (selectedMediaType == "video") "视频回收站为空" else "照片回收站为空",
+                        message = if (selectedMediaType == "video") "待删视频会单独显示在这里，不会和照片混在一起。" else "待删照片会单独显示在这里，不会和视频混在一起。",
+                        actionText = "切换类别",
+                        onAction = { selectedMediaType = if (selectedMediaType == "video") "photo" else "video" },
+                        modifier = Modifier.padding(18.dp),
+                    )
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(104.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 104.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(visibleTrashItems, key = { it.id }) { item ->
+                            TrashGridTile(
+                                item = item,
+                                onPreview = { previewItem = item },
+                            )
+                        }
                     }
                 }
             }
         }
 
-        if (trashItems.isNotEmpty()) {
+        if (visibleTrashItems.isNotEmpty()) {
             TrashBottomBar(
-                items = trashItems,
-                onRestoreAll = { viewModel.restoreAllTrash() },
-                onDeleteAll = { requestSystemDeleteAuthorization(trashItems) { viewModel.permanentlyDeleteAllTrash() } },
+                items = visibleTrashItems,
+                onRestoreAll = { visibleTrashItems.forEach { viewModel.restoreTrash(it.id) } },
+                onDeleteAll = { requestSystemDeleteAuthorization(visibleTrashItems) { visibleTrashItems.forEach { viewModel.permanentlyDeleteTrash(it.id) } } },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
 
         previewItem?.let { item ->
             TrashPreviewOverlay(
-                item = item,
+                items = visibleTrashItems,
+                initialItem = item,
                 onClose = { previewItem = null },
-                onRestore = {
-                    viewModel.restoreTrash(item.id)
+                onRestore = { target ->
+                    viewModel.restoreTrash(target.id)
                     previewItem = null
                 },
-                onDelete = {
-                    requestSystemDeleteAuthorization(listOf(item)) { viewModel.permanentlyDeleteTrash(item.id) }
+                onDelete = { target ->
+                    requestSystemDeleteAuthorization(listOf(target)) { viewModel.permanentlyDeleteTrash(target.id) }
                     previewItem = null
                 },
             )
@@ -151,34 +179,39 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun TrashGalleryHeader(items: List<TrashItemEntity>) {
+private fun TrashGalleryHeader(
+    items: List<TrashItemEntity>,
+    selectedMediaType: String,
+    onTypeSelected: (String) -> Unit,
+) {
     val photoCount = items.count { it.mediaType != "video" }
     val videoCount = items.size - photoCount
-    val totalSize = items.sumOf { it.size }
+    val selectedCount = if (selectedMediaType == "video") videoCount else photoCount
+    val selectedSize = items.filter { if (selectedMediaType == "video") it.mediaType == "video" else it.mediaType != "video" }.sumOf { it.size }
     GlassSurface(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.72f) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("安全回收", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    Text("${items.size} 个项目等待确认", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-                    Text("预计可释放 " + formatSize(totalSize), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (selectedMediaType == "video") "视频安全回收" else "照片安全回收", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(selectedCount.toString() + " 个项目等待确认", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    Text("预计可释放 " + formatSize(selectedSize), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Surface(shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), contentColor = MaterialTheme.colorScheme.primary) {
                     Text("30 天内可恢复", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TrashFilterPill("全部 " + items.size, selected = true)
-                TrashFilterPill("照片 $photoCount")
-                TrashFilterPill("视频 $videoCount")
+                TrashFilterPill("照片 " + photoCount, selected = selectedMediaType != "video", onClick = { onTypeSelected("photo") })
+                TrashFilterPill("视频 " + videoCount, selected = selectedMediaType == "video", onClick = { onTypeSelected("video") })
             }
         }
     }
 }
 
 @Composable
-private fun TrashFilterPill(text: String, selected: Boolean = false) {
+private fun TrashFilterPill(text: String, selected: Boolean = false, onClick: () -> Unit) {
     Surface(
+        modifier = Modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(999.dp),
         color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.13f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.46f),
         contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -279,38 +312,130 @@ private fun TrashBottomAction(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TrashPreviewOverlay(
-    item: TrashItemEntity,
+    items: List<TrashItemEntity>,
+    initialItem: TrashItemEntity,
     onClose: () -> Unit,
-    onRestore: () -> Unit,
-    onDelete: () -> Unit,
+    onRestore: (TrashItemEntity) -> Unit,
+    onDelete: (TrashItemEntity) -> Unit,
 ) {
     BackHandler(onBack = onClose)
+    if (items.isEmpty()) return
+    val context = LocalContext.current
+    val startIndex = items.indexOfFirst { it.id == initialItem.id }.takeIf { it >= 0 } ?: 0
+    val pagerState = rememberPagerState(initialPage = startIndex) { items.size }
+    val currentItem = items.getOrNull(pagerState.currentPage) ?: initialItem
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        ZoomableTrashMedia(item = item, modifier = Modifier.fillMaxSize())
-        Row(
-            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding().padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        HorizontalPager(
+            state = pagerState,
+            key = { page -> items.getOrNull(page)?.id ?: page },
+            modifier = Modifier.fillMaxSize(),
+        ) { page ->
+            val item = items.getOrNull(page) ?: return@HorizontalPager
+            ZoomableTrashMedia(item = item, modifier = Modifier.fillMaxSize())
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(92.dp)
+                .background(Color.Black.copy(alpha = 0.46f))
+                .statusBarsPadding()
+                .padding(horizontal = 12.dp),
         ) {
-            IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "关闭预览", tint = Color.White)
+            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterStart)) {
+                Icon(Icons.Rounded.Close, contentDescription = "关闭预览", tint = Color.White, modifier = Modifier.size(32.dp))
             }
-            Column(Modifier.weight(1f)) {
-                Text(item.displayName, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                Text(item.folderName + " · " + formatSize(item.size) + " · 双击或双指缩放", color = Color.White.copy(alpha = 0.72f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+            Text(
+                (pagerState.currentPage + 1).toString() + " / " + items.size.toString(),
+                color = Color.White,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            Surface(
+                modifier = Modifier.align(Alignment.CenterEnd).clickable {
+                    openMediaInSystemGallery(
+                        context = context,
+                        uri = Uri.parse(currentItem.uri),
+                        mimeType = currentItem.mimeType,
+                        title = currentItem.displayName,
+                    )
+                },
+                shape = RoundedCornerShape(999.dp),
+                color = Color.White.copy(alpha = 0.10f),
+                contentColor = Color.White,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(Icons.Rounded.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text("在相册中查看", style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                }
             }
         }
-        Surface(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(14.dp),
-            shape = RoundedCornerShape(30.dp),
-            color = Color(0xFF0B2431).copy(alpha = 0.92f),
-            contentColor = Color(0xFFBEEBFF),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7CC6F2).copy(alpha = 0.32f)),
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.68f),
+                            Color.Black.copy(alpha = 0.95f),
+                        )
+                    )
+                )
+                .navigationBarsPadding()
+                .padding(start = 20.dp, end = 20.dp, top = 96.dp, bottom = 18.dp),
         ) {
-            Row(modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
-                TrashPreviewAction("恢复", Icons.Rounded.Restore, onRestore)
-                TrashPreviewAction("永久删除", Icons.Rounded.DeleteForever, onDelete)
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    formatDate(currentItem.dateTaken),
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+                Text(
+                    trashPreviewSubtitle(currentItem),
+                    color = Color.White.copy(alpha = 0.72f),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    TrashPreviewWideAction(
+                        text = "分享",
+                        icon = Icons.Rounded.Share,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f),
+                        onClick = { shareMedia(context, Uri.parse(currentItem.uri), currentItem.mimeType, currentItem.displayName) },
+                    )
+                    TrashPreviewWideAction(
+                        text = "恢复",
+                        icon = Icons.Rounded.Restore,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onRestore(currentItem) },
+                    )
+                    TrashPreviewWideAction(
+                        text = "永久删除",
+                        icon = Icons.Rounded.DeleteForever,
+                        color = Color(0xFFC7332F),
+                        filled = true,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onDelete(currentItem) },
+                    )
+                }
             }
         }
     }
@@ -380,14 +505,39 @@ private fun ZoomableTrashMedia(item: TrashItemEntity, modifier: Modifier = Modif
     }
 }
 
+private fun trashPreviewSubtitle(item: TrashItemEntity): String {
+    val sizePart = formatSize(item.size)
+    val dimensionPart = if (item.width > 0 && item.height > 0) item.width.toString() + " x " + item.height.toString() else null
+    val durationPart = item.duration?.takeIf { it > 0L }?.let { formatDuration(it) }
+    return listOfNotNull(item.displayName, dimensionPart, durationPart, sizePart)
+        .joinToString("  ·  ")
+}
+
 @Composable
-private fun TrashPreviewAction(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(52.dp)) {
-            Icon(icon, contentDescription = text)
+private fun TrashPreviewWideAction(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier,
+    filled: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = modifier.height(58.dp).clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = if (filled) color else Color.Transparent,
+        contentColor = if (filled) Color.White else color,
+        border = if (filled) null else androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.46f)),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(19.dp))
+            Spacer(Modifier.size(7.dp))
+            Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
         }
-        Spacer(Modifier.height(4.dp))
-        Text(text, style = MaterialTheme.typography.labelSmall, color = Color(0xFFBEEBFF))
     }
 }
 

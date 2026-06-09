@@ -17,8 +17,12 @@ data class AppSettings(
     val videoDefaultMuted: Boolean = false,
     val videoDisplayMode: VideoDisplayMode = VideoDisplayMode.IMMERSIVE_CROP,
     val hapticLevel: HapticLevel = HapticLevel.MEDIUM,
+    val keepHapticLevel: HapticLevel = HapticLevel.MEDIUM,
+    val deleteHapticLevel: HapticLevel = HapticLevel.MEDIUM,
+    val favoriteHapticLevel: HapticLevel = HapticLevel.MEDIUM,
+    val undoHapticLevel: HapticLevel = HapticLevel.MEDIUM,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val accentColor: Long = 0xFF2F6886,
+    val accentColor: Long = 0xFFC7ECFE,
     val folderDisplay: FolderDisplayMode = FolderDisplayMode.SINGLE_LINE,
     val immersiveBackground: Boolean = true,
     val photoCleanMode: PhotoCleanMode = PhotoCleanMode.NORMAL,
@@ -28,6 +32,7 @@ data class AppSettings(
     val photoSortOrder: String = "random",
     val photoRandomSeed: Long = 1L,
     val photoFolderPath: String = "",
+    val videoDateMode: String = "all",
     val videoSortOrder: String = "random",
     val videoRandomSeed: Long = 1L,
     val videoFolderPath: String = "",
@@ -49,7 +54,7 @@ data class AppSettings(
     val videoShowProgressBar: Boolean = true,
     val videoShowShuffleButton: Boolean = true,
 ) {
-    val photoThreshold: Float get() = swipeSensitivity.thresholdScale * if (photoCleanMode == PhotoCleanMode.CONSERVATIVE) 1.18f else 1f
+    val photoThreshold: Float get() = swipeSensitivity.thresholdScale
     val videoSeekThresholdPx: Float get() = 80f * swipeSensitivity.thresholdScale
 }
 
@@ -95,7 +100,8 @@ enum class FolderDisplayMode(val label: String) {
 
 enum class PhotoCleanMode(val label: String, val description: String) {
     NORMAL("正常使用", "日常使用推荐，不额外记录，也不改变清理方式"),
-    CONSERVATIVE("保守确认", "待删动作会更谨慎，适合误触较多时使用"),
+    DIAGNOSTIC("帮助排查", "保持原来的清理体验，同时记录更多信息，方便定位问题"),
+    PERFORMANCE("流畅优先", "暂时关闭部分效果，减少卡顿，也方便判断问题是否和动效有关"),
 }
 
 fun nextBatchSize(current: Int): Int = when (current) {
@@ -106,7 +112,7 @@ fun nextBatchSize(current: Int): Int = when (current) {
 }
 
 fun nextAccentColor(current: Long): Long {
-    val palette = listOf(0xFF2F6886, 0xFF7CC6F2, 0xFF5F8D6B, 0xFF7A6AA6, 0xFFD86B86, 0xFFE39E42)
+    val palette = listOf(0xFFC7ECFE, 0xFFDDF5FF, 0xFFF4FBFF, 0xFFEAF8FF, 0xFFE8F0F7)
     val index = palette.indexOf(current).takeIf { it >= 0 } ?: 0
     return palette[(index + 1) % palette.size]
 }

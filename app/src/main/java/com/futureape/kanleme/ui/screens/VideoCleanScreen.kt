@@ -1,11 +1,15 @@
 package com.futureape.kanleme.ui.screens
 
 import android.net.Uri
+import android.os.SystemClock
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -19,18 +23,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.Button
@@ -58,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -90,6 +96,7 @@ import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -99,15 +106,30 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
     val videos = remember(rawVideos) { rawVideos.distinctBy { it.mediaStoreId } }
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val scope by viewModel.videoScope.collectAsStateWithLifecycle()
+    val folders by viewModel.videoFolders.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val videoSessionActionCount by viewModel.videoSessionActionCount.collectAsStateWithLifecycle()
+    val lastVideoAction by viewModel.lastVideoAction.collectAsStateWithLifecycle()
+    val pendingVideoKeeps by viewModel.pendingVideoKeeps.collectAsStateWithLifecycle()
     val haptics = rememberHapticKit(settings)
     val uiScope = rememberCoroutineScope()
     var showGuide by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showFolderPicker by remember { mutableStateOf(false) }
     val pagerState = rememberPagerState(pageCount = { videos.size.coerceAtLeast(1) })
     var lastAppliedShuffleSeed by remember { mutableStateOf(scope.randomSeed) }
+    var lastSettledPage by remember { mutableIntStateOf(0) }
     val dimAlpha by animateFloatAsState(targetValue = if (showGuide && videos.isNotEmpty()) 0.55f else 0f, label = "video_guide_dim")
 
-    LaunchedEffect(scope.folderPaths, scope.sortOrder, settings.excludedFolderPaths) { viewModel.loadVideoDeck(scope) }
+    fun leaveCleaning() {
+        viewModel.finishVideoCleaningSession(videos.getOrNull(pagerState.currentPage))
+        viewModel.resetVideoSessionDateMode()
+        onBack()
+    }
+
+    BackHandler(onBack = ::leaveCleaning)
+
+    LaunchedEffect(scope.folderPaths, scope.dateMode, scope.sortOrder, settings.excludedFolderPaths) { viewModel.loadVideoDeck(scope) }
     LaunchedEffect(videos.isEmpty(), deckPreparing, dashboard.videoCount, dashboard.processedVideoCount, scope) {
         if (videos.isEmpty() && !deckPreparing && dashboard.processedVideoCount < dashboard.videoCount) viewModel.loadVideoDeck(scope)
     }
@@ -116,6 +138,7 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
             pagerState.scrollToPage(0)
             lastAppliedShuffleSeed = scope.randomSeed
         }
+        lastSettledPage = pagerState.currentPage
     }
     LaunchedEffect(videos, settings.videoGuideShown) {
         if (videos.isNotEmpty() && !settings.videoGuideShown) showGuide = true
@@ -125,10 +148,23 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
             pagerState.scrollToPage((videos.size - 1).coerceAtLeast(0))
         }
     }
-    LaunchedEffect(pagerState.currentPage) { haptics.tick() }
+    LaunchedEffect(pagerState.currentPage, videos) {
+        val currentPage = pagerState.currentPage
+        if (videos.isNotEmpty() && currentPage > lastSettledPage) {
+            (lastSettledPage until currentPage).forEach { index ->
+                videos.getOrNull(index)?.let { viewModel.markVideoPendingKeep(it) }
+            }
+        }
+        lastSettledPage = currentPage
+        haptics.tick()
+    }
 
     fun performVideoAction(video: VideoEntity, action: SwipeAction) {
-        haptics.success()
+        when (action) {
+            SwipeAction.Keep -> haptics.keep()
+            SwipeAction.Delete -> haptics.delete()
+            SwipeAction.Favorite -> haptics.favorite()
+        }
         uiScope.launch {
             if (videos.size > 1 && pagerState.currentPage >= videos.lastIndex) {
                 pagerState.scrollToPage((videos.lastIndex - 1).coerceAtLeast(0))
@@ -139,7 +175,7 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
 
     if (videos.isEmpty()) {
         Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-            ScreenHeader("视频整理", "单击播放/暂停，左右滑切换沉浸", onBack)
+            ScreenHeader("视频整理", "单击播放/暂停，左右滑切换沉浸", ::leaveCleaning)
             Box(Modifier.fillMaxSize().padding(18.dp), contentAlignment = Alignment.Center) {
                 if (deckPreparing) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -159,6 +195,8 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
         }
         return
     }
+
+    val currentVideo = videos.getOrNull(pagerState.currentPage)
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         AdaptiveWidthInfo { isMediumOrExpanded, isExpanded ->
@@ -181,10 +219,18 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                         isCurrent = page == pagerState.currentPage,
                         pageIndex = (dashboard.processedVideoCount + page + 1).coerceAtLeast(1),
                         total = dashboard.videoCount.coerceAtLeast(videos.size),
-                        deletedCount = dashboard.pendingDeleteCount,
-                        onKeep = { performVideoAction(video, SwipeAction.Keep) },
+                        sessionActionCount = videoSessionActionCount,
+                        lastAction = lastVideoAction,
                         onFavorite = { performVideoAction(video, SwipeAction.Favorite) },
                         onDelete = { performVideoAction(video, SwipeAction.Delete) },
+                        onUndo = {
+                            haptics.undo()
+                            val mediaStoreId = viewModel.undoVideoCleaningAction()
+                            if (mediaStoreId != null) {
+                                val index = videos.indexOfFirst { it.mediaStoreId == mediaStoreId }
+                                if (index >= 0) uiScope.launch { pagerState.animateScrollToPage(index) }
+                            }
+                        },
                     )
                 }
             }
@@ -192,11 +238,15 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
 
         if (settings.videoShowTopBar || settings.videoShowShuffleButton) {
             VideoOrganizerTopRow(
-                current = (dashboard.processedVideoCount + pagerState.currentPage + 1).coerceAtMost(dashboard.videoCount.coerceAtLeast(videos.size)),
-                total = dashboard.videoCount.coerceAtLeast(videos.size),
-                deletedCount = dashboard.pendingDeleteCount,
+                progressPercent = if (dashboard.videoCount > 0) (((dashboard.processedVideoCount + pendingVideoKeeps.size) * 100f) / dashboard.videoCount).toInt().coerceIn(0, 100) else 0,
+                remainingCount = (dashboard.videoCount - dashboard.processedVideoCount - pendingVideoKeeps.size).coerceAtLeast(0),
                 deletedSizeBytes = dashboard.pendingDeleteBytes,
+                displayMode = settings.videoDisplayMode,
+                dateMode = scope.dateMode,
                 showShuffle = settings.videoShowShuffleButton,
+                onToggleDisplayMode = { haptics.tick(); viewModel.toggleVideoDisplayModeQuick() },
+                onDateClick = { haptics.tick(); showDatePicker = true },
+                onFolderClick = { haptics.tick(); showFolderPicker = true },
                 onShuffle = { haptics.threshold(); viewModel.reshuffleVideoCleaningSession() },
                 modifier = Modifier.align(Alignment.TopCenter),
             )
@@ -204,7 +254,24 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
 
         if (dimAlpha > 0.01f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dimAlpha)))
         androidx.compose.animation.AnimatedVisibility(visible = showGuide, modifier = Modifier.fillMaxSize()) {
-            VideoPositionGuideOverlay(onDismiss = { haptics.tick(); showGuide = false; viewModel.markVideoGuideShown() })
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                VideoGuideDialog(onDismiss = { haptics.tick(); showGuide = false; viewModel.markVideoGuideShown() })
+            }
+        }
+        OrganizerDatePickerAnimatedOverlay(
+            visible = showDatePicker,
+            title = "视频时间筛选",
+            currentMode = scope.dateMode,
+            onApply = { mode -> haptics.tick(); viewModel.setVideoSessionDateMode(mode) },
+            onDismiss = { showDatePicker = false },
+        )
+        if (showFolderPicker && currentVideo != null) {
+            OrganizerFolderPickerOverlay(
+                title = "归档当前视频",
+                folders = folders.ifEmpty { listOf("DCIM/Camera/", "Movies/", "Download/") },
+                onArchive = { path -> haptics.keep(); viewModel.archiveVideoToFolder(currentVideo, path) },
+                onDismiss = { showFolderPicker = false },
+            )
         }
     }
 }
@@ -283,25 +350,50 @@ private fun VideoPositionGuideOverlay(onDismiss: () -> Unit) {
 
 @Composable
 private fun VideoOrganizerTopRow(
-    current: Int,
-    total: Int,
-    deletedCount: Int,
+    progressPercent: Int,
+    remainingCount: Int,
     deletedSizeBytes: Long,
+    displayMode: VideoDisplayMode,
+    dateMode: String,
     showShuffle: Boolean,
+    onToggleDisplayMode: () -> Unit,
+    onDateClick: () -> Unit,
+    onFolderClick: () -> Unit,
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(vertical = 12.dp)
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        VideoTopPill(label = current.toString() + "/" + total.toString(), emphasized = true)
-        VideoTopPill(label = if (deletedSizeBytes > 0L) "可释放 " + formatSize(deletedSizeBytes) else "待删 " + deletedCount.toString())
+        VideoTopPill(
+            label = if (displayMode == VideoDisplayMode.FIT_SCREEN) "原比例" else "全屏",
+            onClick = onToggleDisplayMode,
+        )
+        VideoTopPill(
+            label = organizerDateModeLabel(dateMode),
+            icon = Icons.Rounded.CalendarToday,
+            emphasized = dateMode != "all",
+            onClick = onDateClick,
+        )
+        VideoTopPill(
+            label = "指定归档",
+            icon = Icons.Rounded.Folder,
+            onClick = onFolderClick,
+        )
+        OrganizerProgressPill(
+            progressPercent = progressPercent,
+            remainingCount = remainingCount,
+            remainingLabel = "个",
+            releasableBytes = deletedSizeBytes,
+            modifier = Modifier.width(94.dp),
+            compact = true,
+        )
         if (showShuffle) {
             ShuffleSessionButton(
                 label = "重新随机",
@@ -315,10 +407,14 @@ private fun VideoOrganizerTopRow(
 @Composable
 private fun VideoTopPill(
     label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     emphasized: Boolean = false,
+    onClick: (() -> Unit)? = null,
 ) {
     Surface(
-        modifier = Modifier.height(44.dp),
+        modifier = Modifier
+            .height(44.dp)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(999.dp),
         color = Color.White.copy(alpha = if (emphasized) 0.20f else 0.14f),
         contentColor = Color.White,
@@ -329,6 +425,7 @@ private fun VideoTopPill(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(17.dp))
             Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
     }
@@ -342,10 +439,11 @@ private fun VideoReelPage(
     isCurrent: Boolean,
     pageIndex: Int,
     total: Int,
-    deletedCount: Int,
-    onKeep: () -> Unit,
+    sessionActionCount: Int,
+    lastAction: SwipeAction?,
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
+    onUndo: () -> Unit,
 ) {
     val context = LocalContext.current
     val player = remember(video.uri, isCurrent) {
@@ -364,6 +462,8 @@ private fun VideoReelPage(
     var muted by remember(video.id, settings.videoDefaultMuted) { mutableStateOf(settings.videoDefaultMuted) }
     var controlsVisible by remember(video.id) { mutableStateOf(true) }
     var shouldPlay by remember(video.id) { mutableStateOf(true) }
+    var lastTapMillis by remember(video.id) { mutableStateOf(0L) }
+    var actionOffsetY by remember(video.id) { mutableStateOf(0f) }
 
     LaunchedEffect(player, muted, isCurrent, shouldPlay) {
         player?.playWhenReady = isCurrent && shouldPlay
@@ -431,8 +531,21 @@ private fun VideoReelPage(
                     detectReelSurfaceGestures(
                         haptics = haptics,
                         seekThreshold = settings.videoSeekThresholdPx,
-                        onTogglePlay = { haptics.tick(); shouldPlay = !shouldPlay },
-                        onToggleControls = { controlsVisible = !controlsVisible },
+                        onSurfaceTap = {
+                            val now = SystemClock.uptimeMillis()
+                            if (now - lastTapMillis < 280L) {
+                                controlsVisible = !controlsVisible
+                                lastTapMillis = 0L
+                            } else {
+                                lastTapMillis = now
+                                shouldPlay = !shouldPlay
+                            }
+                            haptics.tick()
+                        },
+                        onSeekBy = { deltaMillis ->
+                            val target = ((player?.currentPosition ?: position) + deltaMillis).coerceIn(0L, duration)
+                            player?.seekTo(target)
+                        },
                         onSpeedStart = { player?.setPlaybackSpeed(2f) },
                         onSpeedEnd = { player?.setPlaybackSpeed(1f) },
                     )
@@ -455,23 +568,34 @@ private fun VideoReelPage(
                 )
         )
 
-        androidx.compose.animation.AnimatedVisibility(visible = controlsVisible && settings.videoShowActionRail, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp)) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = controlsVisible && settings.videoShowActionRail,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 12.dp)
+                .offset { IntOffset(0, actionOffsetY.roundToInt()) }
+                .pointerInput(video.id) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        actionOffsetY = (actionOffsetY + dragAmount.y).coerceIn(-230f, 230f)
+                    }
+                },
+        ) {
             ReelActionRail(
                 muted = muted,
-                playing = shouldPlay,
-                deletedCount = deletedCount,
-                onTogglePlay = { haptics.tick(); shouldPlay = !shouldPlay },
+                sessionActionCount = sessionActionCount,
+                lastAction = lastAction,
                 onMute = { haptics.tick(); muted = !muted },
-                onKeep = onKeep,
                 onFavorite = onFavorite,
                 onDelete = onDelete,
+                onUndo = onUndo,
                 onShare = { haptics.tick(); shareVideo(context, video) },
-                modifier = Modifier.height(424.dp),
+                modifier = Modifier.width(58.dp),
             )
         }
 
         androidx.compose.animation.AnimatedVisibility(
-            visible = controlsVisible && (settings.videoShowInfoPanel || settings.videoShowFolderChips || settings.videoShowProgressBar),
+            visible = controlsVisible && (settings.videoShowInfoPanel || settings.videoShowProgressBar),
             modifier = Modifier.align(Alignment.BottomStart),
         ) {
             Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -483,14 +607,6 @@ private fun VideoReelPage(
                         color = Color.White.copy(alpha = 0.78f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (settings.videoShowFolderChips) {
-                    FolderChipRail(
-                        folders = listOf("指定归档", video.folderName, "Camera (DCIM)", "Downloads"),
-                        selected = video.folderName,
-                        onSelected = { haptics.tick() },
-                        modifier = Modifier.fillMaxWidth().padding(end = if (settings.videoShowActionRail) 74.dp else 0.dp),
                     )
                 }
                 if (settings.videoShowProgressBar) {
@@ -525,33 +641,66 @@ private fun VideoReelPage(
 @Composable
 private fun ReelActionRail(
     muted: Boolean,
-    playing: Boolean,
-    deletedCount: Int,
-    onTogglePlay: () -> Unit,
+    sessionActionCount: Int,
+    lastAction: SwipeAction?,
     onMute: () -> Unit,
-    onKeep: () -> Unit,
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
+    onUndo: () -> Unit,
     onShare: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.width(68.dp),
-        shape = RoundedCornerShape(34.dp),
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
         color = Color.Black.copy(alpha = 0.16f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceEvenly,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            ReelRailButton(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (playing) "暂停" else "播放", onTogglePlay)
+            ReelUndoButton(
+                count = sessionActionCount,
+                color = actionFeedbackColor(lastAction, Color(0xFF4C8FF7)),
+                onClick = onUndo,
+            )
             ReelRailButton(if (muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp, if (muted) "静音" else "声音", onMute)
             ReelRailButton(Icons.Rounded.FavoriteBorder, "收藏", onFavorite)
-            ReelRailButton(Icons.Rounded.Delete, "待删", onDelete, badge = deletedCount.takeIf { it > 0 }?.toString())
+            ReelRailButton(Icons.Rounded.Delete, "待删", onDelete)
             ReelRailButton(Icons.Rounded.Share, "分享", onShare)
-            ReelRailButton(Icons.Rounded.CheckCircle, "保留", onKeep)
+        }
+    }
+}
+
+@Composable
+private fun ReelUndoButton(
+    count: Int,
+    color: Color,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.size(44.dp),
+        shape = RoundedCornerShape(999.dp),
+        color = color.copy(alpha = 0.28f),
+        border = BorderStroke(1.4.dp, color.copy(alpha = 0.78f)),
+        onClick = onClick,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text(
+                count.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+            )
+            Icon(
+                Icons.AutoMirrored.Rounded.Undo,
+                contentDescription = "回到上一条视频",
+                modifier = Modifier.size(13.dp),
+                tint = Color.White.copy(alpha = 0.90f),
+            )
         }
     }
 }
@@ -563,16 +712,16 @@ private fun ReelRailButton(
     onClick: () -> Unit,
     badge: String? = null,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
             Surface(
-                modifier = Modifier.size(42.dp),
+                modifier = Modifier.size(44.dp),
                 shape = RoundedCornerShape(999.dp),
-                color = Color.White.copy(alpha = 0.14f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
+                color = Color.White.copy(alpha = 0.12f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
                 onClick = onClick,
             ) {
-                Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(21.dp)) }
+                Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(22.dp)) }
             }
             if (badge != null) {
                 Surface(
@@ -582,15 +731,14 @@ private fun ReelRailButton(
                 ) { Text(badge, modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp), color = Color.White, style = MaterialTheme.typography.labelSmall) }
             }
         }
-        Text(label, color = Color.White.copy(alpha = 0.76f), style = MaterialTheme.typography.labelSmall)
     }
 }
 
 private suspend fun PointerInputScope.detectReelSurfaceGestures(
     haptics: HapticKit,
     seekThreshold: Float,
-    onTogglePlay: () -> Unit,
-    onToggleControls: () -> Unit,
+    onSurfaceTap: () -> Unit,
+    onSeekBy: (Long) -> Unit,
     onSpeedStart: () -> Unit,
     onSpeedEnd: () -> Unit,
 ) {
@@ -649,12 +797,11 @@ private suspend fun PointerInputScope.detectReelSurfaceGestures(
 
         if (horizontalMode) {
             if (abs(totalX) > seekThreshold) {
-                onToggleControls()
+                onSeekBy((totalX * 80f).toLong())
                 haptics.success()
             }
         } else if (!longPressed && abs(totalX) < slop && abs(totalY) < slop) {
-            onTogglePlay()
+            onSurfaceTap()
         }
     }
 }
-
