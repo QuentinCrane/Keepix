@@ -59,7 +59,7 @@ docs/en/*
 !docs/en/*.md
 !docs/website/
 !docs/website/*.md
-!docs/screenshots/
+docs/screenshots/*
 !docs/screenshots/README.md
 
 # Public website.
