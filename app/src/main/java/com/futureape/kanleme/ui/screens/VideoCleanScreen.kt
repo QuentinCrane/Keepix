@@ -46,7 +46,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -69,6 +68,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -84,6 +84,7 @@ import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.data.settings.AppSettings
 import com.futureape.kanleme.data.settings.VideoDisplayMode
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.util.HapticKit
@@ -97,6 +98,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.futureape.kanleme.ui.i18n.Text
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -602,7 +604,7 @@ private fun VideoReelPage(
                 if (settings.videoShowInfoPanel) {
                     Text("@" + video.folderName, style = MaterialTheme.typography.headlineSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        settings.videoDisplayMode.label + " · " + formatDate(video.dateTaken) + " · " + formatSize(video.size) + " · " + formatDuration(duration),
+                        stringResource(settings.videoDisplayMode.labelRes) + " · " + formatDate(video.dateTaken) + " · " + formatSize(video.size) + " · " + formatDuration(duration),
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.White.copy(alpha = 0.78f),
                         maxLines = 1,
@@ -697,7 +699,7 @@ private fun ReelUndoButton(
             )
             Icon(
                 Icons.AutoMirrored.Rounded.Undo,
-                contentDescription = "回到上一条视频",
+                contentDescription = stringResource(R.string.a11y_back_to_previous_video),
                 modifier = Modifier.size(13.dp),
                 tint = Color.White.copy(alpha = 0.90f),
             )

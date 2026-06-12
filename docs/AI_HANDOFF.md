@@ -6,8 +6,8 @@
 
 - App 名称：看了么 / Keepix
 - 包名：`com.futureape.kanleme`
-- 当前版本：`2.3.0`
-- `versionCode`：`56`
+- 当前版本：`2.3.1`
+- `versionCode`：`57`
 - 最低系统：Android 11，`minSdk = 30`
 - 目标系统：`targetSdk = 35`
 
@@ -61,7 +61,7 @@
 
 ```text
 app/build/outputs/apk/release/app-release-signed.apk
-app/build/outputs/release-package/kanleme-v2.3.0-release.zip
+app/build/outputs/release-package/kanleme-v2.3.1-release.zip
 ```
 
 这些产物应作为 GitHub Release 附件上传，不应提交进 Git。

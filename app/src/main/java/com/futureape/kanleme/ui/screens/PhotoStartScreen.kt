@@ -32,7 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.futureape.kanleme.ui.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -137,7 +138,7 @@ fun PhotoStartScreen(
                 PhotoOptionPill(
                     icon = Icons.Rounded.Swipe,
                     title = "手势",
-                    subtitle = settings.gestureDirection.label,
+                    subtitle = stringResource(settings.gestureDirection.labelRes),
                     modifier = Modifier.weight(1f),
                     onClick = { haptics.tick(); viewModel.cycleGestureDirection() },
                 )
@@ -197,7 +198,7 @@ fun PhotoStartScreen(
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PhotoFeatureLine("点击图片", "进入大图查看器")
                     PhotoFeatureLine("左右滑动", "保留当前照片")
-                    PhotoFeatureLine("上下滑动", settings.gestureDirection.guide)
+                    PhotoFeatureLine("上下滑动", stringResource(settings.gestureDirection.guideRes))
                     PhotoFeatureLine("排除文件夹", "被排除内容不会进入整理队列")
                 }
             }

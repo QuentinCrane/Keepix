@@ -47,6 +47,13 @@ Official Website:[Keepix — Organize your gallery like swiping short videos](ht
 - Separate favorites and trash views for photos and videos.
 - A device-local settings center for layout, behavior, feedback, and maintenance.
 
+### Language support
+
+- English, Simplified Chinese, and Traditional Chinese are supported through Android's standard locale resources.
+- App naming follows the active language: `Keepix` in English, `看了么` in Simplified Chinese, and `看了麼` in Traditional Chinese.
+- Traditional Chinese copy uses Taiwan-friendly terms such as `相簿`, `資料夾`, `影片`, and `垃圾桶`.
+- The app follows the system language and Android per-app language settings; there is no separate in-app language switch.
+
 ### Privacy first
 
 - No accounts, subscriptions, ads, or cloud sync.

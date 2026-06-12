@@ -1,6 +1,6 @@
 package com.futureape.kanleme.ui.util
 
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -25,6 +25,6 @@ fun formatDuration(durationMs: Long): String {
 }
 
 fun formatDate(timeMillis: Long): String {
-    if (timeMillis <= 0L) return "未知时间"
-    return SimpleDateFormat("yyyy年M月d日", Locale.CHINA).format(Date(timeMillis))
+    if (timeMillis <= 0L) return ""
+    return DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault()).format(Date(timeMillis))
 }

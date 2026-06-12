@@ -30,7 +30,6 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
@@ -62,6 +63,7 @@ import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
 import com.futureape.kanleme.ui.util.shareMedia
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.launch
+import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
@@ -152,7 +154,7 @@ private fun FavoritePhotoPreviewOverlay(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "关闭预览", tint = Color.White)
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = stringResource(R.string.a11y_close_preview), tint = Color.White)
             }
             Column(Modifier.weight(1f)) {
                 Text(photo.displayName, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)

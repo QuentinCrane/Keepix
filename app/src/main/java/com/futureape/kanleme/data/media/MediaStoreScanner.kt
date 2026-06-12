@@ -2,12 +2,15 @@ package com.futureape.kanleme.data.media
 
 import android.content.ContentResolver
 import android.content.ContentUris
+import android.content.Context
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.VideoEntity
+import com.futureape.kanleme.R
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,6 +19,7 @@ class MediaStoreAccessException(message: String, cause: Throwable? = null) : Run
 @Singleton
 class MediaStoreScanner @Inject constructor(
     private val resolver: ContentResolver,
+    @ApplicationContext private val context: Context,
 ) {
     fun scanImages(limit: Int? = null): List<PhotoEntity> {
         val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
@@ -38,7 +42,7 @@ class MediaStoreScanner @Inject constructor(
             sortColumn = MediaStore.Images.Media.DATE_TAKEN,
             fallbackSortColumn = MediaStore.Images.Media.DATE_ADDED,
             limit = limit,
-            mediaLabel = "照片",
+            mediaLabel = context.getString(R.string.media_label_photo),
         )?.use { cursor ->
             val idCol = cursor.require(MediaStore.Images.Media._ID)
             while (cursor.moveToNext()) {
@@ -49,7 +53,7 @@ class MediaStoreScanner @Inject constructor(
                 val uri = uriObject.toString()
                 val mimeType = cursor.string(MediaStore.Images.Media.MIME_TYPE) ?: "image/*"
                 val size = cursor.long(MediaStore.Images.Media.SIZE)
-                val folderName = relativePath?.trimEnd('/')?.substringAfterLast('/')?.ifBlank { "相册" } ?: "相册"
+                val folderName = relativePath?.trimEnd('/')?.substringAfterLast('/')?.ifBlank { context.getString(R.string.media_default_album) } ?: context.getString(R.string.media_default_album)
                 val dateAddedSeconds = cursor.long(MediaStore.Images.Media.DATE_ADDED)
                 val dateTaken = cursor.long(MediaStore.Images.Media.DATE_TAKEN).takeIf { it > 0 }
                     ?: dateAddedSeconds.takeIf { it > 0 }?.times(1000)
@@ -117,14 +121,14 @@ class MediaStoreScanner @Inject constructor(
             sortColumn = MediaStore.Video.Media.DATE_TAKEN,
             fallbackSortColumn = MediaStore.Video.Media.DATE_ADDED,
             limit = limit,
-            mediaLabel = "视频",
+            mediaLabel = context.getString(R.string.media_label_video),
         )?.use { cursor ->
             val idCol = cursor.require(MediaStore.Video.Media._ID)
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
                 val relativePath = cursor.string(MediaStore.Video.Media.RELATIVE_PATH)
                 val displayName = cursor.string(MediaStore.Video.Media.DISPLAY_NAME)?.ifBlank { "VID_" + id } ?: "VID_" + id
-                val folderName = relativePath?.trimEnd('/')?.substringAfterLast('/')?.ifBlank { "视频" } ?: "视频"
+                val folderName = relativePath?.trimEnd('/')?.substringAfterLast('/')?.ifBlank { context.getString(R.string.media_default_video_folder) } ?: context.getString(R.string.media_default_video_folder)
                 val dateAddedSeconds = cursor.long(MediaStore.Video.Media.DATE_ADDED)
                 val dateTaken = cursor.long(MediaStore.Video.Media.DATE_TAKEN).takeIf { it > 0 }
                     ?: dateAddedSeconds.takeIf { it > 0 }?.times(1000)
@@ -167,7 +171,7 @@ class MediaStoreScanner @Inject constructor(
         return try {
             resolver.query(collection, projection, queryArgs, null)
         } catch (security: SecurityException) {
-            throw MediaStoreAccessException("没有读取" + mediaLabel + "的系统权限，请重新授权相册访问", security)
+            throw MediaStoreAccessException(context.getString(R.string.media_error_read_permission, mediaLabel), security)
         } catch (_: IllegalArgumentException) {
             // Some OEM MediaStore providers are picky about Bundle sort columns.
             // Fallback to a simple SQL sort order, without embedding LIMIT in the SQL string.
@@ -175,7 +179,7 @@ class MediaStoreScanner @Inject constructor(
             try {
                 resolver.query(collection, projection, null, null, sortOrder)
             } catch (security: SecurityException) {
-                throw MediaStoreAccessException("没有读取" + mediaLabel + "的系统权限，请重新授权相册访问", security)
+                throw MediaStoreAccessException(context.getString(R.string.media_error_read_permission, mediaLabel), security)
             }
         }
     }

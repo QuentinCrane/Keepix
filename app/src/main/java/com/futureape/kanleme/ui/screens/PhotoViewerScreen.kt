@@ -48,7 +48,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -61,6 +60,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -76,6 +76,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
@@ -88,9 +89,10 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import com.futureape.kanleme.ui.i18n.Text
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -160,7 +162,7 @@ fun PhotoViewerScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "返回", tint = Color.White, modifier = Modifier.size(34.dp))
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = stringResource(R.string.a11y_back), tint = Color.White, modifier = Modifier.size(34.dp))
                 }
                 Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                     Text(
@@ -177,7 +179,7 @@ fun PhotoViewerScreen(
                     )
                 }
                 IconButton(onClick = { shareMedia(context, Uri.parse(photo.uri), photo.mimeType, photo.displayName) }) {
-                    Icon(Icons.Rounded.Share, contentDescription = "分享", tint = Color.White, modifier = Modifier.size(30.dp))
+                    Icon(Icons.Rounded.Share, contentDescription = stringResource(R.string.a11y_share), tint = Color.White, modifier = Modifier.size(30.dp))
                 }
             }
 
@@ -315,8 +317,8 @@ private fun ExifLine(label: String, value: String) {
 }
 
 private fun formatViewerDateTime(timeMillis: Long): String {
-    if (timeMillis <= 0L) return "未知时间"
-    return SimpleDateFormat("yyyy年M月d日 HH:mm", Locale.CHINA).format(Date(timeMillis))
+    if (timeMillis <= 0L) return ""
+    return DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, Locale.getDefault()).format(Date(timeMillis))
 }
 
 @Composable
@@ -482,7 +484,7 @@ private fun ZoomableViewerPhoto(
                                 },
                                 modifier = Modifier.size(40.dp),
                             ) {
-                                Icon(Icons.Rounded.PlayArrow, contentDescription = "播放实况")
+                                Icon(Icons.Rounded.PlayArrow, contentDescription = stringResource(R.string.a11y_play_motion))
                             }
                             Text("长按图片或点此播放实况", style = MaterialTheme.typography.labelMedium)
                         }
@@ -557,7 +559,7 @@ private fun MotionPhotoVideoPlayer(
                 .padding(top = 92.dp, end = 18.dp)
                 .size(42.dp),
         ) {
-            Icon(Icons.Rounded.Close, contentDescription = "关闭实况")
+            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.a11y_close_motion))
         }
     }
 }
@@ -571,12 +573,12 @@ private fun MoveFolderSheet(
     onMove: (String) -> Unit,
 ) {
     val presets = listOf(
-        "Pictures/回留精选/",
-        "Pictures/回留待整理/",
-        "DCIM/回留相册/",
+        "Pictures/Kanleme/Favorites/",
+        "Pictures/Kanleme/ToReview/",
+        "DCIM/Kanleme/",
     )
     val options = (presets + knownFolders).distinct().filter { it.isNotBlank() }.take(12)
-    var customPath by remember(currentPhoto.id) { mutableStateOf(currentPhoto.relativePath ?: "Pictures/回留精选/") }
+    var customPath by remember(currentPhoto.id) { mutableStateOf(currentPhoto.relativePath ?: "Pictures/Kanleme/Favorites/") }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -587,7 +589,7 @@ private fun MoveFolderSheet(
         ) {
             Text("移动到文件夹", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "目标路径使用相册相对路径，例如 Pictures/回留精选/。系统可能会要求照片写入授权。",
+                "目标路径使用相册相对路径，例如 Pictures/Kanleme/Favorites/。系统可能会要求照片写入授权。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

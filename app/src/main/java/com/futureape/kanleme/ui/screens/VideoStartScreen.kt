@@ -33,7 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.futureape.kanleme.ui.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -141,7 +142,7 @@ fun VideoStartScreen(
                 VideoOptionPill(
                     icon = Icons.Rounded.AspectRatio,
                     title = "显示比例",
-                    subtitle = settings.videoDisplayMode.label,
+                    subtitle = stringResource(settings.videoDisplayMode.labelRes),
                     modifier = Modifier.weight(1f),
                     onClick = { haptics.tick(); viewModel.cycleVideoDisplayMode() },
                 )
@@ -194,7 +195,7 @@ fun VideoStartScreen(
                     FeatureLine("上下滑动", "切换上一个 / 下一个视频")
                     FeatureLine("左右滑动", "明显横向拖动时快进或快退")
                     FeatureLine("长按屏幕", "临时 2 倍速播放，松开恢复")
-                    FeatureLine("显示比例", settings.videoDisplayMode.description)
+                    FeatureLine("显示比例", stringResource(settings.videoDisplayMode.descriptionRes))
                 }
             }
         }

@@ -6,8 +6,8 @@ This document is a quick handoff for the next maintainer or AI assistant. It onl
 
 - App name: Keepix / 看了么
 - Package name: `com.futureape.kanleme`
-- Current version: `2.3.0`
-- `versionCode`: `56`
+- Current version: `2.3.1`
+- `versionCode`: `57`
 - Minimum OS: Android 11, `minSdk = 30`
 - Target OS: `targetSdk = 35`
 
@@ -64,8 +64,7 @@ Current local release artifact paths:
 
 ```text
 app/build/outputs/apk/release/app-release-signed.apk
-app/build/outputs/release-package/kanleme-v2.3.0-release.zip
+app/build/outputs/release-package/kanleme-v2.3.1-release.zip
 ```
 
 These artifacts should be uploaded as GitHub Release attachments, not committed to Git.
-

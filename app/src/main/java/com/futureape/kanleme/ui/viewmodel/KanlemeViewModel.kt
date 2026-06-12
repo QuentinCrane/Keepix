@@ -22,6 +22,10 @@ import com.futureape.kanleme.data.settings.SwipeSensitivity
 import com.futureape.kanleme.data.settings.ThemeMode
 import com.futureape.kanleme.data.settings.VideoDisplayMode
 import com.futureape.kanleme.data.settings.nextAccentColor
+import com.futureape.kanleme.R
+import com.futureape.kanleme.ui.i18n.UiText
+import com.futureape.kanleme.ui.i18n.dynamicUiText
+import com.futureape.kanleme.ui.i18n.uiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -37,7 +41,7 @@ import javax.inject.Inject
 data class SimilarDetectionUiState(
     val running: Boolean = false,
     val progress: Float = 0f,
-    val stage: String = "未开始",
+    val stage: UiText = uiText(R.string.similar_stage_not_started),
     val processedHint: Int = 0,
     val totalHint: Int = 0,
     val lastResultCount: Int = 0,
@@ -135,7 +139,7 @@ class KanlemeViewModel @Inject constructor(
     private val _pendingVideoKeeps = MutableStateFlow<Map<Long, VideoEntity>>(emptyMap())
     val pendingVideoKeeps = _pendingVideoKeeps.asStateFlow()
 
-    private val _message = MutableStateFlow<String?>(null)
+    private val _message = MutableStateFlow<UiText?>(null)
     val message = _message.asStateFlow()
 
     private var lastAutoRefreshAccessKey: String? = null
@@ -164,12 +168,12 @@ class KanlemeViewModel @Inject constructor(
         runCatching { repository.refreshMediaLibrary() }
             .onSuccess { (p, v) ->
                 if (showMessage) {
-                    _message.value = prefix + "已同步 " + p + " 张照片、" + v + " 个视频"
+                    _message.value = uiText(R.string.message_library_synced, p, v)
                 }
                 loadPhotoDeck()
                 loadVideoDeck()
             }
-            .onFailure { _message.value = it.message ?: "媒体库同步失败，请检查相册权限" }
+            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_library_sync_failed) }
     }
 
     fun clearMessage() { _message.value = null }
@@ -453,7 +457,7 @@ class KanlemeViewModel @Inject constructor(
             _pendingVideoKeeps.value = pending - mediaStoreId
             _videoSessionActionCount.value = (_videoSessionActionCount.value - 1).coerceAtLeast(0)
             _lastVideoAction.value = SwipeAction.Keep
-            _message.value = "已回到上一条视频"
+            _message.value = uiText(R.string.message_back_to_previous_video)
             return mediaStoreId
         }
         viewModelScope.launch {
@@ -461,12 +465,12 @@ class KanlemeViewModel @Inject constructor(
                 .onSuccess { ok ->
                     if (ok) {
                         _videoSessionActionCount.value = (_videoSessionActionCount.value - 1).coerceAtLeast(0)
-                        _message.value = "已撤回上一条视频"
+                        _message.value = uiText(R.string.message_video_undo_success)
                     } else {
-                        _message.value = "没有可撤回的视频"
+                        _message.value = uiText(R.string.message_video_undo_empty)
                     }
                 }
-                .onFailure { _message.value = it.message ?: "撤回失败" }
+                .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
             loadVideoDeck()
         }
         return null
@@ -474,8 +478,8 @@ class KanlemeViewModel @Inject constructor(
 
     fun movePhotoToFolder(photo: PhotoEntity, relativePath: String) = viewModelScope.launch {
         runCatching { repository.movePhotoToFolder(photo, relativePath) }
-            .onSuccess { _message.value = it.message }
-            .onFailure { _message.value = it.message ?: "移动文件夹失败" }
+            .onSuccess { _message.value = dynamicUiText(it.message) }
+            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_move_folder_failed) }
     }
 
     fun archivePhotoToFolder(photo: PhotoEntity, relativePath: String) = viewModelScope.launch {
@@ -488,10 +492,10 @@ class KanlemeViewModel @Inject constructor(
             _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
             _photoSessionActionCount.value += 1
             _lastPhotoAction.value = SwipeAction.Keep
-            _message.value = message
+            _message.value = dynamicUiText(message)
             refillPhotoDeckIfNeeded()
         }.onFailure {
-            _message.value = it.message ?: "归档失败"
+            _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_archive_failed)
         }
     }
 
@@ -506,16 +510,16 @@ class KanlemeViewModel @Inject constructor(
             _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == video.mediaStoreId }
             if (!wasPending) _videoSessionActionCount.value += 1
             _lastVideoAction.value = SwipeAction.Keep
-            _message.value = message
+            _message.value = dynamicUiText(message)
             refillVideoDeckIfNeeded()
         }.onFailure {
-            _message.value = it.message ?: "归档失败"
+            _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_archive_failed)
         }
     }
 
     fun seedSimilarGroups(limit: Int = 3600) {
         if (similarDetectionJob?.isActive == true) {
-            _message.value = "相似照片检测正在后台继续，返回此页面会自动恢复进度"
+            _message.value = uiText(R.string.message_similar_detection_background)
             return
         }
         similarDetectionJob = viewModelScope.launch {
@@ -523,14 +527,14 @@ class KanlemeViewModel @Inject constructor(
             _similarDetectionState.value = SimilarDetectionUiState(
                 running = true,
                 progress = 0.01f,
-                stage = "准备读取媒体库",
+                stage = uiText(R.string.similar_stage_prepare_library),
                 processedHint = 0,
                 totalHint = totalHint,
                 lastResultCount = _similarDetectionState.value.lastResultCount,
             )
             try {
                 if (dashboard.value.photoCount == 0) {
-                    _similarDetectionState.value = _similarDetectionState.value.copy(stage = "首次检测前正在同步媒体库")
+                    _similarDetectionState.value = _similarDetectionState.value.copy(stage = uiText(R.string.similar_stage_syncing_before_first_run))
                     runCatching { repository.refreshMediaLibrary() }
                 }
                 runCatching {
@@ -540,7 +544,7 @@ class KanlemeViewModel @Inject constructor(
                         _similarDetectionState.value = _similarDetectionState.value.copy(
                             running = true,
                             progress = if (processed >= total && total > 0) 0.96f else progress.coerceAtLeast(0.02f),
-                            stage = stage,
+                            stage = dynamicUiText(stage),
                             processedHint = processed.coerceAtLeast(0),
                             totalHint = total.coerceAtLeast(1),
                         )
@@ -551,19 +555,19 @@ class KanlemeViewModel @Inject constructor(
                         _similarDetectionState.value = SimilarDetectionUiState(
                             running = false,
                             progress = 1f,
-                            stage = if (count > 0) "检测完成，已生成候选分组" else "检测完成，未发现明显相似照片",
+                            stage = if (count > 0) uiText(R.string.similar_stage_done_with_groups) else uiText(R.string.similar_stage_done_empty),
                             processedHint = total,
                             totalHint = total,
                             lastResultCount = count,
                         )
-                        _message.value = if (count > 0) "已生成 $count 个相似/模糊/连拍分组" else "没有检测到明显相似照片，可稍后扩大相册权限或重新同步媒体库"
+                        _message.value = if (count > 0) UiText.Plural(R.plurals.similar_group_count, count) else uiText(R.string.message_similar_detection_no_result)
                     }
                     .onFailure { throwable ->
                         _similarDetectionState.value = _similarDetectionState.value.copy(
                             running = false,
-                            stage = throwable.message ?: "相似照片检测失败，可点击继续检测重试",
+                            stage = throwable.message?.let(::dynamicUiText) ?: uiText(R.string.similar_stage_failed_retry),
                         )
-                        _message.value = throwable.message ?: "相似照片检测失败"
+                        _message.value = throwable.message?.let(::dynamicUiText) ?: uiText(R.string.message_similar_detection_failed)
                     }
             } finally {
                 if (_similarDetectionState.value.running) {
@@ -583,32 +587,32 @@ class KanlemeViewModel @Inject constructor(
 
     fun restoreTrash(id: Long) = viewModelScope.launch {
         runCatching { repository.restoreTrashItem(id) }
-            .onSuccess { _message.value = "已恢复" }
-            .onFailure { _message.value = it.message ?: "恢复失败" }
+            .onSuccess { _message.value = uiText(R.string.message_restore_success) }
+            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_restore_failed) }
     }
 
     fun permanentlyDeleteTrash(id: Long) = viewModelScope.launch {
         runCatching { repository.permanentlyDeleteTrashItem(id) }
-            .onSuccess { _message.value = "已永久删除" }
-            .onFailure { _message.value = it.message ?: "永久删除失败" }
+            .onSuccess { _message.value = uiText(R.string.message_permanent_delete_success) }
+            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_permanent_delete_failed) }
     }
 
     fun permanentlyDeleteAllTrash() = viewModelScope.launch {
         runCatching { repository.permanentlyDeleteAllTrash() }
-            .onSuccess { _message.value = "已处理全部回收站项目" }
-            .onFailure { _message.value = it.message ?: "批量删除失败" }
+            .onSuccess { _message.value = uiText(R.string.message_trash_all_processed) }
+            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_batch_delete_failed) }
     }
 
     fun restoreAllTrash() = viewModelScope.launch {
         runCatching { repository.restoreAllTrash() }
-            .onSuccess { _message.value = "已恢复全部回收站项目" }
-            .onFailure { _message.value = it.message ?: "批量恢复失败" }
+            .onSuccess { _message.value = uiText(R.string.message_trash_all_restored) }
+            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_batch_restore_failed) }
     }
 
     fun undoLastAction() = viewModelScope.launch {
         runCatching { repository.undoLastAction() }
-            .onSuccess { ok -> _message.value = if (ok) "已撤销上一步操作" else "没有可撤销操作" }
-            .onFailure { _message.value = it.message ?: "撤销失败" }
+            .onSuccess { ok -> _message.value = if (ok) uiText(R.string.message_undo_success) else uiText(R.string.message_undo_empty) }
+            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
         loadPhotoDeck(); loadVideoDeck()
     }
 
@@ -617,12 +621,12 @@ class KanlemeViewModel @Inject constructor(
             .onSuccess { ok ->
                 if (ok) {
                     _photoSessionActionCount.value = (_photoSessionActionCount.value - 1).coerceAtLeast(0)
-                    _message.value = "已回到上一张照片"
+                    _message.value = uiText(R.string.message_photo_back_success)
                 } else {
-                    _message.value = "没有可撤回的照片"
+                    _message.value = uiText(R.string.message_photo_undo_empty)
                 }
             }
-            .onFailure { _message.value = it.message ?: "撤回失败" }
+            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
         loadPhotoDeck()
     }
 
@@ -742,7 +746,7 @@ class KanlemeViewModel @Inject constructor(
     fun replayPositionGuides() = viewModelScope.launch {
         settingsRepository.setPhotoGuideShown(false)
         settingsRepository.setVideoGuideShown(false)
-        _message.value = "已重置定位式教程，进入照片/视频整理页会再次显示"
+        _message.value = uiText(R.string.message_position_guides_reset)
     }
 
     fun addExcludedFolder(path: String) = viewModelScope.launch {

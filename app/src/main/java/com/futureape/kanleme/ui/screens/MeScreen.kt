@@ -38,22 +38,24 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.components.MetricPill
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun MeScreen(
@@ -127,7 +129,7 @@ fun MeScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Text("  媒体统计", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { viewModel.refreshLibrary() }) { Icon(Icons.Rounded.Refresh, contentDescription = "刷新") }
+                        IconButton(onClick = { viewModel.refreshLibrary() }) { Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.a11y_refresh)) }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                         MetricPill("总文件", (dashboard.photoCount + dashboard.videoCount).toString(), modifier = Modifier.weight(1f))

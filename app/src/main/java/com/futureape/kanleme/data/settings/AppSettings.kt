@@ -1,6 +1,8 @@
 package com.futureape.kanleme.data.settings
 
+import com.futureape.kanleme.R
 import androidx.compose.runtime.Immutable
+import androidx.annotation.StringRes
 
 @Immutable
 data class AppSettings(
@@ -58,50 +60,50 @@ data class AppSettings(
     val videoSeekThresholdPx: Float get() = 80f * swipeSensitivity.thresholdScale
 }
 
-enum class DeleteMode(val label: String, val description: String) {
-    PENDING_CONFIRM("待删确认", "先放入待删列表，确认后再处理"),
-    SYSTEM_TRASH("系统回收站", "尝试移入系统回收站，不额外限制"),
+enum class DeleteMode(@StringRes val labelRes: Int, @StringRes val descriptionRes: Int) {
+    PENDING_CONFIRM(R.string.delete_mode_pending_confirm, R.string.delete_mode_pending_confirm_desc),
+    SYSTEM_TRASH(R.string.delete_mode_system_trash, R.string.delete_mode_system_trash_desc),
 }
 
-enum class SwipeSensitivity(val label: String, val thresholdScale: Float) {
-    GENTLE("灵敏", 0.72f),
-    STANDARD("标准", 1.0f),
-    STABLE("稳一点", 1.28f),
+enum class SwipeSensitivity(@StringRes val labelRes: Int, val thresholdScale: Float) {
+    GENTLE(R.string.swipe_sensitivity_gentle, 0.72f),
+    STANDARD(R.string.swipe_sensitivity_standard, 1.0f),
+    STABLE(R.string.swipe_sensitivity_stable, 1.28f),
 }
 
-enum class GestureDirection(val label: String, val guide: String) {
-    DEFAULT("上删下藏", "上滑待删，下滑收藏，左右保留"),
-    REVERSE_VERTICAL("上藏下删", "上滑收藏，下滑待删，左右保留"),
+enum class GestureDirection(@StringRes val labelRes: Int, @StringRes val guideRes: Int) {
+    DEFAULT(R.string.gesture_direction_default, R.string.gesture_direction_default_guide),
+    REVERSE_VERTICAL(R.string.gesture_direction_reverse_vertical, R.string.gesture_direction_reverse_vertical_guide),
 }
 
-enum class VideoDisplayMode(val label: String, val description: String) {
-    IMMERSIVE_CROP("沉浸裁切", "像短视频平台一样铺满屏幕，横屏视频会被裁切"),
-    FIT_SCREEN("完整比例", "保留视频原始比例，横屏视频不会被强制竖屏裁切"),
-    FILL_WIDTH("铺满屏宽", "优先铺满屏幕宽度，适合横屏和混合素材"),
+enum class VideoDisplayMode(@StringRes val labelRes: Int, @StringRes val descriptionRes: Int) {
+    IMMERSIVE_CROP(R.string.video_display_mode_immersive_crop, R.string.video_display_mode_immersive_crop_desc),
+    FIT_SCREEN(R.string.video_display_mode_fit_screen, R.string.video_display_mode_fit_screen_desc),
+    FILL_WIDTH(R.string.video_display_mode_fill_width, R.string.video_display_mode_fill_width_desc),
 }
 
-enum class HapticLevel(val label: String) {
-    OFF("关闭"),
-    LIGHT("轻微"),
-    MEDIUM("细腻"),
-    STRONG("明显"),
+enum class HapticLevel(@StringRes val labelRes: Int) {
+    OFF(R.string.haptic_level_off),
+    LIGHT(R.string.haptic_level_light),
+    MEDIUM(R.string.haptic_level_medium),
+    STRONG(R.string.haptic_level_strong),
 }
 
-enum class ThemeMode(val label: String) {
-    SYSTEM("跟随系统"),
-    LIGHT("浅色"),
-    DARK("深色"),
+enum class ThemeMode(@StringRes val labelRes: Int) {
+    SYSTEM(R.string.theme_mode_system),
+    LIGHT(R.string.theme_mode_light),
+    DARK(R.string.theme_mode_dark),
 }
 
-enum class FolderDisplayMode(val label: String) {
-    SINGLE_LINE("单行显示"),
-    MULTI_LINE("多行显示"),
+enum class FolderDisplayMode(@StringRes val labelRes: Int) {
+    SINGLE_LINE(R.string.folder_display_single_line),
+    MULTI_LINE(R.string.folder_display_multi_line),
 }
 
-enum class PhotoCleanMode(val label: String, val description: String) {
-    NORMAL("正常使用", "日常使用推荐，不额外记录，也不改变清理方式"),
-    DIAGNOSTIC("帮助排查", "保持原来的清理体验，同时记录更多信息，方便定位问题"),
-    PERFORMANCE("流畅优先", "暂时关闭部分效果，减少卡顿，也方便判断问题是否和动效有关"),
+enum class PhotoCleanMode(@StringRes val labelRes: Int, @StringRes val descriptionRes: Int) {
+    NORMAL(R.string.photo_clean_mode_normal, R.string.photo_clean_mode_normal_desc),
+    DIAGNOSTIC(R.string.photo_clean_mode_diagnostic, R.string.photo_clean_mode_diagnostic_desc),
+    PERFORMANCE(R.string.photo_clean_mode_performance, R.string.photo_clean_mode_performance_desc),
 }
 
 fun nextBatchSize(current: Int): Int = when (current) {

@@ -1,5 +1,6 @@
 package com.futureape.kanleme.ui.util
 
+import com.futureape.kanleme.R
 import android.content.ActivityNotFoundException
 import android.content.ContentUris
 import android.content.ClipData
@@ -18,7 +19,7 @@ fun shareMedia(context: Context, uri: Uri, mimeType: String, title: String) {
         clipData = ClipData.newUri(context.contentResolver, title, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    val chooser = Intent.createChooser(sendIntent, "分享 $title")
+    val chooser = Intent.createChooser(sendIntent, context.getString(R.string.share_chooser_title, title))
     context.startActivity(chooser)
 }
 
@@ -41,7 +42,7 @@ fun openPhotoInSystemGallery(context: Context, photo: PhotoEntity) {
             context = context,
             uri = companionVideoUri,
             mimeType = "video/*",
-            title = photo.displayName + " 动态片段",
+            title = context.getString(R.string.motion_clip_title, photo.displayName),
             fallbackUri = mediaStoreUri,
         )
         return
@@ -71,7 +72,7 @@ fun openMediaInSystemGallery(
     context: Context,
     uri: Uri,
     mimeType: String,
-    title: String = "媒体文件",
+    title: String = context.getString(R.string.media_file_title),
     fallbackUri: Uri = uri,
 ) {
     val resolvedType = when {
@@ -124,7 +125,7 @@ fun openMediaInSystemGallery(
         }
     }
 
-    val chooser = Intent.createChooser(candidates.first(), "用相册查看").apply {
+    val chooser = Intent.createChooser(candidates.first(), context.getString(R.string.gallery_chooser_title)).apply {
         putExtra(Intent.EXTRA_INITIAL_INTENTS, candidates.drop(1).toTypedArray())
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

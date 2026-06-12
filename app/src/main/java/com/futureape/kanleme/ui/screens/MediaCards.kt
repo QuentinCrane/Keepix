@@ -53,7 +53,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -65,6 +64,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -96,6 +96,7 @@ import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.data.settings.AppSettings
 import com.futureape.kanleme.data.settings.GestureDirection
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.util.HapticKit
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatDuration
@@ -112,6 +113,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlin.math.abs
 import kotlin.math.max
+import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun ScreenHeader(title: String, subtitle: String? = null, onBack: (() -> Unit)? = null) {
@@ -121,7 +123,7 @@ fun ScreenHeader(title: String, subtitle: String? = null, onBack: (() -> Unit)? 
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (onBack != null) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "返回") }
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = stringResource(R.string.a11y_back)) }
         }
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.headlineMedium)
@@ -795,7 +797,7 @@ fun FolderChipRail(
             shape = RoundedCornerShape(999.dp),
             color = adaptiveWhiteSurface(0.26f),
             border = androidx.compose.foundation.BorderStroke(1.dp, adaptiveWhiteBorder(0.32f)),
-        ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Add, contentDescription = "添加文件夹") } }
+        ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.a11y_add_folder)) } }
         folders.forEach { folder ->
             val isSelected = folder == selected
             Surface(
@@ -859,7 +861,7 @@ private fun ShareCircle(onShare: () -> Unit) {
         shape = CircleShape,
         color = adaptiveWhiteSurface(0.26f),
         border = androidx.compose.foundation.BorderStroke(1.dp, adaptiveWhiteBorder(0.34f)),
-    ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Share, contentDescription = "分享") } }
+    ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Share, contentDescription = stringResource(R.string.a11y_share)) } }
 }
 
 

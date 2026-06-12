@@ -25,7 +25,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.futureape.kanleme.ui.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -43,7 +43,7 @@ import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.openVideoInSystemGallery
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -252,5 +252,5 @@ private fun TimelineThumb(
 
 private fun dateTitle(epochMillis: Long): String {
     val safeMillis = epochMillis.takeIf { it > 0 } ?: System.currentTimeMillis()
-    return SimpleDateFormat("yyyy年M月d日 E", Locale.CHINA).format(Date(safeMillis))
+    return DateFormat.getDateInstance(DateFormat.FULL, Locale.getDefault()).format(Date(safeMillis))
 }

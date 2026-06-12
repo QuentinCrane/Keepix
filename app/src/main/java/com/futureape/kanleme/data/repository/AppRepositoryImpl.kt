@@ -610,7 +610,7 @@ class AppRepositoryImpl @Inject constructor(
     }
 
     private fun todayLocalDate(now: Long = System.currentTimeMillis()): String =
-        SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(java.util.Date(now))
+        SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(java.util.Date(now))
 
     private fun rangeFor(mode: String): Pair<Long, Long>? {
         val cal = Calendar.getInstance()

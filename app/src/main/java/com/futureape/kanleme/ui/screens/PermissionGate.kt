@@ -22,7 +22,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,11 +31,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.GlassSurface
+import com.futureape.kanleme.ui.i18n.Text
 
 /**
  * Android 13+ uses granular media permissions. Android 14+ can return either full
@@ -107,7 +109,7 @@ fun MediaPermissionGate(
                     Icon(Icons.Rounded.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Text("需要访问相册", style = MaterialTheme.typography.headlineSmall)
                     Text(
-                        "回留的核心功能是全相册整理，所以需要读取照片和视频。所有扫描都在本机完成，不上传媒体文件。",
+                        stringResource(R.string.permission_intro),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -136,7 +138,7 @@ private fun PartialAccessBanner(
             Text("当前是部分照片访问", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(4.dp))
             Text(
-                "时间轴和整理流只会显示系统允许回留访问的照片/视频。需要全相册整理时，请重新授权并选择允许访问所有照片和视频。",
+                stringResource(R.string.permission_partial_notice),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

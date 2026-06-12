@@ -47,7 +47,7 @@ Prefer Android platform capabilities over custom replacements:
 
 ## Current Release State
 
-Version `2.3.0` continues the cleanup-workspace direction:
+Version `2.3.1` continues the cleanup-workspace direction:
 
 - The home screen uses a modern white and light-blue visual style, supports horizontal switching between photo and video cleanup, and restores the recent media entry points.
 - Photo cleanup uses edge-triggered action feedback, a compact progress pill, fullscreen year and month filters, and a fullscreen viewer.
@@ -138,4 +138,3 @@ The goal is to keep only the settings that actually affect behavior. Empty or de
 - Use fullscreen enter and exit animation for time filters.
 - Keep layout density readable on phones and tablets.
 - Keep the app local-first at every layer.
-

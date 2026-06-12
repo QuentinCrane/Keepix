@@ -47,7 +47,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
@@ -57,6 +56,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -72,6 +72,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.util.rememberHapticKit
@@ -79,6 +80,7 @@ import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun PhotoCleanScreen(
@@ -645,7 +647,7 @@ private fun CompactPhotoInfoBar(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Text(sessionActionCount.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, maxLines = 1)
-                Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "回到上一张照片", modifier = Modifier.size(16.dp), tint = Color.White.copy(alpha = 0.88f))
+                Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = stringResource(R.string.a11y_back_to_previous_photo), modifier = Modifier.size(16.dp), tint = Color.White.copy(alpha = 0.88f))
             }
         }
         if (showInfo) {
@@ -687,7 +689,7 @@ private fun CompactPhotoInfoBar(
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Icon(Icons.Rounded.Folder, contentDescription = "选择相册：" + selectedAlbum, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.Folder, contentDescription = stringResource(R.string.a11y_choose_album, selectedAlbum), modifier = Modifier.size(20.dp))
                     Text("相册", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
             }

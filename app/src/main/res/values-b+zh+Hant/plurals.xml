@@ -1,0 +1,18 @@
+<resources>
+    <plurals name="photo_count">
+        <item quantity="one">%d 張照片</item>
+        <item quantity="other">%d 張照片</item>
+    </plurals>
+    <plurals name="video_count">
+        <item quantity="one">%d 部影片</item>
+        <item quantity="other">%d 部影片</item>
+    </plurals>
+    <plurals name="folder_count">
+        <item quantity="one">%d 個資料夾</item>
+        <item quantity="other">%d 個資料夾</item>
+    </plurals>
+    <plurals name="similar_group_count">
+        <item quantity="one">已產生 %d 個相似、模糊或連拍分組</item>
+        <item quantity="other">已產生 %d 個相似、模糊或連拍分組</item>
+    </plurals>
+</resources>

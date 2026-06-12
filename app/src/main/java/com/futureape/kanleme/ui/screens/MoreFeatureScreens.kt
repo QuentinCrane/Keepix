@@ -37,7 +37,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -62,6 +62,7 @@ import com.futureape.kanleme.data.local.ProcessingStatus
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.AchievementUi
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.components.MetricPill
@@ -72,6 +73,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import com.futureape.kanleme.ui.i18n.Text
 
 private sealed class TodayMemoryItem {
     abstract val stableId: String
@@ -359,7 +361,7 @@ fun AnnualReportScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                     GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.74f) {
                         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             Icon(Icons.Rounded.AutoGraph, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(42.dp))
-                            Text("${r.year} 回留年度整理报告", style = MaterialTheme.typography.headlineMedium)
+                            Text(stringResource(R.string.annual_report_title, r.year), style = MaterialTheme.typography.headlineMedium)
                             Text(r.styleTitle, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
                             Text(r.styleDescription, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

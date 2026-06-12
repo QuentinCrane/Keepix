@@ -53,5 +53,5 @@ apksigner verify --verbose --print-certs app\build\outputs\apk\release\app-relea
 
 ```text
 app/build/outputs/apk/release/app-release-signed.apk
-app/build/outputs/release-package/kanleme-v2.3.0-release.zip
+app/build/outputs/release-package/kanleme-v2.3.1-release.zip
 ```

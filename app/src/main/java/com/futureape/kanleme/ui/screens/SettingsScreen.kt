@@ -57,7 +57,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -72,12 +71,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.futureape.kanleme.BuildConfig
 import com.futureape.kanleme.data.settings.AppSettings
 import com.futureape.kanleme.data.settings.HapticLevel
 import com.futureape.kanleme.data.settings.PhotoCleanMode
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.components.NativeFolderExcludeButton
@@ -88,6 +89,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.futureape.kanleme.ui.i18n.Text
 
 private enum class SettingsPage(val title: String) {
     HOME("设置"),
@@ -281,7 +283,7 @@ private fun SettingsPageContent(
                     { SettingsMenuRow(Icons.Rounded.TouchApp, "整理页面显示", customizationSummary(settings), color = Color(0xFF55A6C8), onClick = { goTo(SettingsPage.CLEANING_DISPLAY) }) },
                     { SettingsMenuRow(Icons.Rounded.Layers, "整理方式", "删除、归档和相似照片检测", color = Color(0xFF6D9E65), onClick = { goTo(SettingsPage.ORGANIZE) }) },
                     { SettingsMenuRow(Icons.Rounded.Tune, "操作体验", "滑动灵敏度、手势方向、声音、震动、视频比例", color = Color(0xFFD44C84), onClick = { goTo(SettingsPage.EXPERIENCE) }) },
-                    { SettingsMenuRow(Icons.Rounded.Palette, "外观显示", settings.themeMode.label + " · " + settings.folderDisplay.label, color = Color(settings.accentColor), onClick = { goTo(SettingsPage.APPEARANCE) }) },
+                    { SettingsMenuRow(Icons.Rounded.Palette, "外观显示", stringResource(settings.themeMode.labelRes) + " · " + stringResource(settings.folderDisplay.labelRes), color = Color(settings.accentColor), onClick = { goTo(SettingsPage.APPEARANCE) }) },
                 ))
                 SectionTitle("媒体范围")
                 SettingsGroup(listOf<@Composable () -> Unit>(
@@ -316,7 +318,7 @@ private fun SettingsPageContent(
             SettingsPage.ORGANIZE -> {
                 SectionTitle("整理方式")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.Delete, "删除模式", settings.deleteMode.label, color = Color(0xFFDD5A56), onClick = { onTick(); viewModel.cycleDeleteMode() }) },
+                    { SettingsRow(Icons.Rounded.Delete, "删除模式", stringResource(settings.deleteMode.labelRes), color = Color(0xFFDD5A56), onClick = { onTick(); viewModel.cycleDeleteMode() }) },
                     { SettingsRow(Icons.AutoMirrored.Rounded.DriveFileMove, "移动到文件夹时", if (settings.autoMoveOnKeepFavorite) "已开启指定归档确认" else "点击开启文件移动能力", onClick = { openSheet(SettingsSheet.MOVE_PERMISSION) }) },
                     { SettingsSwitchRow(Icons.Rounded.BrokenImage, "相似照片检测", "自动检测连拍、截图和相似照片", checked = settings.similarDetection, onCheckedChange = { onTick(); viewModel.setSimilarDetection(it) }, badge = "测试") },
                 ))
@@ -403,21 +405,21 @@ private fun SettingsPageContent(
             SettingsPage.EXPERIENCE -> {
                 SectionTitle("操作体验")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.Tune, "滑动灵敏度", settings.swipeSensitivity.label, color = Color(0xFFD44C84), onClick = { onTick(); viewModel.cycleSwipeSensitivity() }) },
-                    { SettingsRow(Icons.Rounded.TouchApp, "手势方向", settings.gestureDirection.label, color = Color(0xFFD44C84), onClick = { onTick(); viewModel.cycleGestureDirection() }) },
+                    { SettingsRow(Icons.Rounded.Tune, "滑动灵敏度", stringResource(settings.swipeSensitivity.labelRes), color = Color(0xFFD44C84), onClick = { onTick(); viewModel.cycleSwipeSensitivity() }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, "手势方向", stringResource(settings.gestureDirection.labelRes), color = Color(0xFFD44C84), onClick = { onTick(); viewModel.cycleGestureDirection() }) },
                     { SettingsSwitchRow(Icons.Rounded.MusicNote, "滑动音效", if (settings.swipeSound) "已开启" else "已关闭", checked = settings.swipeSound, onCheckedChange = { onTick(); viewModel.setSwipeSound(it) }, color = Color(0xFFE8A93B)) },
                     { SettingsSwitchRow(Icons.Rounded.MusicNote, "打开视频默认静音", "进入视频整理时默认静音，点侧边栏音量按钮可恢复声音", checked = settings.videoDefaultMuted, onCheckedChange = { onTick(); viewModel.setVideoDefaultMuted(it) }, color = Color(0xFFE8A93B)) },
-                    { SettingsRow(Icons.Rounded.AspectRatio, "视频显示比例", settings.videoDisplayMode.label + " · " + settings.videoDisplayMode.description, color = Color(0xFF5E8DB4), onClick = { onTick(); viewModel.cycleVideoDisplayMode() }) },
-                    { SettingsRow(Icons.Rounded.Vibration, "震动反馈", settings.hapticLevel.label, color = Color(0xFF55A6C8), onClick = { openSheet(SettingsSheet.HAPTIC) }) },
+                    { SettingsRow(Icons.Rounded.AspectRatio, "视频显示比例", stringResource(settings.videoDisplayMode.labelRes) + " · " + stringResource(settings.videoDisplayMode.descriptionRes), color = Color(0xFF5E8DB4), onClick = { onTick(); viewModel.cycleVideoDisplayMode() }) },
+                    { SettingsRow(Icons.Rounded.Vibration, "震动反馈", stringResource(settings.hapticLevel.labelRes), color = Color(0xFF55A6C8), onClick = { openSheet(SettingsSheet.HAPTIC) }) },
                 ))
             }
 
             SettingsPage.APPEARANCE -> {
                 SectionTitle("外观显示")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.Palette, "主题模式", settings.themeMode.label, trailingContent = { ThemeModeDots(settings.themeMode.ordinal) }, onClick = { onTick(); viewModel.cycleThemeMode() }) },
+                    { SettingsRow(Icons.Rounded.Palette, "主题模式", stringResource(settings.themeMode.labelRes), trailingContent = { ThemeModeDots(settings.themeMode.ordinal) }, onClick = { onTick(); viewModel.cycleThemeMode() }) },
                     { SettingsRow(Icons.Rounded.ColorLens, "选择主题色", "点击切换应用主题色", trailingContent = { ColorDot(settings.accentColor) }, onClick = { onTick(); viewModel.cycleAccentColor() }) },
-                    { SettingsRow(Icons.Rounded.Folder, "文件夹显示", settings.folderDisplay.label, onClick = { onTick(); viewModel.cycleFolderDisplay() }) },
+                    { SettingsRow(Icons.Rounded.Folder, "文件夹显示", stringResource(settings.folderDisplay.labelRes), onClick = { onTick(); viewModel.cycleFolderDisplay() }) },
                     { SettingsSwitchRow(Icons.Rounded.Palette, "沉浸背景", "整理时以前一张照片的模糊效果作为背景", checked = settings.immersiveBackground, onCheckedChange = { onTick(); viewModel.setImmersiveBackground(it) }) },
                 ))
             }
@@ -440,9 +442,9 @@ private fun SettingsPageContent(
             SettingsPage.DIAGNOSIS -> {
                 SectionTitle("诊断排障")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.CleaningServices, "照片清理模式", settings.photoCleanMode.label, onClick = { openSheet(SettingsSheet.PHOTO_CLEAN_MODE) }) },
+                    { SettingsRow(Icons.Rounded.CleaningServices, "照片清理模式", stringResource(settings.photoCleanMode.labelRes), onClick = { openSheet(SettingsSheet.PHOTO_CLEAN_MODE) }) },
                 ))
-                Text(settings.photoCleanMode.description, modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(settings.photoCleanMode.descriptionRes), modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -451,7 +453,7 @@ private fun SettingsPageContent(
 @Composable
 private fun SettingsHeader(title: String, subtitle: String, onBack: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "返回") }
+        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = stringResource(R.string.a11y_back)) }
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.headlineMedium)
             Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -624,8 +626,8 @@ private fun PhotoCleanModeSheet(
                     PhotoCleanMode.DIAGNOSTIC -> Icons.Rounded.SettingsBackupRestore
                     PhotoCleanMode.PERFORMANCE -> Icons.Rounded.Block
                 },
-                title = mode.label,
-                subtitle = mode.description,
+                title = stringResource(mode.labelRes),
+                subtitle = stringResource(mode.descriptionRes),
                 selected = settings.photoCleanMode == mode,
                 color = MaterialTheme.colorScheme.primary,
                 onClick = {

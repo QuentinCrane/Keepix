@@ -48,7 +48,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.futureape.kanleme.data.local.TrashItemEntity
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.formatDate
@@ -80,6 +81,7 @@ import com.futureape.kanleme.ui.util.openMediaInSystemGallery
 import com.futureape.kanleme.ui.util.shareMedia
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlin.math.ceil
+import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
@@ -348,7 +350,7 @@ private fun TrashPreviewOverlay(
                 .padding(horizontal = 12.dp),
         ) {
             IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterStart)) {
-                Icon(Icons.Rounded.Close, contentDescription = "关闭预览", tint = Color.White, modifier = Modifier.size(32.dp))
+                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.a11y_close_preview), tint = Color.White, modifier = Modifier.size(32.dp))
             }
             Text(
                 (pagerState.currentPage + 1).toString() + " / " + items.size.toString(),

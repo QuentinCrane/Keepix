@@ -20,7 +20,6 @@ import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,6 +41,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.FloatingGlassNav
 import com.futureape.kanleme.ui.components.FloatingGlassRail
 import com.futureape.kanleme.ui.components.LiquidBackground
@@ -61,14 +62,17 @@ import com.futureape.kanleme.ui.screens.AnnualReportScreen
 import com.futureape.kanleme.ui.screens.AchievementsScreen
 import com.futureape.kanleme.ui.screens.VideoCleanScreen
 import com.futureape.kanleme.ui.screens.VideoStartScreen
+import com.futureape.kanleme.ui.i18n.asString
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.delay
+import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun KanlemeApp(initialShortcutTarget: String?, viewModel: KanlemeViewModel = hiltViewModel()) {
     val navController = rememberNavController()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val messageText = message?.asString()
     var visibleMessage by remember { mutableStateOf<String?>(null) }
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val backStack by navController.currentBackStackEntryAsState()
@@ -95,8 +99,8 @@ fun KanlemeApp(initialShortcutTarget: String?, viewModel: KanlemeViewModel = hil
         viewModel.loadVideoDeck()
     }
 
-    LaunchedEffect(message) {
-        val currentMessage = message ?: return@LaunchedEffect
+    LaunchedEffect(messageText) {
+        val currentMessage = messageText ?: return@LaunchedEffect
         visibleMessage = currentMessage
         viewModel.clearMessage()
         delay(2100)
@@ -272,6 +276,7 @@ fun KanlemeApp(initialShortcutTarget: String?, viewModel: KanlemeViewModel = hil
 
 @Composable
 private fun NonBlockingStatusChip(message: String?, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val dismissHint = stringResource(R.string.message_tap_to_dismiss)
     androidx.compose.animation.AnimatedVisibility(
         visible = message != null,
         enter = fadeIn(tween(120)) + slideInVertically(tween(180)) { -it / 2 },
@@ -286,7 +291,7 @@ private fun NonBlockingStatusChip(message: String?, onDismiss: () -> Unit, modif
             shadowElevation = 0.dp,
         ) {
             Text(
-                text = (message.orEmpty() + "  ·  轻点关闭"),
+                text = (message.orEmpty() + "  ·  " + dismissHint),
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.inverseOnSurface,
                 style = MaterialTheme.typography.labelLarge,

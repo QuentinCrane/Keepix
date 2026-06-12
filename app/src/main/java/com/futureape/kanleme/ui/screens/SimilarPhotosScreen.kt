@@ -21,7 +21,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.futureape.kanleme.ui.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.components.GlassSurface
+import com.futureape.kanleme.ui.i18n.asString
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 
 @Composable
@@ -41,7 +42,7 @@ fun SimilarPhotosScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onOpenP
         SimilarDetectionProgressCard(
             running = detection.running,
             progress = detection.progress,
-            stage = detection.stage,
+            stage = detection.stage.asString(),
             processedHint = detection.processedHint,
             totalHint = detection.totalHint,
             lastResultCount = detection.lastResultCount,

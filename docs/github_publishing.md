@@ -34,7 +34,8 @@
    - 真实照片、视频、定位日志或个人路径日志
 3. 确认 `LICENSE` 和 `NOTICE` 已随仓库提交；本项目使用 `Apache-2.0 + NOTICE` 来保留原始项目归属。
 4. 如准备展示截图，补充到 `docs/screenshots/`，并在 README 新增“项目预览”段落后引用真实图片。
-5. 首次推送后检查 GitHub Actions 的 Android CI 是否能通过。
+5. 多语言更新发布前，确认 `values/`、`values-en/`、`values-b+zh+Hant/`、`values-zh-rTW/`、`res/xml/locales_config.xml` 都已经提交。
+6. 首次推送后检查 GitHub Actions 的 Android CI 是否能通过。
 
 ## 建议命令
 
@@ -97,6 +98,8 @@ https://github.com/QuentinCrane/Keepix
 
 本次发布建议在 GitHub Releases 中突出以下内容：
 
+- 多语言支持：简体中文、台湾繁体中文和英文随系统语言 / Android 应用语言设置切换；应用名分别为 `看了么`、`看了麼`、`Keepix`。
+- 语言习惯适配：繁中使用台湾常用术语，例如 `相簿`、`資料夾`、`影片`、`垃圾桶`；英文使用自然产品术语，例如 `Clean`、`Keep`、`Favorite`、`Pending delete`、`Trash`。
 - 首页现代化：白色 / 浅蓝主视觉，横向滑动切换照片整理和视频整理，恢复最近新增照片 / 视频入口，并清理只服务装饰的背景几何元素。
 - 照片整理升级：边缘动作反馈、短进度胶囊、左下角数量 / 撤回按钮、带进出场动画的全屏年份 / 月份筛选和指定归档。
 - 视频整理升级：下滑暂存保留、上滑回看重判、退出统一提交保留，右侧可拖动整体工具组和数量 / 撤回按钮。
