@@ -57,7 +57,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -284,6 +283,20 @@ data class PhotoSwipeFeedback(
     val intensity: Float = 0f,
 )
 
+private data class ExitingPhotoCard(
+    val photo: PhotoEntity,
+    val startX: Float,
+    val startY: Float,
+    val targetX: Float,
+    val targetY: Float,
+    val sequence: Long = SystemClock.uptimeMillis(),
+)
+
+private fun smoothDeckPromotion(value: Float): Float {
+    val t = value.coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
+
 @Composable
 fun PhotoDeckStage(
     photos: List<PhotoEntity>,
@@ -296,38 +309,55 @@ fun PhotoDeckStage(
     onAction: (PhotoEntity, SwipeAction) -> Unit,
 ) {
     val top = photos.firstOrNull() ?: return
-    val context = LocalContext.current
+    val deckPromotion = remember(top.id) { Animatable(0f) }
+    var exitingPhotoCard by remember { mutableStateOf<ExitingPhotoCard?>(null) }
+
+    LaunchedEffect(exitingPhotoCard?.sequence) {
+        val card = exitingPhotoCard ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(420)
+        if (exitingPhotoCard?.sequence == card.sequence) exitingPhotoCard = null
+    }
+
     Box(modifier, contentAlignment = Alignment.Center) {
         photos.drop(1).take(3).reversed().forEachIndexed { index, photo ->
             val depth = 3 - index
-            val animatedLift by animateFloatAsState(
-                targetValue = depth * 20f,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-                label = "deck_lift_$depth",
-            )
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(Uri.parse(photo.uri))
-                    .memoryCacheKey(photo.uri)
-                    .diskCacheKey(photo.uri)
-                    .placeholderMemoryCacheKey(photo.uri)
-                    .crossfade(false)
-                    .build(),
-                contentDescription = photo.displayName,
+            val promotion = deckPromotion.value.coerceIn(0f, 1f)
+            val easedPromotion = smoothDeckPromotion(promotion)
+            val effectiveDepth = (depth - easedPromotion).coerceAtLeast(0f)
+            fun fillForDepth(value: Float): Float = (0.88f - value * 0.028f).coerceAtLeast(0.76f)
+            fun scaleForDepth(value: Float): Float = 1f - value * 0.058f
+            fun alphaForDepth(value: Float): Float = if (value <= 1f) 1f else (1f - (value - 1f) * 0.16f).coerceIn(0.70f, 1f)
+            fun rotationForDepth(value: Int): Float = when (value) { 0, 1 -> 0f; 2 -> 2.2f; else -> -1.2f }
+            val fillWidth = if (depth == 1) {
+                val start = fillForDepth(depth.toFloat())
+                start + (0.96f - start) * easedPromotion
+            } else {
+                fillForDepth(effectiveDepth)
+            }
+            val liftDp = effectiveDepth * 34f
+            val rotation = rotationForDepth(depth) + (rotationForDepth((depth - 1).coerceAtLeast(0)) - rotationForDepth(depth)) * easedPromotion
+            val scale = scaleForDepth(effectiveDepth)
+            val cardAlpha = alphaForDepth(effectiveDepth)
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth((0.90f - depth * 0.018f).coerceAtLeast(0.80f))
+                    .fillMaxWidth(fillWidth)
                     .aspectRatio(photoDisplayAspectRatio(photo))
                     .graphicsLayer {
-                        translationY = animatedLift.dp.toPx()
-                        rotationZ = when (depth) { 1 -> -2.8f; 2 -> 2.2f; else -> -1.2f }
-                        scaleX = 1f - depth * 0.045f
-                        scaleY = 1f - depth * 0.045f
-                        alpha = 0.90f - depth * 0.13f
+                        translationY = liftDp.dp.toPx()
+                        rotationZ = rotation
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = cardAlpha
                     }
                     .shadow(28.dp, RoundedCornerShape(30.dp), ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.20f))
                     .clip(RoundedCornerShape(30.dp)),
-                contentScale = ContentScale.Fit,
-            )
+            ) {
+                PhotoFitImageWithSoftFill(
+                    photo = photo,
+                    modifier = Modifier.fillMaxSize(),
+                    contentDescription = photo.displayName,
+                )
+            }
         }
         SwipePhotoCard(
             photo = top,
@@ -335,11 +365,47 @@ fun PhotoDeckStage(
             haptics = haptics,
             onOpen = { onOpen(top) },
             onSwipeFeedbackChanged = onSwipeFeedbackChanged,
-            onAction = { onAction(top, it) },
+            onDeckPromotionChanged = { value ->
+                if (value <= 0f) {
+                    deckPromotion.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                    )
+                } else if (value >= 1f) {
+                    deckPromotion.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                    )
+                } else {
+                    deckPromotion.snapTo(value.coerceIn(0f, 1f))
+                }
+            },
+            onAction = { action, startX, startY, targetX, targetY ->
+                exitingPhotoCard = null
+                exitingPhotoCard = ExitingPhotoCard(
+                    photo = top,
+                    startX = startX,
+                    startY = startY,
+                    targetX = targetX,
+                    targetY = targetY,
+                )
+                onAction(top, action)
+            },
             modifier = Modifier
                 .fillMaxWidth(0.96f)
                 .onGloballyPositioned { coordinates -> onTopCardPositioned(coordinates.boundsInRoot()) },
         )
+        exitingPhotoCard?.let { exiting ->
+            if (photos.none { it.mediaStoreId == exiting.photo.mediaStoreId }) {
+                ExitingPhotoOverlay(
+                    exiting = exiting,
+                    modifier = Modifier.fillMaxWidth(0.96f),
+                    onFinished = {
+                        if (exitingPhotoCard?.sequence == exiting.sequence) exitingPhotoCard = null
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -350,7 +416,8 @@ fun SwipePhotoCard(
     haptics: HapticKit,
     onOpen: () -> Unit = {},
     onSwipeFeedbackChanged: (PhotoSwipeFeedback) -> Unit = {},
-    onAction: (SwipeAction) -> Unit,
+    onDeckPromotionChanged: suspend (Float) -> Unit = {},
+    onAction: (SwipeAction, Float, Float, Float, Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -363,13 +430,9 @@ fun SwipePhotoCard(
     var inlineMotionManualHint by remember(photo.id) { mutableStateOf(false) }
     val offsetX = remember(photo.id) { Animatable(0f) }
     val offsetY = remember(photo.id) { Animatable(0f) }
-    // Do not fade the incoming photo from transparent; that exposes the backdrop and reads as a flash.
-    // The new card now rises from the already-rendered deck layer with a small scale/position motion.
-    val entryAlpha = remember(photo.id) { Animatable(1f) }
-    val entryScale = remember(photo.id) { Animatable(0.955f) }
-    val entryOffsetY = remember(photo.id) { Animatable(38f) }
     var lastZone by remember(photo.id) { mutableStateOf("") }
     var activeHint by remember(photo.id) { mutableStateOf<SwipeAction?>(null) }
+    var actionCommitted by remember(photo.id) { mutableStateOf(false) }
     val feedbackAlpha by animateFloatAsState(
         targetValue = (abs(offsetX.value) / 260f + abs(offsetY.value) / 260f).coerceIn(0f, 1f),
         animationSpec = tween(120),
@@ -387,10 +450,6 @@ fun SwipePhotoCard(
     val verticalDominanceRatio = 1.38f
     val horizontalDominanceRatio = 1.22f
 
-    LaunchedEffect(photo.id) {
-        launch { entryScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)) }
-        entryOffsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
-    }
     suspend fun startInlineMotionPreview(manual: Boolean) {
         if (!canInlinePlayMotion) return
         if (!manual && MotionPreviewAutoplayMemory.hasPlayed(photo.id)) {
@@ -460,124 +519,129 @@ fun SwipePhotoCard(
         return PhotoSwipeFeedback()
     }
 
+    fun deckPromotionProgress(x: Float, y: Float): Float {
+        return (max(abs(x), abs(y)) / 190f).coerceIn(0f, 0.76f)
+    }
+
     Box(
         modifier = modifier
             .graphicsLayer {
                 translationX = offsetX.value
-                translationY = offsetY.value + entryOffsetY.value
+                translationY = offsetY.value
                 rotationZ = rotation
                 val distance = (abs(offsetX.value) + abs(offsetY.value)).coerceAtMost(520f) / 520f
-                scaleX = entryScale.value * (1f - distance * 0.035f)
-                scaleY = entryScale.value * (1f - distance * 0.035f)
-                alpha = entryAlpha.value
+                scaleX = 1f - distance * 0.035f
+                scaleY = 1f - distance * 0.035f
+                alpha = if (actionCommitted) 0f else 1f
             }
-            .pointerInput(photo.id, settings) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    var totalX = 0f
-                    var totalY = 0f
-                    var dragging = false
-                    val slop = viewConfiguration.touchSlop
-                    val dragStartSlop = slop * 1.35f
-                    val tapSlop = slop * 1.10f
-                    val fastLongPressTimeout = 300L
-                    var longPressHandled = false
-                    val longPressStartMillis = SystemClock.uptimeMillis()
-                    val longPressJob = scope.launch {
-                        kotlinx.coroutines.delay(fastLongPressTimeout)
-                        if (canInlinePlayMotion && !dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop) {
-                            longPressHandled = true
-                            haptics.threshold()
-                            startInlineMotionPreview(manual = true)
-                        }
-                    }
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (change.changedToUpIgnoreConsumed()) break
-                        val delta = change.positionChange()
-                        if (delta.x != 0f || delta.y != 0f) {
-                            totalX += delta.x
-                            totalY += delta.y
-                            if (canInlinePlayMotion && !dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop && SystemClock.uptimeMillis() - longPressStartMillis >= fastLongPressTimeout) {
-                                longPressHandled = true
-                                longPressJob.cancel()
-                                haptics.threshold()
-                                scope.launch { startInlineMotionPreview(manual = true) }
-                            }
-                            if (!dragging && max(abs(totalX), abs(totalY)) > dragStartSlop) {
-                                dragging = true
-                                longPressJob.cancel()
-                                haptics.tick()
-                            }
-                            if (dragging) {
-                                change.consume()
-                                val nextX = offsetX.value + delta.x
-                                val nextY = offsetY.value + delta.y
-                                val zoneAction = classify(nextX, nextY)
-                                activeHint = zoneAction
-                                onSwipeFeedbackChanged(visualFeedback(nextX, nextY))
-                                val zone = zoneAction?.name.orEmpty()
-                                if (zone.isNotEmpty() && zone != lastZone) {
-                                    lastZone = zone
+            .then(
+                if (actionCommitted) {
+                    Modifier
+                } else {
+                    Modifier.pointerInput(photo.id, settings) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            var totalX = 0f
+                            var totalY = 0f
+                            var dragging = false
+                            val slop = viewConfiguration.touchSlop
+                            val dragStartSlop = slop * 1.35f
+                            val tapSlop = slop * 1.10f
+                            val fastLongPressTimeout = 300L
+                            var longPressHandled = false
+                            val longPressStartMillis = SystemClock.uptimeMillis()
+                            val longPressJob = scope.launch {
+                                kotlinx.coroutines.delay(fastLongPressTimeout)
+                                if (canInlinePlayMotion && !dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop) {
+                                    longPressHandled = true
                                     haptics.threshold()
-                                } else if (zone.isEmpty()) {
+                                    startInlineMotionPreview(manual = true)
+                                }
+                            }
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (change.changedToUpIgnoreConsumed()) break
+                                val delta = change.positionChange()
+                                if (delta.x != 0f || delta.y != 0f) {
+                                    totalX += delta.x
+                                    totalY += delta.y
+                                    if (canInlinePlayMotion && !dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop && SystemClock.uptimeMillis() - longPressStartMillis >= fastLongPressTimeout) {
+                                        longPressHandled = true
+                                        longPressJob.cancel()
+                                        haptics.threshold()
+                                        scope.launch { startInlineMotionPreview(manual = true) }
+                                    }
+                                    if (!dragging && max(abs(totalX), abs(totalY)) > dragStartSlop) {
+                                        dragging = true
+                                        longPressJob.cancel()
+                                        haptics.tick()
+                                    }
+                                    if (dragging) {
+                                        change.consume()
+                                        val nextX = offsetX.value + delta.x
+                                        val nextY = offsetY.value + delta.y
+                                        val zoneAction = classify(nextX, nextY)
+                                        activeHint = zoneAction
+                                        onSwipeFeedbackChanged(visualFeedback(nextX, nextY))
+                                        scope.launch { onDeckPromotionChanged(deckPromotionProgress(nextX, nextY)) }
+                                        val zone = zoneAction?.name.orEmpty()
+                                        if (zone.isNotEmpty() && zone != lastZone) {
+                                            lastZone = zone
+                                            haptics.threshold()
+                                        } else if (zone.isEmpty()) {
+                                            lastZone = ""
+                                        }
+                                        scope.launch {
+                                            offsetX.snapTo(nextX)
+                                            offsetY.snapTo(nextY)
+                                        }
+                                    }
+                                }
+                            }
+
+                            longPressJob.cancel()
+
+                            if (!dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop) {
+                                haptics.tick()
+                                onOpen()
+                            } else {
+                                val action = if (dragging) classify(offsetX.value, offsetY.value) else null
+                                if (action == null) {
+                                    activeHint = null
+                                    onSwipeFeedbackChanged(PhotoSwipeFeedback())
+                                    scope.launch { onDeckPromotionChanged(0f) }
+                                    scope.launch { offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) }
+                                    scope.launch { offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) }
+                                } else {
+                                    scope.launch { onDeckPromotionChanged(1f) }
+                                    val targetX = when (action) {
+                                        SwipeAction.Keep -> if (offsetX.value < 0) -980f else 980f
+                                        else -> offsetX.value * 1.75f
+                                    }
+                                    val targetY = when (action) {
+                                        SwipeAction.Delete -> if (settings.gestureDirection == GestureDirection.DEFAULT) -1260f else 1260f
+                                        SwipeAction.Favorite -> if (settings.gestureDirection == GestureDirection.DEFAULT) 1260f else -1260f
+                                        SwipeAction.Keep -> offsetY.value
+                                    }
+                                    actionCommitted = true
+                                    onAction(action, offsetX.value, offsetY.value, targetX, targetY)
+                                    activeHint = null
+                                    onSwipeFeedbackChanged(PhotoSwipeFeedback())
                                     lastZone = ""
                                 }
-                                scope.launch {
-                                    offsetX.snapTo(nextX)
-                                    offsetY.snapTo(nextY)
-                                }
-                            }
-                        }
-                    }
-
-                    longPressJob.cancel()
-
-                    if (!dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop) {
-                        haptics.tick()
-                        onOpen()
-                    } else {
-                        val action = if (dragging) classify(offsetX.value, offsetY.value) else null
-                        if (action == null) {
-                            activeHint = null
-                            onSwipeFeedbackChanged(PhotoSwipeFeedback())
-                            scope.launch { offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) }
-                            scope.launch { offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) }
-                        } else {
-                            val targetX = when (action) {
-                                SwipeAction.Keep -> if (offsetX.value < 0) -980f else 980f
-                                else -> offsetX.value * 1.75f
-                            }
-                            val targetY = when (action) {
-                                SwipeAction.Delete -> if (settings.gestureDirection == GestureDirection.DEFAULT) -1260f else 1260f
-                                SwipeAction.Favorite -> if (settings.gestureDirection == GestureDirection.DEFAULT) 1260f else -1260f
-                                SwipeAction.Keep -> offsetY.value
-                            }
-                            scope.launch {
-                                offsetX.animateTo(targetX, tween(260, easing = FastOutSlowInEasing))
-                            }
-                            scope.launch {
-                                offsetY.animateTo(targetY, tween(260, easing = FastOutSlowInEasing))
-                                onAction(action)
-                                // Keep the old card off-screen until the deck state swaps.
-                                // Snapping it back to 0 here caused a one-frame jump/flash before the next photo appeared.
-                                activeHint = null
-                                onSwipeFeedbackChanged(PhotoSwipeFeedback())
-                                lastZone = ""
                             }
                         }
                     }
                 }
-            }
+            )
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(photoRatio)
                 .clip(RoundedCornerShape(32.dp))
-                .background(Color.Black.copy(alpha = 0.96f))
-                .border(1.dp, adaptiveWhiteBorder(0.38f), RoundedCornerShape(32.dp))
+                .background(Color.Black)
         ) {
             val motionPreview = inlineMotionSource
             if (motionPreview != null) {
@@ -588,18 +652,7 @@ fun SwipePhotoCard(
                     onEnded = { inlineMotionSource = null; inlineMotionManualHint = true },
                 )
             } else {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(Uri.parse(photo.uri))
-                        .memoryCacheKey(photo.uri)
-                        .diskCacheKey(photo.uri)
-                        .placeholderMemoryCacheKey(photo.uri)
-                        .crossfade(false)
-                        .build(),
-                    contentDescription = photo.displayName,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
-                )
+                PlainFitPhotoImage(photo = photo, modifier = Modifier.fillMaxSize(), contentDescription = photo.displayName)
             }
             PhotoDynamicBadgeRow(
                 photo = photo,
@@ -622,6 +675,92 @@ fun SwipePhotoCard(
             )
         }
     }
+}
+
+@Composable
+private fun ExitingPhotoOverlay(
+    exiting: ExitingPhotoCard,
+    modifier: Modifier = Modifier,
+    onFinished: () -> Unit,
+) {
+    val offsetX = remember(exiting.sequence) { Animatable(exiting.startX) }
+    val offsetY = remember(exiting.sequence) { Animatable(exiting.startY) }
+    val ratio = remember(exiting.photo.id, exiting.photo.width, exiting.photo.height, exiting.photo.exifWidth, exiting.photo.exifHeight) {
+        photoDisplayAspectRatio(exiting.photo)
+    }
+
+    LaunchedEffect(exiting.sequence) {
+        val xJob = launch {
+            offsetX.animateTo(exiting.targetX, tween(260, easing = FastOutSlowInEasing))
+        }
+        val yJob = launch {
+            offsetY.animateTo(exiting.targetY, tween(260, easing = FastOutSlowInEasing))
+        }
+        xJob.join()
+        yJob.join()
+        onFinished()
+    }
+
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                translationX = offsetX.value
+                translationY = offsetY.value
+                rotationZ = (offsetX.value / 34f).coerceIn(-16f, 16f)
+                val distance = (abs(offsetX.value) + abs(offsetY.value)).coerceAtMost(520f) / 520f
+                scaleX = 1f - distance * 0.035f
+                scaleY = 1f - distance * 0.035f
+            }
+            .aspectRatio(ratio)
+            .clip(RoundedCornerShape(32.dp))
+            .background(Color.Black),
+    ) {
+        PlainFitPhotoImage(
+            photo = exiting.photo,
+            modifier = Modifier.fillMaxSize(),
+            contentDescription = exiting.photo.displayName,
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.04f), Color.Black.copy(alpha = 0.16f))
+                )
+            )
+        )
+    }
+}
+
+@Composable
+private fun PhotoFitImageWithSoftFill(
+    photo: PhotoEntity,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = photo.displayName,
+) {
+    PlainFitPhotoImage(photo = photo, modifier = modifier.background(Color.Black), contentDescription = contentDescription)
+}
+
+@Composable
+private fun PlainFitPhotoImage(
+    photo: PhotoEntity,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = photo.displayName,
+) {
+    val context = LocalContext.current
+    val model = remember(photo.uri) {
+        ImageRequest.Builder(context)
+            .data(Uri.parse(photo.uri))
+            .memoryCacheKey(photo.uri)
+            .diskCacheKey(photo.uri)
+            .placeholderMemoryCacheKey(photo.uri)
+            .crossfade(false)
+            .build()
+    }
+    AsyncImage(
+        model = model,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = ContentScale.Fit,
+    )
 }
 
 @Composable
@@ -1193,11 +1332,17 @@ fun VideoCard(video: VideoEntity, onAction: (SwipeAction) -> Unit) {
 }
 
 private fun photoDisplayAspectRatio(photo: PhotoEntity): Float {
-    val width = photo.width.takeIf { it > 0 } ?: photo.exifWidth?.takeIf { it > 0 } ?: 1
-    val height = photo.height.takeIf { it > 0 } ?: photo.exifHeight?.takeIf { it > 0 } ?: 1
+    val width = photo.exifWidth?.takeIf { it > 0 } ?: photo.width.takeIf { it > 0 } ?: 1
+    val height = photo.exifHeight?.takeIf { it > 0 } ?: photo.height.takeIf { it > 0 } ?: 1
     val raw = width.toFloat() / height.toFloat()
-    // Keep the real photo orientation visible, while avoiding unusably tall/wide cards on phones.
-    return raw.coerceIn(0.58f, 1.70f)
+    val minRatio = when {
+        photo.isLongImage -> 0.42f
+        photo.isScreenshot -> 0.46f
+        else -> 0.50f
+    }
+    // Keep the real photo orientation visible for common phone screenshots and panoramas,
+    // while still bounding extreme long images so the card remains usable.
+    return raw.coerceIn(minRatio, 2.20f)
 }
 
 

@@ -147,6 +147,7 @@ class KanlemeViewModel @Inject constructor(
     private var videoDeckRefilling = false
     private var lastGeneratedRandomSeed = 1L
     private var similarDetectionJob: Job? = null
+    private val pendingPhotoActionMediaIds = mutableSetOf<Long>()
 
     init {
         viewModelScope.launch {
@@ -189,6 +190,9 @@ class KanlemeViewModel @Inject constructor(
     private fun ensureRandomSeed(scope: CleaningScope): CleaningScope =
         if (scope.sortOrder == "random" && scope.randomSeed <= 1L) scope.copy(randomSeed = nextRandomSeed()) else scope
 
+    private fun List<PhotoEntity>.withoutPendingPhotoActions(): List<PhotoEntity> =
+        filterNot { it.mediaStoreId in pendingPhotoActionMediaIds }
+
     fun loadPhotoDeck(scope: CleaningScope = _photoScope.value) = viewModelScope.launch {
         val requestedScope = ensureRandomSeed(scope)
         _photoScope.value = requestedScope
@@ -197,6 +201,7 @@ class KanlemeViewModel @Inject constructor(
         try {
             _photoDeck.value = repository
                 .loadPhotoDeck(requestedScope.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
+                .withoutPendingPhotoActions()
                 .distinctBy { it.mediaStoreId }
         } finally {
             if (showPreparing) _photoDeckPreparing.value = false
@@ -232,6 +237,7 @@ class KanlemeViewModel @Inject constructor(
             try {
                 _photoDeck.value = repository
                     .loadPhotoDeck(session.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
+                    .withoutPendingPhotoActions()
                     .distinctBy { it.mediaStoreId }
             } finally {
                 _photoDeckPreparing.value = false
@@ -275,6 +281,7 @@ class KanlemeViewModel @Inject constructor(
             try {
                 _photoDeck.value = repository
                     .loadPhotoDeck(session.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
+                    .withoutPendingPhotoActions()
                     .distinctBy { it.mediaStoreId }
             } finally {
                 _photoDeckPreparing.value = false
@@ -309,6 +316,7 @@ class KanlemeViewModel @Inject constructor(
         try {
             val fresh = repository.loadPhotoDeck(_photoScope.value.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
             val merged = (_photoDeck.value + fresh)
+                .withoutPendingPhotoActions()
                 .distinctBy { it.mediaStoreId }
                 .take(CONTINUOUS_PHOTO_DECK_SIZE)
             _photoDeck.value = merged
@@ -392,23 +400,33 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun onPhotoAction(photo: PhotoEntity, action: SwipeAction) = viewModelScope.launch {
-        repository.handlePhotoAction(photo, action)
+        pendingPhotoActionMediaIds += photo.mediaStoreId
         _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
         _photoSessionActionCount.value += 1
         _lastPhotoAction.value = action
-        refillPhotoDeckIfNeeded()
+        try {
+            repository.handlePhotoAction(photo, action)
+            refillPhotoDeckIfNeeded()
+        } finally {
+            pendingPhotoActionMediaIds -= photo.mediaStoreId
+        }
     }
 
     fun onPhotoActionWithOptionalMove(photo: PhotoEntity, action: SwipeAction, targetRelativePath: String?) = viewModelScope.launch {
-        val s = settingsRepository.settings.first()
-        if (targetRelativePath != null && s.autoMoveOnKeepFavorite && action in setOf(SwipeAction.Keep, SwipeAction.Favorite)) {
-            repository.movePhotoToFolder(photo, targetRelativePath)
-        }
-        repository.handlePhotoAction(photo, action)
+        pendingPhotoActionMediaIds += photo.mediaStoreId
         _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
         _photoSessionActionCount.value += 1
         _lastPhotoAction.value = action
-        refillPhotoDeckIfNeeded()
+        try {
+            val s = settingsRepository.settings.first()
+            if (targetRelativePath != null && s.autoMoveOnKeepFavorite && action in setOf(SwipeAction.Keep, SwipeAction.Favorite)) {
+                repository.movePhotoToFolder(photo, targetRelativePath)
+            }
+            repository.handlePhotoAction(photo, action)
+            refillPhotoDeckIfNeeded()
+        } finally {
+            pendingPhotoActionMediaIds -= photo.mediaStoreId
+        }
     }
 
     fun onVideoAction(video: VideoEntity, action: SwipeAction) = viewModelScope.launch {
