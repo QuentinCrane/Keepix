@@ -6,10 +6,23 @@ import android.content.ContentUris
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.net.Uri
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.VideoEntity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 fun shareMedia(context: Context, uri: Uri, mimeType: String, title: String) {
     val resolvedType = mimeType.ifBlank { "*/*" }
@@ -29,6 +42,34 @@ fun sharePhoto(context: Context, photo: PhotoEntity) {
 
 fun shareVideo(context: Context, video: VideoEntity) {
     shareMedia(context, Uri.parse(video.uri), video.mimeType.ifBlank { "video/*" }, video.displayName)
+}
+
+suspend fun shareDailyReportImage(
+    context: Context,
+    todayPhotos: Int,
+    todayVideos: Int,
+    todayActions: Int,
+) {
+    val title = "今日整理日报"
+    val uri = withContext(Dispatchers.IO) {
+        val bitmap = createDailyReportBitmap(todayPhotos, todayVideos, todayActions)
+        val reportsDir = File(context.cacheDir, "daily-reports").apply { mkdirs() }
+        val file = File(reportsDir, "kanleme-daily-report.png")
+        file.outputStream().use { output ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+        }
+        bitmap.recycle()
+        FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+    }
+    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_TITLE, title)
+        clipData = ClipData.newUri(context.contentResolver, title, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    val chooser = Intent.createChooser(sendIntent, context.getString(R.string.share_chooser_title, title))
+    context.startActivity(chooser)
 }
 
 fun openPhotoInSystemGallery(context: Context, photo: PhotoEntity) {
@@ -138,3 +179,119 @@ fun openMediaInSystemGallery(
         context.startActivity(viewIntent(uri, broadType))
     }
 }
+
+private fun createDailyReportBitmap(todayPhotos: Int, todayVideos: Int, todayActions: Int): Bitmap {
+    val width = 1080
+    val height = 1440
+    val total = todayPhotos + todayVideos
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val primary = Color.rgb(32, 124, 224)
+    val primarySoft = Color.rgb(224, 239, 255)
+    val ink = Color.rgb(21, 27, 36)
+    val muted = Color.rgb(104, 116, 132)
+    val line = Color.rgb(226, 232, 240)
+    val paper = Color.rgb(251, 253, 255)
+
+    canvas.drawColor(Color.rgb(238, 244, 251))
+    paint.color = paper
+    canvas.drawRoundRect(RectF(54f, 54f, width - 54f, height - 54f), 64f, 64f, paint)
+
+    paint.color = primarySoft
+    canvas.drawRoundRect(RectF(96f, 100f, width - 96f, 424f), 46f, 46f, paint)
+    paint.color = Color.WHITE
+    canvas.drawRoundRect(RectF(118f, 122f, width - 118f, 402f), 38f, 38f, paint)
+
+    paint.textAlign = Paint.Align.LEFT
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    paint.color = primary
+    paint.textSize = 42f
+    canvas.drawText("看了么", 154f, 192f, paint)
+
+    paint.color = ink
+    paint.textSize = 76f
+    canvas.drawText("今日整理", 154f, 286f, paint)
+
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+    paint.color = muted
+    paint.textSize = 32f
+    canvas.drawText(SimpleDateFormat("M月d日 HH:mm", Locale.getDefault()).format(Date()), 154f, 344f, paint)
+
+    paint.textAlign = Paint.Align.CENTER
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    paint.color = primary
+    paint.textSize = 152f
+    canvas.drawText(formatReportCount(total), width / 2f, 620f, paint)
+
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+    paint.color = muted
+    paint.textSize = 36f
+    val summary = if (total > 0) {
+        "今天已处理 " + total + " 个媒体文件"
+    } else {
+        "今天还没有开始整理"
+    }
+    canvas.drawText(summary, width / 2f, 684f, paint)
+
+    drawReportMetric(canvas, 120f, 770f, "照片", todayPhotos, primary, ink, muted, line, paint)
+    drawReportMetric(canvas, 390f, 770f, "视频", todayVideos, primary, ink, muted, line, paint)
+    drawReportMetric(canvas, 660f, 770f, "动作", todayActions, primary, ink, muted, line, paint)
+
+    paint.color = line
+    canvas.drawRoundRect(RectF(132f, 1064f, width - 132f, 1070f), 3f, 3f, paint)
+
+    paint.color = ink
+    paint.textSize = 42f
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    canvas.drawText(if (total > 0) "小步整理，也是在腾出生活空间" else "开一小局，从几张照片开始", width / 2f, 1160f, paint)
+
+    paint.color = muted
+    paint.textSize = 30f
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+    canvas.drawText("本地统计 · 不上传照片或视频", width / 2f, 1240f, paint)
+
+    paint.color = primary
+    paint.textSize = 34f
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    canvas.drawText("kanleme", width / 2f, 1322f, paint)
+    return bitmap
+}
+
+private fun drawReportMetric(
+    canvas: Canvas,
+    left: Float,
+    top: Float,
+    label: String,
+    value: Int,
+    primary: Int,
+    ink: Int,
+    muted: Int,
+    line: Int,
+    paint: Paint,
+) {
+    paint.color = Color.WHITE
+    canvas.drawRoundRect(RectF(left, top, left + 240f, top + 204f), 34f, 34f, paint)
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = 3f
+    paint.color = line
+    canvas.drawRoundRect(RectF(left, top, left + 240f, top + 204f), 34f, 34f, paint)
+    paint.style = Paint.Style.FILL
+
+    paint.textAlign = Paint.Align.CENTER
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    paint.color = ink
+    paint.textSize = 58f
+    canvas.drawText(formatReportCount(value), left + 120f, top + 92f, paint)
+
+    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+    paint.color = muted
+    paint.textSize = 30f
+    canvas.drawText(label, left + 120f, top + 146f, paint)
+
+    paint.color = primary
+    canvas.drawRoundRect(RectF(left + 88f, top + 166f, left + 152f, top + 174f), 4f, 4f, paint)
+}
+
+private fun formatReportCount(value: Int): String =
+    if (value >= 1000) "%.1fK".format(Locale.US, value / 1000.0).replace(".0", "") else value.toString()

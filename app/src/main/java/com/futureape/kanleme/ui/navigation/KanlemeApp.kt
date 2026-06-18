@@ -136,7 +136,6 @@ fun KanlemeApp(initialShortcutTarget: String?, viewModel: KanlemeViewModel = hil
                         onTrash = { navController.navigate(Destinations.TRASH) },
                         onFavorites = { navController.navigate(Destinations.FAVORITES) },
                         onToday = { navController.navigate(Destinations.TODAY) },
-                        onReport = { navController.navigate(Destinations.ANNUAL) },
                     )
                 }
                 composable(Destinations.PHOTO_START) {

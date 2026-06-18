@@ -58,7 +58,6 @@ suspend fun resolveMotionPhotoPlaybackSource(
 }
 
 private const val MIN_VIDEO_BYTES = 16 * 1024L
-private const val MAX_CACHE_BYTES = 220L * 1024L * 1024L
 
 private fun embeddedMotionCacheFile(context: Context, photo: PhotoEntity): File {
     val dir = File(context.cacheDir, "motion_photo_preview").apply { mkdirs() }
@@ -228,7 +227,7 @@ private fun trimMotionPreviewCache(context: Context) {
     val files = dir.listFiles()?.filter { it.isFile }?.sortedByDescending { it.lastModified() } ?: return
     var total = files.sumOf { it.length() }
     files.asReversed().forEach { file ->
-        if (total <= MAX_CACHE_BYTES) return
+        if (total <= MOTION_PREVIEW_CACHE_MAX_BYTES) return
         total -= file.length()
         file.delete()
     }

@@ -145,9 +145,15 @@ class KanlemeViewModel @Inject constructor(
     private var lastAutoRefreshAccessKey: String? = null
     private var photoDeckRefilling = false
     private var videoDeckRefilling = false
+    private var photoDeckLoadJob: Job? = null
+    private var videoDeckLoadJob: Job? = null
+    private var photoDeckGeneration = 0L
+    private var videoDeckGeneration = 0L
     private var lastGeneratedRandomSeed = 1L
     private var similarDetectionJob: Job? = null
     private val pendingPhotoActionMediaIds = mutableSetOf<Long>()
+    private val handledPhotoActionMediaIds = mutableSetOf<Long>()
+    private val handledVideoActionMediaIds = mutableSetOf<Long>()
 
     init {
         viewModelScope.launch {
@@ -190,35 +196,69 @@ class KanlemeViewModel @Inject constructor(
     private fun ensureRandomSeed(scope: CleaningScope): CleaningScope =
         if (scope.sortOrder == "random" && scope.randomSeed <= 1L) scope.copy(randomSeed = nextRandomSeed()) else scope
 
-    private fun List<PhotoEntity>.withoutPendingPhotoActions(): List<PhotoEntity> =
-        filterNot { it.mediaStoreId in pendingPhotoActionMediaIds }
+    private fun nextPhotoDeckGeneration(): Long {
+        photoDeckLoadJob?.cancel()
+        photoDeckGeneration += 1L
+        return photoDeckGeneration
+    }
 
-    fun loadPhotoDeck(scope: CleaningScope = _photoScope.value) = viewModelScope.launch {
+    private fun nextVideoDeckGeneration(): Long {
+        videoDeckLoadJob?.cancel()
+        videoDeckGeneration += 1L
+        return videoDeckGeneration
+    }
+
+    private fun invalidatePhotoDeckLoads() {
+        photoDeckLoadJob?.cancel()
+        photoDeckGeneration += 1L
+    }
+
+    private fun invalidateVideoDeckLoads() {
+        videoDeckLoadJob?.cancel()
+        videoDeckGeneration += 1L
+    }
+
+    private fun List<PhotoEntity>.withoutLocalPhotoExclusions(): List<PhotoEntity> =
+        filterNot { it.mediaStoreId in pendingPhotoActionMediaIds || it.mediaStoreId in handledPhotoActionMediaIds }
+
+    private fun List<VideoEntity>.withoutLocalVideoExclusions(): List<VideoEntity> =
+        filterNot { it.mediaStoreId in handledVideoActionMediaIds }
+
+    fun loadPhotoDeck(scope: CleaningScope = _photoScope.value) {
         val requestedScope = ensureRandomSeed(scope)
         _photoScope.value = requestedScope
         val showPreparing = _photoDeck.value.isEmpty()
         if (showPreparing) _photoDeckPreparing.value = true
-        try {
-            _photoDeck.value = repository
-                .loadPhotoDeck(requestedScope.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
-                .withoutPendingPhotoActions()
-                .distinctBy { it.mediaStoreId }
-        } finally {
-            if (showPreparing) _photoDeckPreparing.value = false
+        val generation = nextPhotoDeckGeneration()
+        photoDeckLoadJob = viewModelScope.launch {
+            try {
+                val loaded = repository
+                    .loadPhotoDeck(requestedScope.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
+                    .withoutLocalPhotoExclusions()
+                    .distinctBy { it.mediaStoreId }
+                if (generation == photoDeckGeneration) _photoDeck.value = loaded
+            } finally {
+                if (showPreparing && generation == photoDeckGeneration) _photoDeckPreparing.value = false
+            }
         }
     }
 
-    fun loadVideoDeck(scope: CleaningScope = _videoScope.value) = viewModelScope.launch {
+    fun loadVideoDeck(scope: CleaningScope = _videoScope.value) {
         val requestedScope = ensureRandomSeed(scope)
         _videoScope.value = requestedScope
         val showPreparing = _videoDeck.value.isEmpty()
         if (showPreparing) _videoDeckPreparing.value = true
-        try {
-            _videoDeck.value = repository
-                .loadVideoDeck(requestedScope.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
-                .distinctBy { it.mediaStoreId }
-        } finally {
-            if (showPreparing) _videoDeckPreparing.value = false
+        val generation = nextVideoDeckGeneration()
+        videoDeckLoadJob = viewModelScope.launch {
+            try {
+                val loaded = repository
+                    .loadVideoDeck(requestedScope.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
+                    .withoutLocalVideoExclusions()
+                    .distinctBy { it.mediaStoreId }
+                if (generation == videoDeckGeneration) _videoDeck.value = loaded
+            } finally {
+                if (showPreparing && generation == videoDeckGeneration) _videoDeckPreparing.value = false
+            }
         }
     }
 
@@ -231,16 +271,20 @@ class KanlemeViewModel @Inject constructor(
         _photoDeckPreparing.value = true
         _photoSessionActionCount.value = 0
         _lastPhotoAction.value = null
+        pendingPhotoActionMediaIds.clear()
+        handledPhotoActionMediaIds.clear()
         _photoDeck.value = emptyList()
-        viewModelScope.launch {
+        val generation = nextPhotoDeckGeneration()
+        photoDeckLoadJob = viewModelScope.launch {
             if (session.sortOrder == "random") settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed)
             try {
-                _photoDeck.value = repository
+                val loaded = repository
                     .loadPhotoDeck(session.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
-                    .withoutPendingPhotoActions()
+                    .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
+                if (generation == photoDeckGeneration) _photoDeck.value = loaded
             } finally {
-                _photoDeckPreparing.value = false
+                if (generation == photoDeckGeneration) _photoDeckPreparing.value = false
             }
         }
     }
@@ -255,15 +299,19 @@ class KanlemeViewModel @Inject constructor(
         _videoSessionActionCount.value = 0
         _lastVideoAction.value = null
         _pendingVideoKeeps.value = emptyMap()
+        handledVideoActionMediaIds.clear()
         _videoDeck.value = emptyList()
-        viewModelScope.launch {
+        val generation = nextVideoDeckGeneration()
+        videoDeckLoadJob = viewModelScope.launch {
             if (session.sortOrder == "random") settingsRepository.setVideoSortOrderWithSeed("random", session.randomSeed)
             try {
-                _videoDeck.value = repository
+                val loaded = repository
                     .loadVideoDeck(session.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
+                    .withoutLocalVideoExclusions()
                     .distinctBy { it.mediaStoreId }
+                if (generation == videoDeckGeneration) _videoDeck.value = loaded
             } finally {
-                _videoDeckPreparing.value = false
+                if (generation == videoDeckGeneration) _videoDeckPreparing.value = false
             }
         }
     }
@@ -275,16 +323,20 @@ class KanlemeViewModel @Inject constructor(
         _photoDeckPreparing.value = true
         _photoSessionActionCount.value = 0
         _lastPhotoAction.value = null
+        pendingPhotoActionMediaIds.clear()
+        handledPhotoActionMediaIds.clear()
         _photoDeck.value = emptyList()
-        viewModelScope.launch {
+        val generation = nextPhotoDeckGeneration()
+        photoDeckLoadJob = viewModelScope.launch {
             settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed)
             try {
-                _photoDeck.value = repository
+                val loaded = repository
                     .loadPhotoDeck(session.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
-                    .withoutPendingPhotoActions()
+                    .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
+                if (generation == photoDeckGeneration) _photoDeck.value = loaded
             } finally {
-                _photoDeckPreparing.value = false
+                if (generation == photoDeckGeneration) _photoDeckPreparing.value = false
             }
         }
     }
@@ -296,15 +348,19 @@ class KanlemeViewModel @Inject constructor(
         _videoSessionActionCount.value = 0
         _lastVideoAction.value = null
         _pendingVideoKeeps.value = emptyMap()
+        handledVideoActionMediaIds.clear()
         _videoDeck.value = emptyList()
-        viewModelScope.launch {
+        val generation = nextVideoDeckGeneration()
+        videoDeckLoadJob = viewModelScope.launch {
             settingsRepository.setVideoSortOrderWithSeed("random", session.randomSeed)
             try {
-                _videoDeck.value = repository
+                val loaded = repository
                     .loadVideoDeck(session.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
+                    .withoutLocalVideoExclusions()
                     .distinctBy { it.mediaStoreId }
+                if (generation == videoDeckGeneration) _videoDeck.value = loaded
             } finally {
-                _videoDeckPreparing.value = false
+                if (generation == videoDeckGeneration) _videoDeckPreparing.value = false
             }
         }
     }
@@ -312,14 +368,16 @@ class KanlemeViewModel @Inject constructor(
     private suspend fun refillPhotoDeckIfNeeded(force: Boolean = false) {
         if (!force && _photoDeck.value.size > PHOTO_PREFETCH_THRESHOLD) return
         if (photoDeckRefilling) return
+        val generation = photoDeckGeneration
         photoDeckRefilling = true
         try {
             val fresh = repository.loadPhotoDeck(_photoScope.value.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
+            if (generation != photoDeckGeneration) return
             val merged = (_photoDeck.value + fresh)
-                .withoutPendingPhotoActions()
+                .withoutLocalPhotoExclusions()
                 .distinctBy { it.mediaStoreId }
                 .take(CONTINUOUS_PHOTO_DECK_SIZE)
-            _photoDeck.value = merged
+            if (generation == photoDeckGeneration) _photoDeck.value = merged
         } finally {
             photoDeckRefilling = false
         }
@@ -328,13 +386,16 @@ class KanlemeViewModel @Inject constructor(
     private suspend fun refillVideoDeckIfNeeded(force: Boolean = false) {
         if (!force && _videoDeck.value.size > VIDEO_PREFETCH_THRESHOLD) return
         if (videoDeckRefilling) return
+        val generation = videoDeckGeneration
         videoDeckRefilling = true
         try {
             val fresh = repository.loadVideoDeck(_videoScope.value.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
+            if (generation != videoDeckGeneration) return
             val merged = (_videoDeck.value + fresh)
+                .withoutLocalVideoExclusions()
                 .distinctBy { it.mediaStoreId }
                 .take(CONTINUOUS_VIDEO_DECK_SIZE)
-            _videoDeck.value = merged
+            if (generation == videoDeckGeneration) _videoDeck.value = merged
         } finally {
             videoDeckRefilling = false
         }
@@ -401,6 +462,8 @@ class KanlemeViewModel @Inject constructor(
 
     fun onPhotoAction(photo: PhotoEntity, action: SwipeAction) = viewModelScope.launch {
         pendingPhotoActionMediaIds += photo.mediaStoreId
+        handledPhotoActionMediaIds += photo.mediaStoreId
+        invalidatePhotoDeckLoads()
         _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
         _photoSessionActionCount.value += 1
         _lastPhotoAction.value = action
@@ -414,6 +477,8 @@ class KanlemeViewModel @Inject constructor(
 
     fun onPhotoActionWithOptionalMove(photo: PhotoEntity, action: SwipeAction, targetRelativePath: String?) = viewModelScope.launch {
         pendingPhotoActionMediaIds += photo.mediaStoreId
+        handledPhotoActionMediaIds += photo.mediaStoreId
+        invalidatePhotoDeckLoads()
         _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
         _photoSessionActionCount.value += 1
         _lastPhotoAction.value = action
@@ -430,9 +495,11 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun onVideoAction(video: VideoEntity, action: SwipeAction) = viewModelScope.launch {
+        handledVideoActionMediaIds += video.mediaStoreId
+        invalidateVideoDeckLoads()
         val wasPending = removePendingVideoKeep(video)
-        repository.handleVideoAction(video, action)
         _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == video.mediaStoreId }
+        repository.handleVideoAction(video, action)
         if (!wasPending) _videoSessionActionCount.value += 1
         _lastVideoAction.value = action
         refillVideoDeckIfNeeded()
@@ -460,6 +527,8 @@ class KanlemeViewModel @Inject constructor(
         val pending = _pendingVideoKeeps.value
         if (pending.isEmpty()) return@launch
         val pendingIds = pending.keys
+        handledVideoActionMediaIds += pendingIds
+        invalidateVideoDeckLoads()
         pending.values.forEach { video ->
             repository.handleVideoAction(video, SwipeAction.Keep)
         }
@@ -482,14 +551,16 @@ class KanlemeViewModel @Inject constructor(
             runCatching { repository.undoLastAction() }
                 .onSuccess { ok ->
                     if (ok) {
+                        handledVideoActionMediaIds.clear()
+                        invalidateVideoDeckLoads()
                         _videoSessionActionCount.value = (_videoSessionActionCount.value - 1).coerceAtLeast(0)
                         _message.value = uiText(R.string.message_video_undo_success)
+                        loadVideoDeck()
                     } else {
                         _message.value = uiText(R.string.message_video_undo_empty)
                     }
                 }
                 .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
-            loadVideoDeck()
         }
         return null
     }
@@ -501,6 +572,8 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun archivePhotoToFolder(photo: PhotoEntity, relativePath: String) = viewModelScope.launch {
+        handledPhotoActionMediaIds += photo.mediaStoreId
+        invalidatePhotoDeckLoads()
         runCatching {
             val result = repository.movePhotoToFolder(photo, relativePath)
             if (!result.success) error(result.message)
@@ -513,11 +586,14 @@ class KanlemeViewModel @Inject constructor(
             _message.value = dynamicUiText(message)
             refillPhotoDeckIfNeeded()
         }.onFailure {
+            handledPhotoActionMediaIds -= photo.mediaStoreId
             _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_archive_failed)
         }
     }
 
     fun archiveVideoToFolder(video: VideoEntity, relativePath: String) = viewModelScope.launch {
+        handledVideoActionMediaIds += video.mediaStoreId
+        invalidateVideoDeckLoads()
         runCatching {
             val result = repository.moveVideoToFolder(video, relativePath)
             if (!result.success) error(result.message)
@@ -531,6 +607,7 @@ class KanlemeViewModel @Inject constructor(
             _message.value = dynamicUiText(message)
             refillVideoDeckIfNeeded()
         }.onFailure {
+            handledVideoActionMediaIds -= video.mediaStoreId
             _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_archive_failed)
         }
     }
@@ -629,23 +706,36 @@ class KanlemeViewModel @Inject constructor(
 
     fun undoLastAction() = viewModelScope.launch {
         runCatching { repository.undoLastAction() }
-            .onSuccess { ok -> _message.value = if (ok) uiText(R.string.message_undo_success) else uiText(R.string.message_undo_empty) }
+            .onSuccess { ok ->
+                if (ok) {
+                    pendingPhotoActionMediaIds.clear()
+                    handledPhotoActionMediaIds.clear()
+                    handledVideoActionMediaIds.clear()
+                    invalidatePhotoDeckLoads()
+                    invalidateVideoDeckLoads()
+                }
+                _message.value = if (ok) uiText(R.string.message_undo_success) else uiText(R.string.message_undo_empty)
+            }
             .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
-        loadPhotoDeck(); loadVideoDeck()
+        loadPhotoDeck()
+        loadVideoDeck()
     }
 
     fun undoPhotoCleaningAction() = viewModelScope.launch {
         runCatching { repository.undoLastAction() }
             .onSuccess { ok ->
                 if (ok) {
+                    pendingPhotoActionMediaIds.clear()
+                    handledPhotoActionMediaIds.clear()
+                    invalidatePhotoDeckLoads()
                     _photoSessionActionCount.value = (_photoSessionActionCount.value - 1).coerceAtLeast(0)
                     _message.value = uiText(R.string.message_photo_back_success)
+                    loadPhotoDeck()
                 } else {
                     _message.value = uiText(R.string.message_photo_undo_empty)
                 }
             }
             .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
-        loadPhotoDeck()
     }
 
     fun buildAnnualReport(year: Int = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)) = viewModelScope.launch {

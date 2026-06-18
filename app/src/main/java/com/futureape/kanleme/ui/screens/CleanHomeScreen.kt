@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -29,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Image
@@ -36,15 +38,20 @@ import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import com.futureape.kanleme.ui.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,16 +59,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.rememberHapticKit
+import com.futureape.kanleme.ui.util.shareDailyReportImage
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -74,13 +87,17 @@ fun CleanHomeScreen(
     onTrash: () -> Unit,
     onFavorites: () -> Unit,
     onToday: () -> Unit,
-    onReport: () -> Unit,
 ) {
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val recentlyAddedPhotos by viewModel.recentlyAddedPhotos.collectAsStateWithLifecycle()
     val recentVideos by viewModel.recentVideos.collectAsStateWithLifecycle()
     val haptics = rememberHapticKit(settings)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var showDailyReport by remember { mutableStateOf(false) }
+    var exportingDailyReport by remember { mutableStateOf(false) }
+    var dailyReportExportError by remember { mutableStateOf<String?>(null) }
     val selectedIsPhoto = settings.homeMediaTab == "photo"
     val pagerState = rememberPagerState(
         initialPage = if (selectedIsPhoto) 0 else 1,
@@ -115,7 +132,16 @@ fun CleanHomeScreen(
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             HomeTopAction("当年今日", Icons.Rounded.CalendarToday, Modifier.weight(1f), onToday)
-                            HomeTopAction("今日整理", Icons.Rounded.Share, Modifier.weight(1f), onReport)
+                            HomeTopAction(
+                                "今日整理",
+                                Icons.Rounded.Share,
+                                Modifier.weight(1f),
+                                onClick = {
+                                    haptics.tick()
+                                    dailyReportExportError = null
+                                    showDailyReport = true
+                                },
+                            )
                         }
                     }
 
@@ -175,6 +201,199 @@ fun CleanHomeScreen(
                     }
                 }
             }
+        }
+    }
+    if (showDailyReport) {
+        DailyReportDialog(
+            todayPhotos = dashboard.todayPhotoCount,
+            todayVideos = dashboard.todayVideoCount,
+            todayActions = dashboard.todayActionCount,
+            exporting = exportingDailyReport,
+            exportError = dailyReportExportError,
+            onDismiss = {
+                showDailyReport = false
+                dailyReportExportError = null
+            },
+            onExport = {
+                exportingDailyReport = true
+                dailyReportExportError = null
+                scope.launch {
+                    runCatching {
+                        shareDailyReportImage(
+                            context = context,
+                            todayPhotos = dashboard.todayPhotoCount,
+                            todayVideos = dashboard.todayVideoCount,
+                            todayActions = dashboard.todayActionCount,
+                        )
+                    }.onSuccess {
+                        haptics.success()
+                    }.onFailure {
+                        dailyReportExportError = "导出失败，请稍后再试"
+                    }
+                    exportingDailyReport = false
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun DailyReportDialog(
+    todayPhotos: Int,
+    todayVideos: Int,
+    todayActions: Int,
+    exporting: Boolean,
+    exportError: String?,
+    onDismiss: () -> Unit,
+    onExport: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 28.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
+                shape = RoundedCornerShape(34.dp),
+                tonalAlpha = 0.90f,
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("今日整理贴纸", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Surface(
+                            modifier = Modifier.size(42.dp).clickable(onClick = onDismiss),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                    }
+                    DailyReportSticker(
+                        todayPhotos = todayPhotos,
+                        todayVideos = todayVideos,
+                        todayActions = todayActions,
+                    )
+                    if (exportError != null) {
+                        Text(
+                            exportError,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFE25C5C),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TextButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(999.dp),
+                        ) {
+                            Text("关闭", style = MaterialTheme.typography.titleMedium)
+                        }
+                        Button(
+                            onClick = onExport,
+                            enabled = !exporting,
+                            modifier = Modifier.weight(1.25f).height(48.dp),
+                            shape = RoundedCornerShape(999.dp),
+                        ) {
+                            Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (exporting) "导出中" else "导出图片", style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DailyReportSticker(
+    todayPhotos: Int,
+    todayVideos: Int,
+    todayActions: Int,
+    modifier: Modifier = Modifier,
+) {
+    val total = todayPhotos + todayVideos
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "今日整理",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        if (total > 0) "你今天处理了 " + total + " 个媒体文件" else "今天还没有开始整理",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Surface(shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)) {
+                    Text(
+                        "动作 " + todayActions,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                RollingNumberText(
+                    value = total,
+                    compact = true,
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text("今日总计", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TodayMetric("照片", todayPhotos, Modifier.weight(1f))
+                TodayMetric("视频", todayVideos, Modifier.weight(1f))
+                TodayMetric("动作", todayActions, Modifier.weight(1f))
+            }
+            Text(
+                if (total > 0) "小步整理，也是在腾出生活空间" else "开一小局，从几张照片开始",
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TodayMetric(label: String, value: Int, modifier: Modifier) {
+    Surface(
+        modifier = modifier.height(64.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            RollingNumberText(
+                value = value,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
