@@ -3,6 +3,7 @@ package com.futureape.kanleme.ui.screens
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,7 +22,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.Delete
@@ -30,14 +35,17 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -51,6 +59,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.R
@@ -70,6 +79,7 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
     val photos by viewModel.favoritePhotos.collectAsStateWithLifecycle()
     val videos by viewModel.favoriteVideos.collectAsStateWithLifecycle()
     var previewPhoto by remember { mutableStateOf<PhotoEntity?>(null) }
+    var photoColumnCount by rememberSaveable { mutableStateOf(3) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(top = 36.dp, start = 18.dp, end = 18.dp)) {
@@ -77,10 +87,16 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
             if (photos.isEmpty() && videos.isEmpty()) {
                 EmptyState("暂无收藏", "在整理时下滑照片或点击视频收藏按钮，就会出现在这里。", "去同步媒体库", { viewModel.refreshLibrary() })
             } else {
-                Text("收藏照片 ${photos.size} 张，收藏视频 ${videos.size} 个", style = MaterialTheme.typography.titleMedium)
+                FavoritePhotosHeader(
+                    photoCount = photos.size,
+                    videoCount = videos.size,
+                    columnCount = photoColumnCount,
+                    onColumnCountChange = { photoColumnCount = it },
+                )
                 Spacer(Modifier.height(12.dp))
-                PhotoGrid(
+                FavoritePhotoMasonryGrid(
                     photos = photos,
+                    columnCount = photoColumnCount,
                     modifier = Modifier.weight(1f),
                     onPhotoClick = { previewPhoto = it },
                 )
@@ -98,6 +114,149 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
             )
         }
     }
+}
+
+@Composable
+private fun FavoritePhotosHeader(
+    photoCount: Int,
+    videoCount: Int,
+    columnCount: Int,
+    onColumnCountChange: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("收藏照片 " + photoCount + " 张，收藏视频 " + videoCount + " 个", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "原比例 · " + columnCount + " 列",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        FavoriteColumnSelector(
+            selectedColumnCount = columnCount,
+            onSelected = onColumnCountChange,
+        )
+    }
+}
+
+@Composable
+private fun FavoriteColumnSelector(
+    selectedColumnCount: Int,
+    onSelected: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .width(136.dp)
+            .height(44.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        listOf(2, 3).forEach { count ->
+            val selected = selectedColumnCount == count
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(999.dp))
+                    .clickable { onSelected(count) },
+                shape = RoundedCornerShape(999.dp),
+                color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(count.toString() + " 列", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoritePhotoMasonryGrid(
+    photos: List<PhotoEntity>,
+    columnCount: Int,
+    modifier: Modifier = Modifier,
+    onPhotoClick: (PhotoEntity) -> Unit,
+) {
+    val columns = remember(photos, columnCount) { distributeFavoritePhotos(photos, columnCount) }
+    val scrollState = rememberScrollState()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState)
+            .padding(bottom = 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        columns.forEach { columnPhotos ->
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                columnPhotos.forEach { photo ->
+                    FavoritePhotoTile(
+                        photo = photo,
+                        onClick = { onPhotoClick(photo) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoritePhotoTile(
+    photo: PhotoEntity,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    val shape = RoundedCornerShape(18.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(favoriteOriginalAspectRatio(photo))
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(Uri.parse(photo.uri))
+                .memoryCacheKey(photo.uri)
+                .diskCacheKey(photo.uri)
+                .placeholderMemoryCacheKey(photo.uri)
+                .crossfade(false)
+                .build(),
+            contentDescription = photo.displayName,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+private fun distributeFavoritePhotos(photos: List<PhotoEntity>, requestedColumnCount: Int): List<List<PhotoEntity>> {
+    val columnCount = requestedColumnCount.coerceIn(2, 3)
+    val columns = List(columnCount) { mutableListOf<PhotoEntity>() }
+    val estimatedHeights = FloatArray(columnCount)
+    photos.forEach { photo ->
+        val targetIndex = estimatedHeights.indices.minByOrNull { estimatedHeights[it] } ?: 0
+        columns[targetIndex].add(photo)
+        estimatedHeights[targetIndex] += 1f / favoriteOriginalAspectRatio(photo)
+    }
+    return columns.map { it.toList() }
+}
+
+private fun favoriteOriginalAspectRatio(photo: PhotoEntity): Float {
+    val width = photo.exifWidth?.takeIf { it > 0 } ?: photo.width.takeIf { it > 0 } ?: 1
+    val height = photo.exifHeight?.takeIf { it > 0 } ?: photo.height.takeIf { it > 0 } ?: 1
+    return width.toFloat() / height.toFloat()
 }
 
 @Composable
