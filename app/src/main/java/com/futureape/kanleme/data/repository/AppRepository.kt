@@ -109,8 +109,8 @@ interface AppRepository {
     suspend fun refreshMediaLibrary(): Pair<Int, Int>
     suspend fun loadPhotoDeck(scope: CleaningScope): List<PhotoEntity>
     suspend fun loadVideoDeck(scope: CleaningScope): List<VideoEntity>
-    suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction)
-    suspend fun handleVideoAction(video: VideoEntity, action: SwipeAction)
+    suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction): Long
+    suspend fun handleVideoAction(video: VideoEntity, action: SwipeAction): Long
     suspend fun movePhotoToFolder(photo: PhotoEntity, targetRelativePath: String): MovePhotoResult
     suspend fun moveVideoToFolder(video: VideoEntity, targetRelativePath: String): MovePhotoResult
     suspend fun generateSimilarGroups(
@@ -123,6 +123,7 @@ interface AppRepository {
     suspend fun permanentlyDeleteAllTrash()
     suspend fun restoreAllTrash()
     suspend fun undoLastAction(): Boolean
+    suspend fun undoOperation(operationId: Long): Boolean
     suspend fun buildAnnualReport(year: Int): AnnualReport
     suspend fun buildAchievements(): List<AchievementUi>
 }

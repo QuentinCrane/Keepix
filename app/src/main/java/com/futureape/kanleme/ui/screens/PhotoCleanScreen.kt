@@ -97,6 +97,7 @@ fun PhotoCleanScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val sessionActionCount by viewModel.photoSessionActionCount.collectAsStateWithLifecycle()
     val lastPhotoAction by viewModel.lastPhotoAction.collectAsStateWithLifecycle()
+    val undoAnimation by viewModel.photoUndoAnimation.collectAsStateWithLifecycle()
     val haptics = rememberHapticKit(settings)
     val context = LocalContext.current
     var showGuide by remember { mutableStateOf(false) }
@@ -107,6 +108,7 @@ fun PhotoCleanScreen(
 
     fun leaveCleaning() {
         viewModel.resetPhotoSessionDateMode()
+        viewModel.finishPhotoCleaningSession()
         onBack()
     }
 
@@ -165,13 +167,13 @@ fun PhotoCleanScreen(
     val remainingPhotos = (dashboard.photoCount - dashboard.processedPhotoCount).coerceAtLeast(deck.size)
     val dimAlpha by animateFloatAsState(targetValue = if (showGuide) 0.46f else 0f, label = "guide_dim")
 
-    fun perform(photo: PhotoEntity, action: SwipeAction) {
+    fun perform(photo: PhotoEntity, action: SwipeAction, exitTargetX: Float, exitTargetY: Float) {
         when (action) {
             SwipeAction.Keep -> haptics.keep()
             SwipeAction.Delete -> haptics.delete()
             SwipeAction.Favorite -> haptics.favorite()
         }
-        viewModel.onPhotoAction(photo, action)
+        viewModel.onPhotoAction(photo, action, exitTargetX, exitTargetY)
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -236,7 +238,9 @@ fun PhotoCleanScreen(
                     onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
                     onTopCardPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.PhotoCard, rect) },
                     onSwipeFeedbackChanged = { photoSwipeFeedback = it },
-                    onAction = { photo, action -> perform(photo, action) },
+                    undoAnimation = undoAnimation,
+                    onUndoAnimationConsumed = { sequence -> viewModel.clearPhotoUndoAnimation(sequence) },
+                    onAction = { photo, action, _, _, targetX, targetY -> perform(photo, action, targetX, targetY) },
                 )
 
                 if (settings.photoShowInfoBar || settings.photoShowFolderChips) {

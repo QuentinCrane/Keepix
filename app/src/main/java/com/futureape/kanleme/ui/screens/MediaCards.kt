@@ -104,6 +104,7 @@ import com.futureape.kanleme.ui.util.photoMediaBadges
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.components.GlassSurface
+import com.futureape.kanleme.ui.viewmodel.PhotoUndoAnimation
 import kotlinx.coroutines.launch
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -306,7 +307,9 @@ fun PhotoDeckStage(
     onOpen: (PhotoEntity) -> Unit = {},
     onTopCardPositioned: (Rect) -> Unit = {},
     onSwipeFeedbackChanged: (PhotoSwipeFeedback) -> Unit = {},
-    onAction: (PhotoEntity, SwipeAction) -> Unit,
+    undoAnimation: PhotoUndoAnimation? = null,
+    onUndoAnimationConsumed: (Long) -> Unit = {},
+    onAction: (PhotoEntity, SwipeAction, Float, Float, Float, Float) -> Unit,
 ) {
     val top = photos.firstOrNull() ?: return
     val deckPromotion = remember(top.id) { Animatable(0f) }
@@ -365,6 +368,8 @@ fun PhotoDeckStage(
             haptics = haptics,
             onOpen = { onOpen(top) },
             onSwipeFeedbackChanged = onSwipeFeedbackChanged,
+            undoAnimation = undoAnimation?.takeIf { it.mediaStoreId == top.mediaStoreId },
+            onUndoAnimationConsumed = onUndoAnimationConsumed,
             onDeckPromotionChanged = { value ->
                 if (value <= 0f) {
                     deckPromotion.animateTo(
@@ -389,7 +394,7 @@ fun PhotoDeckStage(
                     targetX = targetX,
                     targetY = targetY,
                 )
-                onAction(top, action)
+                onAction(top, action, startX, startY, targetX, targetY)
             },
             modifier = Modifier
                 .fillMaxWidth(0.96f)
@@ -416,6 +421,8 @@ fun SwipePhotoCard(
     haptics: HapticKit,
     onOpen: () -> Unit = {},
     onSwipeFeedbackChanged: (PhotoSwipeFeedback) -> Unit = {},
+    undoAnimation: PhotoUndoAnimation? = null,
+    onUndoAnimationConsumed: (Long) -> Unit = {},
     onDeckPromotionChanged: suspend (Float) -> Unit = {},
     onAction: (SwipeAction, Float, Float, Float, Float) -> Unit,
     modifier: Modifier = Modifier,
@@ -478,6 +485,32 @@ fun SwipePhotoCard(
         inlineMotionLoading = false
         inlineMotionManualHint = false
         if (canInlinePlayMotion) startInlineMotionPreview(manual = false)
+    }
+
+    LaunchedEffect(undoAnimation?.sequence, photo.id) {
+        val motion = undoAnimation ?: return@LaunchedEffect
+        if (motion.mediaStoreId != photo.mediaStoreId) return@LaunchedEffect
+        actionCommitted = false
+        activeHint = null
+        lastZone = ""
+        onSwipeFeedbackChanged(PhotoSwipeFeedback(action = motion.action, offsetX = motion.fromX, offsetY = motion.fromY, intensity = 1f))
+        onDeckPromotionChanged(0.99f)
+        offsetX.snapTo(motion.fromX)
+        offsetY.snapTo(motion.fromY)
+        val xJob = launch {
+            offsetX.animateTo(0f, tween(260, easing = FastOutSlowInEasing))
+        }
+        val yJob = launch {
+            offsetY.animateTo(0f, tween(260, easing = FastOutSlowInEasing))
+        }
+        val deckJob = launch {
+            onDeckPromotionChanged(0f)
+        }
+        xJob.join()
+        yJob.join()
+        deckJob.join()
+        onSwipeFeedbackChanged(PhotoSwipeFeedback())
+        onUndoAnimationConsumed(motion.sequence)
     }
 
     fun verticalAction(y: Float): SwipeAction {

@@ -34,7 +34,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -45,6 +48,23 @@ data class SimilarDetectionUiState(
     val processedHint: Int = 0,
     val totalHint: Int = 0,
     val lastResultCount: Int = 0,
+)
+
+data class PhotoUndoAnimation(
+    val mediaStoreId: Long,
+    val action: SwipeAction,
+    val fromX: Float,
+    val fromY: Float,
+    val sequence: Long = System.nanoTime(),
+)
+
+private data class PhotoSessionAction(
+    val photo: PhotoEntity,
+    val action: SwipeAction,
+    val operationId: Deferred<Long>,
+    val exitTargetX: Float,
+    val exitTargetY: Float,
+    val undoPersistedAction: suspend (Long) -> Unit,
 )
 
 @HiltViewModel
@@ -121,6 +141,9 @@ class KanlemeViewModel @Inject constructor(
     private val _photoDeckPreparing = MutableStateFlow(false)
     val photoDeckPreparing = _photoDeckPreparing.asStateFlow()
 
+    private val _photoUndoAnimation = MutableStateFlow<PhotoUndoAnimation?>(null)
+    val photoUndoAnimation = _photoUndoAnimation.asStateFlow()
+
     private val _videoDeckPreparing = MutableStateFlow(false)
     val videoDeckPreparing = _videoDeckPreparing.asStateFlow()
 
@@ -153,6 +176,8 @@ class KanlemeViewModel @Inject constructor(
     private var similarDetectionJob: Job? = null
     private val pendingPhotoActionMediaIds = mutableSetOf<Long>()
     private val handledPhotoActionMediaIds = mutableSetOf<Long>()
+    private val photoSessionActions = ArrayDeque<PhotoSessionAction>()
+    private val photoPersistenceBarriers = mutableMapOf<Long, Job>()
     private val handledVideoActionMediaIds = mutableSetOf<Long>()
 
     init {
@@ -224,6 +249,100 @@ class KanlemeViewModel @Inject constructor(
     private fun List<VideoEntity>.withoutLocalVideoExclusions(): List<VideoEntity> =
         filterNot { it.mediaStoreId in handledVideoActionMediaIds }
 
+    private fun rememberPhotoSessionAction(
+        photo: PhotoEntity,
+        action: SwipeAction,
+        operationId: Deferred<Long>,
+        exitTargetX: Float,
+        exitTargetY: Float,
+        undoPersistedAction: suspend (Long) -> Unit = { id -> repository.undoOperation(id) },
+    ) {
+        photoSessionActions.addLast(PhotoSessionAction(photo, action, operationId, exitTargetX, exitTargetY, undoPersistedAction))
+    }
+
+    private fun clearPhotoActionHistory() {
+        photoSessionActions.clear()
+        _photoUndoAnimation.value = null
+    }
+
+    private fun popPhotoSessionAction(): PhotoSessionAction? =
+        if (photoSessionActions.isEmpty()) null else photoSessionActions.removeLast()
+
+    private fun applyOptimisticPhotoAction(photo: PhotoEntity, action: SwipeAction) {
+        pendingPhotoActionMediaIds += photo.mediaStoreId
+        handledPhotoActionMediaIds += photo.mediaStoreId
+        invalidatePhotoDeckLoads()
+        _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
+        _photoSessionActionCount.value += 1
+        _lastPhotoAction.value = action
+    }
+
+    private fun restorePhotoSessionAction(snapshot: PhotoSessionAction) {
+        val photo = snapshot.photo
+        pendingPhotoActionMediaIds -= photo.mediaStoreId
+        handledPhotoActionMediaIds -= photo.mediaStoreId
+        invalidatePhotoDeckLoads()
+        _photoDeck.value = (listOf(photo) + _photoDeck.value)
+            .distinctBy { it.mediaStoreId }
+            .take(CONTINUOUS_PHOTO_DECK_SIZE)
+        _photoSessionActionCount.value = (_photoSessionActionCount.value - 1).coerceAtLeast(0)
+        _lastPhotoAction.value = snapshot.action
+        _photoUndoAnimation.value = PhotoUndoAnimation(
+            mediaStoreId = photo.mediaStoreId,
+            action = snapshot.action,
+            fromX = snapshot.exitTargetX,
+            fromY = snapshot.exitTargetY,
+        )
+        _message.value = uiText(R.string.message_photo_back_success)
+    }
+
+    private fun persistPhotoSessionUndo(snapshot: PhotoSessionAction) {
+        val mediaStoreId = snapshot.photo.mediaStoreId
+        lateinit var undoJob: Job
+        undoJob = viewModelScope.launch {
+            try {
+                runCatching {
+                    val operationId = snapshot.operationId.await()
+                    snapshot.undoPersistedAction(operationId)
+                }
+                    .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
+            } finally {
+                if (photoPersistenceBarriers[mediaStoreId] == undoJob) {
+                    photoPersistenceBarriers -= mediaStoreId
+                }
+            }
+        }
+        photoPersistenceBarriers[mediaStoreId] = undoJob
+    }
+
+    private fun persistPhotoAction(photo: PhotoEntity, actionBlock: suspend () -> Long): Deferred<Long> {
+        val priorBarrier = photoPersistenceBarriers[photo.mediaStoreId]
+        return viewModelScope.async {
+            try {
+                priorBarrier?.join()
+                val operationId = actionBlock()
+                refillPhotoDeckIfNeeded()
+                operationId
+            } finally {
+                pendingPhotoActionMediaIds -= photo.mediaStoreId
+            }
+        }
+    }
+
+    fun finishPhotoCleaningSession() {
+        pendingPhotoActionMediaIds.clear()
+        handledPhotoActionMediaIds.clear()
+        clearPhotoActionHistory()
+        _photoSessionActionCount.value = 0
+        _lastPhotoAction.value = null
+    }
+
+    fun clearPhotoUndoAnimation(sequence: Long) {
+        if (_photoUndoAnimation.value?.sequence == sequence) {
+            _photoUndoAnimation.value = null
+        }
+    }
+
     fun loadPhotoDeck(scope: CleaningScope = _photoScope.value) {
         val requestedScope = ensureRandomSeed(scope)
         _photoScope.value = requestedScope
@@ -273,6 +392,7 @@ class KanlemeViewModel @Inject constructor(
         _lastPhotoAction.value = null
         pendingPhotoActionMediaIds.clear()
         handledPhotoActionMediaIds.clear()
+        clearPhotoActionHistory()
         _photoDeck.value = emptyList()
         val generation = nextPhotoDeckGeneration()
         photoDeckLoadJob = viewModelScope.launch {
@@ -321,10 +441,6 @@ class KanlemeViewModel @Inject constructor(
         val session = _photoScope.value.copy(sortOrder = "random", randomSeed = nextRandomSeed())
         _photoScope.value = session
         _photoDeckPreparing.value = true
-        _photoSessionActionCount.value = 0
-        _lastPhotoAction.value = null
-        pendingPhotoActionMediaIds.clear()
-        handledPhotoActionMediaIds.clear()
         _photoDeck.value = emptyList()
         val generation = nextPhotoDeckGeneration()
         photoDeckLoadJob = viewModelScope.launch {
@@ -460,38 +576,43 @@ class KanlemeViewModel @Inject constructor(
         loadVideoDeck(_videoScope.value.copy(sortOrder = next, randomSeed = seed))
     }
 
-    fun onPhotoAction(photo: PhotoEntity, action: SwipeAction) = viewModelScope.launch {
-        pendingPhotoActionMediaIds += photo.mediaStoreId
-        handledPhotoActionMediaIds += photo.mediaStoreId
-        invalidatePhotoDeckLoads()
-        _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
-        _photoSessionActionCount.value += 1
-        _lastPhotoAction.value = action
-        try {
-            repository.handlePhotoAction(photo, action)
-            refillPhotoDeckIfNeeded()
-        } finally {
-            pendingPhotoActionMediaIds -= photo.mediaStoreId
+    fun onPhotoAction(photo: PhotoEntity, action: SwipeAction) {
+        val exitTargetX = when (action) {
+            SwipeAction.Keep -> 980f
+            else -> 0f
         }
+        val exitTargetY = when (action) {
+            SwipeAction.Delete -> -1260f
+            SwipeAction.Favorite -> 1260f
+            SwipeAction.Keep -> 0f
+        }
+        onPhotoAction(photo, action, exitTargetX, exitTargetY)
     }
 
-    fun onPhotoActionWithOptionalMove(photo: PhotoEntity, action: SwipeAction, targetRelativePath: String?) = viewModelScope.launch {
-        pendingPhotoActionMediaIds += photo.mediaStoreId
-        handledPhotoActionMediaIds += photo.mediaStoreId
-        invalidatePhotoDeckLoads()
-        _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
-        _photoSessionActionCount.value += 1
-        _lastPhotoAction.value = action
-        try {
+    fun onPhotoAction(photo: PhotoEntity, action: SwipeAction, exitTargetX: Float, exitTargetY: Float) {
+        applyOptimisticPhotoAction(photo, action)
+        val operationId = persistPhotoAction(photo) {
+            repository.handlePhotoAction(photo, action)
+        }
+        rememberPhotoSessionAction(photo, action, operationId, exitTargetX, exitTargetY)
+    }
+
+    fun onPhotoActionWithOptionalMove(
+        photo: PhotoEntity,
+        action: SwipeAction,
+        targetRelativePath: String?,
+        exitTargetX: Float,
+        exitTargetY: Float,
+    ) {
+        applyOptimisticPhotoAction(photo, action)
+        val operationId = persistPhotoAction(photo) {
             val s = settingsRepository.settings.first()
             if (targetRelativePath != null && s.autoMoveOnKeepFavorite && action in setOf(SwipeAction.Keep, SwipeAction.Favorite)) {
                 repository.movePhotoToFolder(photo, targetRelativePath)
             }
             repository.handlePhotoAction(photo, action)
-            refillPhotoDeckIfNeeded()
-        } finally {
-            pendingPhotoActionMediaIds -= photo.mediaStoreId
         }
+        rememberPhotoSessionAction(photo, action, operationId, exitTargetX, exitTargetY)
     }
 
     fun onVideoAction(video: VideoEntity, action: SwipeAction) = viewModelScope.launch {
@@ -577,12 +698,23 @@ class KanlemeViewModel @Inject constructor(
         runCatching {
             val result = repository.movePhotoToFolder(photo, relativePath)
             if (!result.success) error(result.message)
-            repository.handlePhotoAction(photo, SwipeAction.Keep)
-            result.message
-        }.onSuccess { message ->
+            val operationId = repository.handlePhotoAction(photo, SwipeAction.Keep)
+            result.message to operationId
+        }.onSuccess { (message, operationId) ->
             _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
             _photoSessionActionCount.value += 1
             _lastPhotoAction.value = SwipeAction.Keep
+            rememberPhotoSessionAction(
+                photo = photo,
+                action = SwipeAction.Keep,
+                operationId = CompletableDeferred(operationId),
+                exitTargetX = 980f,
+                exitTargetY = 0f,
+                undoPersistedAction = { id ->
+                    repository.undoOperation(id)
+                    repository.movePhotoToFolder(photo, photo.relativePath ?: photo.folderPath)
+                },
+            )
             _message.value = dynamicUiText(message)
             refillPhotoDeckIfNeeded()
         }.onFailure {
@@ -710,6 +842,7 @@ class KanlemeViewModel @Inject constructor(
                 if (ok) {
                     pendingPhotoActionMediaIds.clear()
                     handledPhotoActionMediaIds.clear()
+                    clearPhotoActionHistory()
                     handledVideoActionMediaIds.clear()
                     invalidatePhotoDeckLoads()
                     invalidateVideoDeckLoads()
@@ -721,21 +854,14 @@ class KanlemeViewModel @Inject constructor(
         loadVideoDeck()
     }
 
-    fun undoPhotoCleaningAction() = viewModelScope.launch {
-        runCatching { repository.undoLastAction() }
-            .onSuccess { ok ->
-                if (ok) {
-                    pendingPhotoActionMediaIds.clear()
-                    handledPhotoActionMediaIds.clear()
-                    invalidatePhotoDeckLoads()
-                    _photoSessionActionCount.value = (_photoSessionActionCount.value - 1).coerceAtLeast(0)
-                    _message.value = uiText(R.string.message_photo_back_success)
-                    loadPhotoDeck()
-                } else {
-                    _message.value = uiText(R.string.message_photo_undo_empty)
-                }
-            }
-            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
+    fun undoPhotoCleaningAction() {
+        val snapshot = popPhotoSessionAction()
+        if (snapshot == null) {
+            _message.value = uiText(R.string.message_photo_undo_empty)
+            return
+        }
+        restorePhotoSessionAction(snapshot)
+        persistPhotoSessionUndo(snapshot)
     }
 
     fun buildAnnualReport(year: Int = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)) = viewModelScope.launch {

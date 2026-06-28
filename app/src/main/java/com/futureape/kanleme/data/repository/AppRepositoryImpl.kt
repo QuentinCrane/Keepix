@@ -281,14 +281,14 @@ class AppRepositoryImpl @Inject constructor(
             .take(targetLimit)
     }
 
-    override suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction) = withContext(Dispatchers.IO) {
+    override suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction): Long = withContext(Dispatchers.IO) {
         val newProcessing = when (action) {
             SwipeAction.Keep -> ProcessingStatus.KEPT
             SwipeAction.Favorite -> ProcessingStatus.FAVORITED
             SwipeAction.Delete -> photo.processingStatus
         }
         val newDeletion = if (action == SwipeAction.Delete) DeletionStatus.PENDING else photo.deletionStatus
-        recordOperation(photo.id, "photo", photo.processingStatus, photo.deletionStatus, newProcessing, newDeletion, action.name)
+        val operationId = recordOperation(photo.id, "photo", photo.processingStatus, photo.deletionStatus, newProcessing, newDeletion, action.name)
         when (action) {
             SwipeAction.Keep -> {
                 photoDao.updateProcessingStatus(photo.id, ProcessingStatus.KEPT)
@@ -312,16 +312,17 @@ class AppRepositoryImpl @Inject constructor(
                 bumpStats(photoDelta = 1, deletedSize = photo.size)
             }
         }
+        operationId
     }
 
-    override suspend fun handleVideoAction(video: VideoEntity, action: SwipeAction) = withContext(Dispatchers.IO) {
+    override suspend fun handleVideoAction(video: VideoEntity, action: SwipeAction): Long = withContext(Dispatchers.IO) {
         val newProcessing = when (action) {
             SwipeAction.Keep -> ProcessingStatus.KEPT
             SwipeAction.Favorite -> ProcessingStatus.FAVORITED
             SwipeAction.Delete -> video.processingStatus
         }
         val newDeletion = if (action == SwipeAction.Delete) DeletionStatus.PENDING else video.deletionStatus
-        recordOperation(video.id, "video", video.processingStatus, video.deletionStatus, newProcessing, newDeletion, action.name)
+        val operationId = recordOperation(video.id, "video", video.processingStatus, video.deletionStatus, newProcessing, newDeletion, action.name)
         when (action) {
             SwipeAction.Keep -> {
                 videoDao.updateProcessingStatus(video.id, ProcessingStatus.KEPT)
@@ -345,6 +346,7 @@ class AppRepositoryImpl @Inject constructor(
                 bumpStats(videoDelta = 1, deletedSize = video.size)
             }
         }
+        operationId
     }
 
     override suspend fun movePhotoToFolder(photo: PhotoEntity, targetRelativePath: String): MovePhotoResult = withContext(Dispatchers.IO) {
@@ -463,14 +465,13 @@ class AppRepositoryImpl @Inject constructor(
 
     override suspend fun undoLastAction(): Boolean = withContext(Dispatchers.IO) {
         val op = operationDao.lastUndoable() ?: return@withContext false
-        if (op.mediaType == "photo") {
-            photoDao.restoreStatus(op.mediaId, op.previousProcessingStatus, op.previousDeletionStatus)
-        } else {
-            videoDao.restoreStatus(op.mediaId, op.previousProcessingStatus, op.previousDeletionStatus)
-        }
-        if (op.action == SwipeAction.Delete.name) trashDao.deleteByMedia(op.mediaId, op.mediaType)
-        operationDao.markUndone(op.id)
-        bumpStats(undoDelta = 1)
+        undoOperation(op)
+        true
+    }
+
+    override suspend fun undoOperation(operationId: Long): Boolean = withContext(Dispatchers.IO) {
+        val op = operationDao.undoableById(operationId) ?: return@withContext false
+        undoOperation(op)
         true
     }
 
@@ -524,6 +525,17 @@ class AppRepositoryImpl @Inject constructor(
         }
     }
 
+    private suspend fun undoOperation(op: OperationHistoryEntity) {
+        if (op.mediaType == "photo") {
+            photoDao.restoreStatus(op.mediaId, op.previousProcessingStatus, op.previousDeletionStatus)
+        } else {
+            videoDao.restoreStatus(op.mediaId, op.previousProcessingStatus, op.previousDeletionStatus)
+        }
+        if (op.action == SwipeAction.Delete.name) trashDao.deleteByMedia(op.mediaId, op.mediaType)
+        operationDao.markUndone(op.id)
+        bumpStats(undoDelta = 1)
+    }
+
     private suspend fun recordOperation(
         mediaId: Long,
         mediaType: String,
@@ -532,8 +544,8 @@ class AppRepositoryImpl @Inject constructor(
         newProcessing: String,
         newDeletion: String,
         action: String,
-    ) {
-        operationDao.insert(
+    ): Long {
+        return operationDao.insert(
             OperationHistoryEntity(
                 mediaId = mediaId,
                 mediaType = mediaType,
