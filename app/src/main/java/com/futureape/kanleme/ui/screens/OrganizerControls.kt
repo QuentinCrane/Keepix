@@ -42,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -327,6 +328,7 @@ fun OrganizerDatePickerOverlay(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OrganizerFolderPickerOverlay(
+    visible: Boolean = true,
     title: String,
     folders: List<String>,
     onArchive: (String) -> Unit,
@@ -339,65 +341,74 @@ fun OrganizerFolderPickerOverlay(
             .distinct()
             .sortedBy { it.lowercase(Locale.getDefault()) }
     }
+    LaunchedEffect(visible) {
+        if (!visible) pendingFolder = null
+    }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
-        contentColor = MaterialTheme.colorScheme.onBackground,
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(160)) + slideInVertically(tween(220)) { it / 5 },
+        exit = fadeOut(tween(130)) + slideOutVertically(tween(180)) { it / 5 },
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 8.dp),
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.a11y_close))
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-                    Text("选择后确认，当前媒体会直接归档并进入下一项", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(Modifier.width(48.dp))
-            }
-
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .statusBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
             ) {
-                items(folderItems) { path ->
-                    val label = folderLabel(path)
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .combinedClickable(onClick = { pendingFolder = path }),
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.10f)),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.a11y_close))
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                        Text("选择后确认，当前媒体会直接归档并进入下一项", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.width(48.dp))
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(folderItems) { path ->
+                        val label = folderLabel(path)
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(onClick = { pendingFolder = path }),
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.10f)),
                         ) {
-                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                                Icon(
-                                    Icons.Rounded.Folder,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(9.dp),
-                                )
-                            }
-                            Column(Modifier.weight(1f)) {
-                                Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(path, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                                    Icon(
+                                        Icons.Rounded.Folder,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(9.dp),
+                                    )
+                                }
+                                Column(Modifier.weight(1f)) {
+                                    Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(path, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                         }
                     }
@@ -446,6 +457,7 @@ fun organizerDateModeLabel(mode: String): String = when {
         val month = parts.getOrNull(1).orEmpty().toIntOrNull()?.toString().orEmpty()
         if (year.isNotBlank() && month.isNotBlank()) year + " 年 " + month + " 月" else "指定月份"
     }
+    mode.startsWith("d:") -> mode.removePrefix("d:").replace("-", "/")
     mode.startsWith("multiym:") -> "多选月份 " + mode.removePrefix("multiym:").split(",").count { it.isNotBlank() }
     mode == "today_history" -> "当年今日"
     else -> "全部时间"
@@ -453,8 +465,8 @@ fun organizerDateModeLabel(mode: String): String = when {
 
 fun actionFeedbackColor(action: SwipeAction?, fallback: Color): Color = when (action) {
     SwipeAction.Delete -> Color(0xFFE74C4C)
-    SwipeAction.Favorite -> Color(0xFF4C8FF7)
-    SwipeAction.Keep -> Color(0xFF37B36B)
+    SwipeAction.Favorite -> Color(0xFFE6A63E)
+    SwipeAction.Keep -> Color(0xFF74A7FF)
     null -> fallback
 }
 

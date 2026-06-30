@@ -98,7 +98,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
     fun requestSystemDeleteAuthorization(targets: List<TrashItemEntity>, onConfirmed: () -> Unit) {
         val uris = targets.mapNotNull { item -> runCatching { Uri.parse(item.uri) }.getOrNull() }
         if (uris.isEmpty()) {
-            onConfirmed()
+            viewModel.showMessage("媒体地址无效，无法调起系统删除确认")
             return
         }
         runCatching {
@@ -107,7 +107,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
             systemDeleteLauncher.launch(IntentSenderRequest.Builder(request.intentSender).build())
         }.onFailure {
             pendingDeleteAction = null
-            onConfirmed()
+            viewModel.showMessage("无法调起系统删除确认，请稍后再试")
         }
     }
 
@@ -157,7 +157,10 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
             TrashBottomBar(
                 items = visibleTrashItems,
                 onRestoreAll = { visibleTrashItems.forEach { viewModel.restoreTrash(it.id) } },
-                onDeleteAll = { requestSystemDeleteAuthorization(visibleTrashItems) { visibleTrashItems.forEach { viewModel.permanentlyDeleteTrash(it.id) } } },
+                onDeleteAll = {
+                    val targets = visibleTrashItems
+                    requestSystemDeleteAuthorization(targets) { viewModel.confirmTrashDeleted(targets.map { it.id }) }
+                },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
@@ -172,7 +175,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                     previewItem = null
                 },
                 onDelete = { target ->
-                    requestSystemDeleteAuthorization(listOf(target)) { viewModel.permanentlyDeleteTrash(target.id) }
+                    requestSystemDeleteAuthorization(listOf(target)) { viewModel.confirmTrashDeleted(target.id) }
                     previewItem = null
                 },
             )

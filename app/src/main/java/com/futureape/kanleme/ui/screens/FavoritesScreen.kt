@@ -1,6 +1,8 @@
 package com.futureape.kanleme.ui.screens
 
+import android.content.ContentUris
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,6 +14,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -24,12 +27,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -61,14 +67,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
+import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
+import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
+import com.futureape.kanleme.ui.util.openVideoInSystemGallery
 import com.futureape.kanleme.ui.util.shareMedia
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.launch
@@ -87,19 +96,26 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
             if (photos.isEmpty() && videos.isEmpty()) {
                 EmptyState("暂无收藏", "在整理时下滑照片或点击视频收藏按钮，就会出现在这里。", "去同步媒体库", { viewModel.refreshLibrary() })
             } else {
-                FavoritePhotosHeader(
-                    photoCount = photos.size,
-                    videoCount = videos.size,
-                    columnCount = photoColumnCount,
-                    onColumnCountChange = { photoColumnCount = it },
-                )
-                Spacer(Modifier.height(12.dp))
-                FavoritePhotoMasonryGrid(
-                    photos = photos,
-                    columnCount = photoColumnCount,
-                    modifier = Modifier.weight(1f),
-                    onPhotoClick = { previewPhoto = it },
-                )
+                if (videos.isNotEmpty()) {
+                    FavoriteVideoStrip(videos)
+                    Spacer(Modifier.height(16.dp))
+                }
+                if (photos.isNotEmpty()) {
+                    FavoritePhotosHeader(
+                        photoCount = photos.size,
+                        columnCount = photoColumnCount,
+                        onColumnCountChange = { photoColumnCount = it },
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    FavoritePhotoMasonryGrid(
+                        photos = photos,
+                        columnCount = photoColumnCount,
+                        modifier = Modifier.weight(1f),
+                        onPhotoClick = { previewPhoto = it },
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
             }
         }
 
@@ -117,9 +133,70 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
 }
 
 @Composable
+private fun FavoriteVideoStrip(videos: List<VideoEntity>) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("收藏视频 · " + videos.size + " 个", style = MaterialTheme.typography.titleSmall)
+        LazyRow(
+            contentPadding = PaddingValues(end = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(videos, key = { it.id }) { video ->
+                FavoriteVideoTile(video)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoriteVideoTile(video: VideoEntity) {
+    val context = LocalContext.current
+    val videoUri = remember(video.mediaStoreId, video.uri) {
+        if (video.mediaStoreId > 0L) {
+            ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, video.mediaStoreId)
+        } else {
+            Uri.parse(video.uri)
+        }
+    }
+    Box(
+        modifier = Modifier
+            .width(132.dp)
+            .aspectRatio(0.78f)
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
+            .clickable { openVideoInSystemGallery(context, video) },
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(videoUri)
+                .memoryCacheKey(videoUri.toString())
+                .diskCacheKey(videoUri.toString())
+                .placeholderMemoryCacheKey(videoUri.toString())
+                .crossfade(false)
+                .build(),
+            contentDescription = video.displayName,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        GlassSurface(
+            modifier = Modifier.align(Alignment.TopStart).padding(7.dp),
+            shape = RoundedCornerShape(999.dp),
+            tonalAlpha = 0.34f,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(Icons.Rounded.PlayCircle, contentDescription = null, modifier = Modifier.height(14.dp), tint = Color.White)
+                Text(formatDuration(video.duration), color = Color.White, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Composable
 private fun FavoritePhotosHeader(
     photoCount: Int,
-    videoCount: Int,
     columnCount: Int,
     onColumnCountChange: (Int) -> Unit,
 ) {
@@ -129,7 +206,7 @@ private fun FavoritePhotosHeader(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text("收藏照片 " + photoCount + " 张，收藏视频 " + videoCount + " 个", style = MaterialTheme.typography.titleMedium)
+            Text("收藏照片 " + photoCount + " 张", style = MaterialTheme.typography.titleMedium)
             Text(
                 "原比例 · " + columnCount + " 列",
                 style = MaterialTheme.typography.bodySmall,

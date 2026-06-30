@@ -8,6 +8,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Density
@@ -19,9 +22,13 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private var shortcutTarget by mutableStateOf<String?>(null)
+    private var shortcutNonce by mutableStateOf(0L)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        handleShortcutIntent(intent)
         setContent {
             val viewModel: KanlemeViewModel = hiltViewModel()
             val settings = viewModel.settings.collectAsStateWithLifecycle().value
@@ -42,7 +49,11 @@ class MainActivity : ComponentActivity() {
             )
             KanlemeTheme(themeMode = settings.themeMode, accentColor = settings.accentColor) {
                 CompositionLocalProvider(LocalDensity provides compactDensity) {
-                    KanlemeApp(initialShortcutTarget = extractShortcutTarget(intent), viewModel = viewModel)
+                    KanlemeApp(
+                        initialShortcutTarget = shortcutTarget,
+                        shortcutNonce = shortcutNonce,
+                        viewModel = viewModel,
+                    )
                 }
             }
         }
@@ -51,6 +62,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleShortcutIntent(intent)
     }
 
     override fun onDestroy() {
@@ -61,6 +73,12 @@ class MainActivity : ComponentActivity() {
     private fun extractShortcutTarget(intent: Intent?): String? {
         if (intent?.action != ACTION_CLEAN) return null
         return intent.getStringExtra(EXTRA_SHORTCUT_TARGET)
+    }
+
+    private fun handleShortcutIntent(intent: Intent?) {
+        val target = extractShortcutTarget(intent) ?: return
+        shortcutTarget = target
+        shortcutNonce = System.nanoTime()
     }
 
     companion object {

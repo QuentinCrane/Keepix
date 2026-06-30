@@ -1,6 +1,15 @@
 package com.futureape.kanleme.ui.screens
 
+import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -8,7 +17,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -33,15 +44,19 @@ import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import com.futureape.kanleme.ui.i18n.Text
@@ -54,19 +69,32 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.futureape.kanleme.data.local.PhotoEntity
+import com.futureape.kanleme.data.local.VideoEntity
+import com.futureape.kanleme.data.repository.CleaningScope
+import com.futureape.kanleme.data.repository.DashboardStats
+import com.futureape.kanleme.data.settings.AppSettings
+import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.GlassSurface
@@ -87,18 +115,25 @@ fun CleanHomeScreen(
     onTrash: () -> Unit,
     onFavorites: () -> Unit,
     onToday: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val recentlyAddedPhotos by viewModel.recentlyAddedPhotos.collectAsStateWithLifecycle()
     val recentVideos by viewModel.recentVideos.collectAsStateWithLifecycle()
+    val photoDeck by viewModel.photoDeck.collectAsStateWithLifecycle()
+    val videoDeck by viewModel.videoDeck.collectAsStateWithLifecycle()
+    val photoDeckPreparing by viewModel.photoDeckPreparing.collectAsStateWithLifecycle()
+    val videoDeckPreparing by viewModel.videoDeckPreparing.collectAsStateWithLifecycle()
+    val photoScope by viewModel.photoScope.collectAsStateWithLifecycle()
+    val videoScope by viewModel.videoScope.collectAsStateWithLifecycle()
     val haptics = rememberHapticKit(settings)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showDailyReport by remember { mutableStateOf(false) }
     var exportingDailyReport by remember { mutableStateOf(false) }
     var dailyReportExportError by remember { mutableStateOf<String?>(null) }
-    val selectedIsPhoto = settings.homeMediaTab == "photo"
+    val selectedIsPhoto = settings.homeMediaTab == "photo" || settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO
     val pagerState = rememberPagerState(
         initialPage = if (selectedIsPhoto) 0 else 1,
         pageCount = { 2 },
@@ -115,89 +150,168 @@ fun CleanHomeScreen(
             viewModel.setHomeMediaTab(nextTab)
         }
     }
+    LaunchedEffect(settings.appVisualStyle, settings.homeMediaTab) {
+        if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO && settings.homeMediaTab != "photo") {
+            viewModel.setHomeMediaTab("photo")
+        }
+    }
+    LaunchedEffect(photoScope, videoScope, settings.excludedFolderPaths, photoDeckPreparing, videoDeckPreparing) {
+        if (photoDeck.isEmpty() && !photoDeckPreparing) viewModel.loadPhotoDeck(photoScope)
+        if (videoDeck.isEmpty() && !videoDeckPreparing) viewModel.loadVideoDeck(videoScope)
+    }
 
-    AdaptiveWidthInfo { _, isExpanded ->
-        AdaptiveCenter(maxWidth = if (isExpanded) 1180.dp else 720.dp) {
-            Box(Modifier.fillMaxSize()) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = 18.dp,
-                        end = 18.dp,
-                        top = 54.dp,
-                        bottom = contentPadding.calculateBottomPadding(),
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            HomeTopAction("当年今日", Icons.Rounded.CalendarToday, Modifier.weight(1f), onToday)
-                            HomeTopAction(
-                                "今日整理",
-                                Icons.Rounded.Share,
-                                Modifier.weight(1f),
-                                onClick = {
+    // New Keepix visual path lives in ImmersiveCleanHomeScreen.kt.
+    if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
+        ImmersiveCleanHomeScreen(
+            contentPadding = contentPadding,
+            dashboard = dashboard,
+            settings = settings,
+            photoScope = photoScope,
+            videoScope = videoScope,
+            photos = photoDeck,
+            videos = videoDeck,
+            photoPreparing = photoDeckPreparing,
+            videoPreparing = videoDeckPreparing,
+            selectedIsPhoto = selectedIsPhoto,
+            onPhotoTab = {
+                haptics.tick()
+                viewModel.setHomeMediaTab("photo")
+            },
+            onVideoTab = {
+                haptics.tick()
+                onVideo()
+            },
+            onPhoto = {
+                if (photoDeck.isNotEmpty()) onPhoto() else if (!photoDeckPreparing) viewModel.loadPhotoDeck(photoScope)
+            },
+            onVideo = {
+                if (videoDeck.isNotEmpty()) onVideo() else if (!videoDeckPreparing) viewModel.loadVideoDeck(videoScope)
+            },
+            onTimeline = onTimeline,
+            onTrash = onTrash,
+            onFavorites = onFavorites,
+            onToday = onToday,
+            onSettings = onSettings,
+            onPhotoType = { type ->
+                haptics.tick()
+                viewModel.setHomeMediaTab("photo")
+                viewModel.setPhotoTypeFilter(type)
+            },
+            onPhotoDate = { mode ->
+                haptics.tick()
+                viewModel.setPhotoDateMode(mode)
+            },
+            onPhotoSort = { order ->
+                haptics.tick()
+                viewModel.setPhotoSortOrder(order)
+            },
+            onPhotoBatch = { size ->
+                haptics.tick()
+                viewModel.setPhotoBatchSize(size)
+            },
+            onVideoDate = { mode ->
+                haptics.tick()
+                viewModel.setVideoDateMode(mode)
+            },
+            onVideoSort = { order ->
+                haptics.tick()
+                viewModel.setVideoSortOrder(order)
+            },
+            onVideoBatch = { size ->
+                haptics.tick()
+                viewModel.setVideoBatchSize(size)
+            },
+            onDailyReport = {
+                haptics.tick()
+                dailyReportExportError = null
+                showDailyReport = true
+            },
+        )
+    } else {
+        // Legacy Liquid Glass home path. Keep old visual code here only.
+        AdaptiveWidthInfo { _, isExpanded ->
+            AdaptiveCenter(maxWidth = if (isExpanded) 1180.dp else 720.dp) {
+                Box(Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 18.dp,
+                            end = 18.dp,
+                            top = 54.dp,
+                            bottom = contentPadding.calculateBottomPadding(),
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                HomeTopAction("当年今日", Icons.Rounded.CalendarToday, Modifier.weight(1f), onToday)
+                                HomeTopAction(
+                                    "今日整理",
+                                    Icons.Rounded.Share,
+                                    Modifier.weight(1f),
+                                    onClick = {
+                                        haptics.tick()
+                                        dailyReportExportError = null
+                                        showDailyReport = true
+                                    },
+                                )
+                            }
+                        }
+
+                        item {
+                            HomeMediaSegment(
+                                selectedIsPhoto = selectedIsPhoto,
+                                photoCount = dashboard.photoCount,
+                                videoCount = dashboard.videoCount,
+                                onPhoto = {
                                     haptics.tick()
-                                    dailyReportExportError = null
-                                    showDailyReport = true
+                                    viewModel.setHomeMediaTab("photo")
+                                },
+                                onVideo = {
+                                    haptics.tick()
+                                    viewModel.setHomeMediaTab("video")
                                 },
                             )
                         }
-                    }
 
-                    item {
-                        HomeMediaSegment(
-                            selectedIsPhoto = selectedIsPhoto,
-                            photoCount = dashboard.photoCount,
-                            videoCount = dashboard.videoCount,
-                            onPhoto = {
-                                haptics.tick()
-                                viewModel.setHomeMediaTab("photo")
-                            },
-                            onVideo = {
-                                haptics.tick()
-                                viewModel.setHomeMediaTab("video")
-                            },
-                        )
-                    }
+                        item {
+                            HorizontalPager(
+                                state = pagerState,
+                                modifier = Modifier.fillMaxWidth().height(474.dp),
+                                pageSpacing = 12.dp,
+                            ) { page ->
+                                HomeOrganizePage(
+                                    isPhoto = page == 0,
+                                    photoCount = dashboard.photoCount,
+                                    videoCount = dashboard.videoCount,
+                                    processedPhotoCount = dashboard.processedPhotoCount,
+                                    processedVideoCount = dashboard.processedVideoCount,
+                                    releasableBytes = dashboard.pendingDeleteBytes,
+                                    recentlyAddedPhotoCount = recentlyAddedPhotos.size,
+                                    recentlyAddedVideoCount = recentVideos.size,
+                                    onNumberPulse = { haptics.threshold() },
+                                    onStart = if (page == 0) onPhoto else onVideo,
+                                    onTimeline = onTimeline,
+                                )
+                            }
+                        }
 
-                    item {
-                        HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier.fillMaxWidth().height(474.dp),
-                            pageSpacing = 12.dp,
-                        ) { page ->
-                            HomeOrganizePage(
-                                isPhoto = page == 0,
-                                photoCount = dashboard.photoCount,
-                                videoCount = dashboard.videoCount,
-                                processedPhotoCount = dashboard.processedPhotoCount,
-                                processedVideoCount = dashboard.processedVideoCount,
-                                releasableBytes = dashboard.pendingDeleteBytes,
-                                recentlyAddedPhotoCount = recentlyAddedPhotos.size,
-                                recentlyAddedVideoCount = recentVideos.size,
-                                onNumberPulse = { haptics.threshold() },
-                                onStart = if (page == 0) onPhoto else onVideo,
-                                onTimeline = onTimeline,
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                OutlineHomeButton("回收站", dashboard.trashCount, Icons.Rounded.Delete, modifier = Modifier.weight(1f), onClick = onTrash)
+                                OutlineHomeButton("我的收藏", dashboard.favoriteCount, Icons.Rounded.FavoriteBorder, modifier = Modifier.weight(1f), onClick = onFavorites)
+                            }
+                        }
+
+                        item {
+                            QuickEntry(
+                                if (selectedIsPhoto) "全相册时间轴" else "全视频时间轴",
+                                if (selectedIsPhoto) "按日期浏览、打开大图、移动文件夹" else "按日期浏览视频、快速打开播放",
+                                if (selectedIsPhoto) Icons.Rounded.Image else Icons.Rounded.Movie,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = onTimeline,
                             )
                         }
-                    }
-
-                    item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            OutlineHomeButton("回收站", dashboard.trashCount, Icons.Rounded.Delete, modifier = Modifier.weight(1f), onClick = onTrash)
-                            OutlineHomeButton("我的收藏", dashboard.favoriteCount, Icons.Rounded.FavoriteBorder, modifier = Modifier.weight(1f), onClick = onFavorites)
-                        }
-                    }
-
-                    item {
-                        QuickEntry(
-                            if (selectedIsPhoto) "全相册时间轴" else "全视频时间轴",
-                            if (selectedIsPhoto) "按日期浏览、打开大图、移动文件夹" else "按日期浏览视频、快速打开播放",
-                            if (selectedIsPhoto) Icons.Rounded.Image else Icons.Rounded.Movie,
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = onTimeline,
-                        )
                     }
                 }
             }
@@ -468,7 +582,7 @@ private fun HomeMediaSegment(
     onPhoto: () -> Unit,
     onVideo: () -> Unit,
 ) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.68f) {
+    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), tonalAlpha = 0.84f) {
         BoxWithConstraints(Modifier.fillMaxWidth().height(90.dp).padding(8.dp)) {
             val tabWidth = (maxWidth - 16.dp) / 2
             val indicatorOffset by animateDpAsState(
@@ -481,9 +595,9 @@ private fun HomeMediaSegment(
                     .width(tabWidth)
                     .height(74.dp)
                     .offset(x = indicatorOffset),
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.11f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
             ) {}
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SegmentTab(
@@ -522,12 +636,12 @@ private fun MainOrganizeCard(
     onClick: () -> Unit,
 ) {
     val oledDark = MaterialTheme.colorScheme.background.luminance() < 0.03f
-    val cardColor = if (oledDark) Color(0xFF050505) else MaterialTheme.colorScheme.surface
-    val cardBorder = if (oledDark) Color.White.copy(alpha = 0.10f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.86f)
-    val cardShape = RoundedCornerShape(34.dp)
+    val cardColor = if (oledDark) Color(0xFF050505) else MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
+    val cardBorder = if (oledDark) Color.White.copy(alpha = 0.10f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+    val cardShape = RoundedCornerShape(30.dp)
     Box(
         modifier = modifier
-            .height(274.dp)
+            .height(262.dp)
             .clip(cardShape)
             .background(cardColor)
             .border(BorderStroke(1.dp, cardBorder), cardShape)
@@ -536,7 +650,7 @@ private fun MainOrganizeCard(
     ) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)) {
+                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)) {
                     Icon(icon, contentDescription = null, modifier = Modifier.padding(10.dp).size(24.dp), tint = MaterialTheme.colorScheme.primary)
                 }
                 Text(if (title.contains("视频")) "本地视频" else "本地照片", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
@@ -705,3 +819,4 @@ private fun RollingNumberText(
 }
 
 private fun Int.toDisplayCount(): String = if (this >= 1000) "%.1fK".format(this / 1000.0).replace(".0", "") else toString()
+

@@ -27,6 +27,10 @@ data class DashboardStats(
     val trashCount: Int = 0,
     val pendingDeleteCount: Int = 0,
     val pendingDeleteBytes: Long = 0L,
+    val photoPendingDeleteCount: Int = 0,
+    val videoPendingDeleteCount: Int = 0,
+    val photoPendingDeleteBytes: Long = 0L,
+    val videoPendingDeleteBytes: Long = 0L,
     val todayPhotoCount: Int = 0,
     val todayVideoCount: Int = 0,
     val todayActionCount: Int = 0,
@@ -119,6 +123,7 @@ interface AppRepository {
     ): Int
     suspend fun similarGroupDetail(groupId: String): SimilarGroupDetail?
     suspend fun restoreTrashItem(trashId: Long)
+    suspend fun markTrashItemDeleted(trashId: Long)
     suspend fun permanentlyDeleteTrashItem(trashId: Long)
     suspend fun permanentlyDeleteAllTrash()
     suspend fun restoreAllTrash()

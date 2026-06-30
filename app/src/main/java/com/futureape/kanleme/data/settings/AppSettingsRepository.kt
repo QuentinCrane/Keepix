@@ -38,6 +38,7 @@ class AppSettingsRepository @Inject constructor(
         val deleteHapticLevel = stringPreferencesKey("delete_haptic_level")
         val favoriteHapticLevel = stringPreferencesKey("favorite_haptic_level")
         val undoHapticLevel = stringPreferencesKey("undo_haptic_level")
+        val appVisualStyle = stringPreferencesKey("app_visual_style")
         val themeMode = stringPreferencesKey("theme_mode")
         val accentColor = longPreferencesKey("accent_color")
         val folderDisplay = stringPreferencesKey("folder_display")
@@ -57,6 +58,7 @@ class AppSettingsRepository @Inject constructor(
         val videoGuideShown = booleanPreferencesKey("video_guide_shown")
         val excludedFolderPaths = stringSetPreferencesKey("excluded_folder_paths")
         val onboardingShown = booleanPreferencesKey("onboarding_shown")
+        val photoFocusMode = booleanPreferencesKey("photo_focus_mode")
         val photoShowTopBar = booleanPreferencesKey("photo_show_top_bar")
         val photoShowFilterChips = booleanPreferencesKey("photo_show_filter_chips")
         val photoShowFolderChips = booleanPreferencesKey("photo_show_folder_chips")
@@ -70,12 +72,13 @@ class AppSettingsRepository @Inject constructor(
         val videoShowFolderChips = booleanPreferencesKey("video_show_folder_chips")
         val videoShowProgressBar = booleanPreferencesKey("video_show_progress_bar")
         val videoShowShuffleButton = booleanPreferencesKey("video_show_shuffle_button")
+        val videoChromeVisible = booleanPreferencesKey("video_chrome_visible")
     }
 
     val settings: Flow<AppSettings> = context.kanlemeSettingsDataStore.data.map { p ->
         AppSettings(
             deleteMode = p[Keys.deleteMode].toEnum(DeleteMode.PENDING_CONFIRM),
-            photoBatchSize = p[Keys.photoBatchSize] ?: 20,
+            photoBatchSize = p[Keys.photoBatchSize] ?: 30,
             videoBatchSize = p[Keys.videoBatchSize] ?: 20,
             autoMoveOnKeepFavorite = p[Keys.autoMoveOnKeepFavorite] ?: true,
             similarDetection = p[Keys.similarDetection] ?: false,
@@ -84,13 +87,14 @@ class AppSettingsRepository @Inject constructor(
             quickActionButtons = p[Keys.quickActionButtons] ?: true,
             swapShareAndUndo = p[Keys.swapShareAndUndo] ?: false,
             swipeSound = p[Keys.swipeSound] ?: true,
-            videoDefaultMuted = p[Keys.videoDefaultMuted] ?: false,
+            videoDefaultMuted = p[Keys.videoDefaultMuted] ?: true,
             videoDisplayMode = p[Keys.videoDisplayMode].toEnum(VideoDisplayMode.IMMERSIVE_CROP),
             hapticLevel = p[Keys.hapticLevel].toEnum(HapticLevel.MEDIUM),
             keepHapticLevel = p[Keys.keepHapticLevel].toEnum(HapticLevel.MEDIUM),
             deleteHapticLevel = p[Keys.deleteHapticLevel].toEnum(HapticLevel.MEDIUM),
             favoriteHapticLevel = p[Keys.favoriteHapticLevel].toEnum(HapticLevel.MEDIUM),
             undoHapticLevel = p[Keys.undoHapticLevel].toEnum(HapticLevel.MEDIUM),
+            appVisualStyle = p[Keys.appVisualStyle].toEnum(AppVisualStyle.IMMERSIVE_PHOTO),
             themeMode = p[Keys.themeMode].toEnum(ThemeMode.SYSTEM),
             accentColor = p[Keys.accentColor] ?: 0xFFC7ECFE,
             folderDisplay = p[Keys.folderDisplay].toEnum(FolderDisplayMode.SINGLE_LINE),
@@ -110,6 +114,7 @@ class AppSettingsRepository @Inject constructor(
             videoGuideShown = p[Keys.videoGuideShown] ?: false,
             excludedFolderPaths = p[Keys.excludedFolderPaths] ?: emptySet(),
             onboardingShown = p[Keys.onboardingShown] ?: false,
+            photoFocusMode = p[Keys.photoFocusMode] ?: false,
             photoShowTopBar = p[Keys.photoShowTopBar] ?: true,
             photoShowFilterChips = p[Keys.photoShowFilterChips] ?: true,
             photoShowFolderChips = p[Keys.photoShowFolderChips] ?: true,
@@ -123,6 +128,7 @@ class AppSettingsRepository @Inject constructor(
             videoShowFolderChips = p[Keys.videoShowFolderChips] ?: true,
             videoShowProgressBar = p[Keys.videoShowProgressBar] ?: true,
             videoShowShuffleButton = p[Keys.videoShowShuffleButton] ?: true,
+            videoChromeVisible = p[Keys.videoChromeVisible] ?: true,
         )
     }
 
@@ -143,6 +149,7 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setDeleteHapticLevel(value: HapticLevel) = editString(Keys.deleteHapticLevel, value.name)
     suspend fun setFavoriteHapticLevel(value: HapticLevel) = editString(Keys.favoriteHapticLevel, value.name)
     suspend fun setUndoHapticLevel(value: HapticLevel) = editString(Keys.undoHapticLevel, value.name)
+    suspend fun setAppVisualStyle(value: AppVisualStyle) = editString(Keys.appVisualStyle, value.name)
     suspend fun setThemeMode(value: ThemeMode) = editString(Keys.themeMode, value.name)
     suspend fun setAccentColor(value: Long) = context.kanlemeSettingsDataStore.edit { it[Keys.accentColor] = value }
     suspend fun setFolderDisplay(value: FolderDisplayMode) = editString(Keys.folderDisplay, value.name)
@@ -184,6 +191,7 @@ class AppSettingsRepository @Inject constructor(
     }
     suspend fun clearExcludedFolders() = context.kanlemeSettingsDataStore.edit { it[Keys.excludedFolderPaths] = emptySet() }
     suspend fun setOnboardingShown(value: Boolean) = editBoolean(Keys.onboardingShown, value)
+    suspend fun setPhotoFocusMode(value: Boolean) = editBoolean(Keys.photoFocusMode, value)
     suspend fun setPhotoShowTopBar(value: Boolean) = editBoolean(Keys.photoShowTopBar, value)
     suspend fun setPhotoShowFilterChips(value: Boolean) = editBoolean(Keys.photoShowFilterChips, value)
     suspend fun setPhotoShowFolderChips(value: Boolean) = editBoolean(Keys.photoShowFolderChips, value)
@@ -197,6 +205,7 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setVideoShowFolderChips(value: Boolean) = editBoolean(Keys.videoShowFolderChips, value)
     suspend fun setVideoShowProgressBar(value: Boolean) = editBoolean(Keys.videoShowProgressBar, value)
     suspend fun setVideoShowShuffleButton(value: Boolean) = editBoolean(Keys.videoShowShuffleButton, value)
+    suspend fun setVideoChromeVisible(value: Boolean) = editBoolean(Keys.videoChromeVisible, value)
 
     private fun normalizeFolderRule(path: String): String {
         val cleaned = path.trim().replace('\\', '/').trim('/')
@@ -212,6 +221,7 @@ class AppSettingsRepository @Inject constructor(
         if (safe in setOf("all", "seven_days", "month", "year", "today_history")) return safe
         if (Regex("""y:\d{4}""").matches(safe)) return safe
         if (Regex("""ym:\d{4}-\d{2}""").matches(safe)) return safe
+        if (Regex("""d:\d{4}-\d{2}-\d{2}""").matches(safe)) return safe
         if (Regex("""multiym:(\d{4}-\d{2})(,\d{4}-\d{2})*""").matches(safe)) return safe
         return "all"
     }

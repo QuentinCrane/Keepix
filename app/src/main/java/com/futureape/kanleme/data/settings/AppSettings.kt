@@ -7,7 +7,7 @@ import androidx.annotation.StringRes
 @Immutable
 data class AppSettings(
     val deleteMode: DeleteMode = DeleteMode.PENDING_CONFIRM,
-    val photoBatchSize: Int = 20,
+    val photoBatchSize: Int = 30,
     val videoBatchSize: Int = 20,
     val autoMoveOnKeepFavorite: Boolean = true,
     val similarDetection: Boolean = false,
@@ -16,13 +16,14 @@ data class AppSettings(
     val quickActionButtons: Boolean = true,
     val swapShareAndUndo: Boolean = false,
     val swipeSound: Boolean = true,
-    val videoDefaultMuted: Boolean = false,
+    val videoDefaultMuted: Boolean = true,
     val videoDisplayMode: VideoDisplayMode = VideoDisplayMode.IMMERSIVE_CROP,
     val hapticLevel: HapticLevel = HapticLevel.MEDIUM,
     val keepHapticLevel: HapticLevel = HapticLevel.MEDIUM,
     val deleteHapticLevel: HapticLevel = HapticLevel.MEDIUM,
     val favoriteHapticLevel: HapticLevel = HapticLevel.MEDIUM,
     val undoHapticLevel: HapticLevel = HapticLevel.MEDIUM,
+    val appVisualStyle: AppVisualStyle = AppVisualStyle.IMMERSIVE_PHOTO,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val accentColor: Long = 0xFFC7ECFE,
     val folderDisplay: FolderDisplayMode = FolderDisplayMode.SINGLE_LINE,
@@ -42,6 +43,7 @@ data class AppSettings(
     val videoGuideShown: Boolean = false,
     val excludedFolderPaths: Set<String> = emptySet(),
     val onboardingShown: Boolean = false,
+    val photoFocusMode: Boolean = false,
     val photoShowTopBar: Boolean = true,
     val photoShowFilterChips: Boolean = true,
     val photoShowFolderChips: Boolean = true,
@@ -55,6 +57,7 @@ data class AppSettings(
     val videoShowFolderChips: Boolean = true,
     val videoShowProgressBar: Boolean = true,
     val videoShowShuffleButton: Boolean = true,
+    val videoChromeVisible: Boolean = true,
 ) {
     val photoThreshold: Float get() = swipeSensitivity.thresholdScale
     val videoSeekThresholdPx: Float get() = 80f * swipeSensitivity.thresholdScale
@@ -89,6 +92,11 @@ enum class HapticLevel(@StringRes val labelRes: Int) {
     STRONG(R.string.haptic_level_strong),
 }
 
+enum class AppVisualStyle {
+    LIQUID_GLASS,
+    IMMERSIVE_PHOTO,
+}
+
 enum class ThemeMode(@StringRes val labelRes: Int) {
     SYSTEM(R.string.theme_mode_system),
     LIGHT(R.string.theme_mode_light),
@@ -108,7 +116,8 @@ enum class PhotoCleanMode(@StringRes val labelRes: Int, @StringRes val descripti
 
 fun nextBatchSize(current: Int): Int = when (current) {
     10 -> 20
-    20 -> 40
+    20 -> 30
+    30 -> 40
     40 -> 60
     else -> 10
 }

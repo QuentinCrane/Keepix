@@ -77,6 +77,10 @@ class AppRepositoryImpl @Inject constructor(
             trashCount = values[6] as Int,
             pendingDeleteCount = photoPendingDelete + videoPendingDelete,
             pendingDeleteBytes = photoPendingDeleteBytes + videoPendingDeleteBytes,
+            photoPendingDeleteCount = photoPendingDelete,
+            videoPendingDeleteCount = videoPendingDelete,
+            photoPendingDeleteBytes = photoPendingDeleteBytes,
+            videoPendingDeleteBytes = videoPendingDeleteBytes,
             todayPhotoCount = values[11] as Int,
             todayVideoCount = values[12] as Int,
             todayActionCount = values[13] as Int,
@@ -441,18 +445,21 @@ class AppRepositoryImpl @Inject constructor(
 
     override suspend fun restoreTrashItem(trashId: Long) = withContext(Dispatchers.IO) {
         val item = trashDao.byId(trashId) ?: return@withContext
-        mediaStoreActions.restoreFromSystemTrash(item.uri)
-        if (item.mediaType == "photo") photoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
-        else videoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
-        trashDao.deleteById(trashId)
+        if (isTrashItemInSystemTrash(item)) {
+            requireMediaOperation(mediaStoreActions.restoreFromSystemTrash(item.uri))
+        }
+        restoreTrashItemLocally(item)
+    }
+
+    override suspend fun markTrashItemDeleted(trashId: Long) = withContext(Dispatchers.IO) {
+        val item = trashDao.byId(trashId) ?: return@withContext
+        markTrashItemDeletedLocally(item)
     }
 
     override suspend fun permanentlyDeleteTrashItem(trashId: Long) = withContext(Dispatchers.IO) {
         val item = trashDao.byId(trashId) ?: return@withContext
-        mediaStoreActions.permanentlyDeleteMedia(item.uri)
-        if (item.mediaType == "photo") photoDao.updateDeletionStatus(listOf(item.mediaId), DeletionStatus.DELETED)
-        else videoDao.updateDeletionStatus(listOf(item.mediaId), DeletionStatus.DELETED)
-        trashDao.deleteById(trashId)
+        requireMediaOperation(mediaStoreActions.permanentlyDeleteMedia(item.uri))
+        markTrashItemDeletedLocally(item)
     }
 
     override suspend fun permanentlyDeleteAllTrash() = withContext(Dispatchers.IO) {
@@ -461,6 +468,35 @@ class AppRepositoryImpl @Inject constructor(
 
     override suspend fun restoreAllTrash() = withContext(Dispatchers.IO) {
         observeTrash().first().forEach { restoreTrashItem(it.id) }
+    }
+
+    private suspend fun isTrashItemInSystemTrash(item: TrashItemEntity): Boolean =
+        if (item.mediaType == "photo") {
+            photoDao.byId(item.mediaId)?.deletionStatus == DeletionStatus.TRASHED
+        } else {
+            videoDao.byId(item.mediaId)?.deletionStatus == DeletionStatus.TRASHED
+        }
+
+    private suspend fun restoreTrashItemLocally(item: TrashItemEntity) {
+        if (item.mediaType == "photo") {
+            photoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
+        } else {
+            videoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
+        }
+        trashDao.deleteById(item.id)
+    }
+
+    private suspend fun markTrashItemDeletedLocally(item: TrashItemEntity) {
+        if (item.mediaType == "photo") {
+            photoDao.updateDeletionStatus(listOf(item.mediaId), DeletionStatus.DELETED)
+        } else {
+            videoDao.updateDeletionStatus(listOf(item.mediaId), DeletionStatus.DELETED)
+        }
+        trashDao.deleteById(item.id)
+    }
+
+    private fun requireMediaOperation(result: MediaOperationResult) {
+        if (result is MediaOperationResult.Failed) throw IllegalStateException(result.reason)
     }
 
     override suspend fun undoLastAction(): Boolean = withContext(Dispatchers.IO) {
@@ -656,6 +692,22 @@ class AppRepositoryImpl @Inject constructor(
             }
             return startCal.timeInMillis to endCal.timeInMillis
         }
+        fun dayRange(year: Int, month: Int, day: Int): Pair<Long, Long> {
+            val startCal = Calendar.getInstance().apply {
+                clear()
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, day)
+            }
+            val endCal = Calendar.getInstance().apply {
+                clear()
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, day)
+                add(Calendar.DAY_OF_MONTH, 1)
+            }
+            return startCal.timeInMillis to endCal.timeInMillis
+        }
         return when (mode) {
             "seven_days" -> end - 7L * 24L * 60L * 60L * 1000L to end
             "month" -> {
@@ -674,6 +726,13 @@ class AppRepositoryImpl @Inject constructor(
                         val year = parts.getOrNull(0)?.toIntOrNull()
                         val month = parts.getOrNull(1)?.toIntOrNull()
                         if (year != null && month != null && month in 1..12) monthRange(year, month) else null
+                    }
+                    mode.startsWith("d:") -> {
+                        val parts = mode.removePrefix("d:").split("-")
+                        val year = parts.getOrNull(0)?.toIntOrNull()
+                        val month = parts.getOrNull(1)?.toIntOrNull()
+                        val day = parts.getOrNull(2)?.toIntOrNull()
+                        if (year != null && month != null && day != null && month in 1..12 && day in 1..31) dayRange(year, month, day) else null
                     }
                     mode.startsWith("multiym:") -> null
                     else -> null

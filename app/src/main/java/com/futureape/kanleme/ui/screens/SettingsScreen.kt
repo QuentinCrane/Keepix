@@ -6,9 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -28,34 +26,41 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.rounded.DriveFileMove
+import androidx.compose.material.icons.automirrored.rounded.Help
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AspectRatio
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,10 +77,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.futureape.kanleme.BuildConfig
 import com.futureape.kanleme.data.settings.AppSettings
+import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.data.settings.HapticLevel
 import com.futureape.kanleme.data.settings.PhotoCleanMode
 import com.futureape.kanleme.R
@@ -102,7 +109,7 @@ private enum class SettingsPage(val title: String) {
     CHANGELOG("更新日志"),
     PRIVACY("隐私政策"),
     HELP("使用帮助"),
-    DIAGNOSIS("诊断排障"),
+    DIAGNOSIS("高级设置"),
 }
 
 private enum class SettingsSheet {
@@ -154,7 +161,10 @@ fun SettingsScreen(
         pageName = target.name
     }
 
-    AdaptiveCenter(maxWidth = 900.dp) {
+    AdaptiveCenter(
+        modifier = Modifier.background(MaterialTheme.colorScheme.background),
+        maxWidth = 900.dp,
+    ) {
         Box(Modifier.fillMaxSize()) {
             if (page != SettingsPage.HOME && predictiveBackProgress > 0.001f) {
                 LazyColumn(
@@ -199,48 +209,56 @@ fun SettingsScreen(
                     }
                 }
             }
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .graphicsLayer {
-                        translationX = predictiveBackProgress * size.width * 0.82f
-                        val scale = 1f - predictiveBackProgress * 0.035f
-                        scaleX = scale
-                        scaleY = scale
-                        alpha = 1f - predictiveBackProgress * 0.18f
-                    },
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
-            ) {
-                item {
-                    SettingsHeader(
-                        title = page.title,
-                        subtitle = if (page == SettingsPage.HOME) "一级菜单" else "二级设置 · 修改后立即生效",
-                        onBack = {
-                            haptics.tick()
-                            if (page == SettingsPage.HOME) onBack() else pageName = SettingsPage.HOME.name
+            AnimatedContent(
+                targetState = page,
+                transitionSpec = {
+                    fadeIn(tween(140)).togetherWith(fadeOut(tween(100)))
+                },
+                label = "settings_page_transition",
+            ) { animatedPage ->
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .graphicsLayer {
+                            translationX = predictiveBackProgress * size.width * 0.82f
+                            val scale = 1f - predictiveBackProgress * 0.035f
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = 1f - predictiveBackProgress * 0.18f
                         },
-                    )
-                }
-                item {
-                    SettingsPageContent(
-                        page = page,
-                        settings = settings,
-                        allFolders = allFolders,
-                        customizeTab = customizeTab,
-                        onSelectCustomizeTab = { customizeTab = it; haptics.tick() },
-                        manualExcludePath = manualExcludePath,
-                        onManualExcludePathChange = { manualExcludePath = it },
-                        showAllFolderRules = showAllFolderRules,
-                        onToggleShowAllFolderRules = { showAllFolderRules = !showAllFolderRules },
-                        onManualExcludeConsumed = { manualExcludePath = "" },
-                        goTo = { target -> haptics.tick(); goTo(target) },
-                        openSheet = { sheet -> haptics.tick(); activeSheetName = sheet.name },
-                        onTick = { haptics.tick() },
-                        onSuccess = { haptics.success() },
-                        viewModel = viewModel,
-                    )
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    item {
+                        SettingsHeader(
+                            title = animatedPage.title,
+                            subtitle = if (animatedPage == SettingsPage.HOME) "一级菜单" else "二级设置 · 修改后立即生效",
+                            onBack = {
+                                haptics.tick()
+                                if (animatedPage == SettingsPage.HOME) onBack() else pageName = SettingsPage.HOME.name
+                            },
+                        )
+                    }
+                    item {
+                        SettingsPageContent(
+                            page = animatedPage,
+                            settings = settings,
+                            allFolders = allFolders,
+                            customizeTab = customizeTab,
+                            onSelectCustomizeTab = { customizeTab = it; haptics.tick() },
+                            manualExcludePath = manualExcludePath,
+                            onManualExcludePathChange = { manualExcludePath = it },
+                            showAllFolderRules = showAllFolderRules,
+                            onToggleShowAllFolderRules = { showAllFolderRules = !showAllFolderRules },
+                            onManualExcludeConsumed = { manualExcludePath = "" },
+                            goTo = { target -> haptics.tick(); goTo(target) },
+                            openSheet = { sheet -> haptics.tick(); activeSheetName = sheet.name },
+                            onTick = { haptics.tick() },
+                            onSuccess = { haptics.success() },
+                            viewModel = viewModel,
+                        )
+                    }
                 }
             }
         }
@@ -278,21 +296,20 @@ private fun SettingsPageContent(
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         when (page) {
             SettingsPage.HOME -> {
-                SectionTitle("常用设置")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsMenuRow(Icons.Rounded.TouchApp, "整理页面显示", customizationSummary(settings), color = Color(0xFF55A6C8), onClick = { goTo(SettingsPage.CLEANING_DISPLAY) }) },
-                    { SettingsMenuRow(Icons.Rounded.Layers, "整理方式", "删除、归档和相似照片检测", color = Color(0xFF6D9E65), onClick = { goTo(SettingsPage.ORGANIZE) }) },
-                    { SettingsMenuRow(Icons.Rounded.Tune, "操作体验", "滑动灵敏度、手势方向、声音、震动、视频比例", color = Color(0xFFD44C84), onClick = { goTo(SettingsPage.EXPERIENCE) }) },
-                    { SettingsMenuRow(Icons.Rounded.Palette, "外观显示", stringResource(settings.themeMode.labelRes) + " · " + stringResource(settings.folderDisplay.labelRes), color = Color(settings.accentColor), onClick = { goTo(SettingsPage.APPEARANCE) }) },
+                    { SettingsRow(Icons.Rounded.Layers, "每组数量", "照片 " + settings.photoBatchSize + " · 视频 " + settings.videoBatchSize, color = Color(0xFF86A7FF), showIcon = false, onClick = { goTo(SettingsPage.ORGANIZE) }) },
+                    { SettingsSwitchRow(Icons.Rounded.Vibration, "震动反馈", stringResource(settings.hapticLevel.labelRes), checked = settings.hapticLevel != HapticLevel.OFF, onCheckedChange = { onTick(); viewModel.setHapticLevel(if (it) HapticLevel.MEDIUM else HapticLevel.OFF) }, color = Color(0xFF86A7FF), showIcon = false) },
+                    { SettingsSwitchRow(Icons.Rounded.Visibility, "照片光效", if (settings.photoShowGestureHint) "删除和收藏时显示光效" else "已关闭", checked = settings.photoShowGestureHint, onCheckedChange = { onTick(); viewModel.setPhotoShowGestureHint(it) }, color = Color(0xFF86A7FF), showIcon = false) },
+                    { SettingsRow(Icons.Rounded.Movie, "视频进度条", if (settings.videoShowProgressBar) "细条" else "隐藏", color = Color(0xFFB884FF), showIcon = false, onClick = { onTick(); viewModel.setVideoShowProgressBar(!settings.videoShowProgressBar) }) },
+                    { SettingsRow(Icons.Rounded.Block, "排除文件夹", if (settings.excludedFolderPaths.isEmpty()) "单独管理" else "已排除 " + settings.excludedFolderPaths.size + " 个文件夹", color = Color(0xFFE46A62), showIcon = false, onClick = { goTo(SettingsPage.EXCLUDED_FOLDERS) }) },
+                    { SettingsRow(Icons.Rounded.Palette, "界面风格", visualStyleLabel(settings.appVisualStyle), color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.APPEARANCE) }) },
                 ))
-                SectionTitle("媒体范围")
+                SectionTitle("服务与支持")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsMenuRow(Icons.Rounded.Block, "排除文件夹", if (settings.excludedFolderPaths.isEmpty()) "未排除任何文件夹" else "已排除 " + settings.excludedFolderPaths.size + " 个文件夹", color = Color(0xFFB64040), onClick = { goTo(SettingsPage.EXCLUDED_FOLDERS) }) },
-                ))
-                SectionTitle("支持与维护")
-                SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsMenuRow(Icons.Rounded.Backup, "数据与更新", "更新日志、隐私政策、使用帮助、媒体库刷新", color = Color(0xFFE3B13B), onClick = { goTo(SettingsPage.DATA) }) },
-                    { SettingsMenuRow(Icons.Rounded.CleaningServices, "诊断排障", "照片清理模式和异常排查", color = Color(0xFF5E8DB4), onClick = { goTo(SettingsPage.DIAGNOSIS) }) },
+                    { SettingsRow(Icons.AutoMirrored.Rounded.Help, "常见问题", "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.HELP) }) },
+                    { SettingsRow(Icons.Rounded.Info, "邮箱", "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.DIAGNOSIS) }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, "新功能许愿", "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.DIAGNOSIS) }) },
+                    { SettingsRow(Icons.Rounded.Info, "隐私说明", "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.PRIVACY) }) },
                 ))
             }
 
@@ -301,6 +318,7 @@ private fun SettingsPageContent(
                     settings = settings,
                     selectedTab = customizeTab,
                     onSelectTab = onSelectCustomizeTab,
+                    onTogglePhotoFocusMode = { onTick(); viewModel.setPhotoFocusMode(!settings.photoFocusMode) },
                     onTogglePhotoTopBar = { onTick(); viewModel.setPhotoShowTopBar(!settings.photoShowTopBar) },
                     onTogglePhotoFilterChips = { onTick(); viewModel.setPhotoShowFilterChips(!settings.photoShowFilterChips) },
                     onTogglePhotoFolderChips = { onTick(); viewModel.setPhotoShowFolderChips(!settings.photoShowFolderChips) },
@@ -316,6 +334,20 @@ private fun SettingsPageContent(
             }
 
             SettingsPage.ORGANIZE -> {
+                SectionTitle("照片默认")
+                SettingsGroup(listOf<@Composable () -> Unit>(
+                    { SettingsRow(Icons.Rounded.CalendarToday, "整理范围", organizerDateModeLabel(settings.photoDateMode), color = Color(0xFF86A7FF), onClick = { onTick(); viewModel.setPhotoDateMode(nextSettingsDateMode(settings.photoDateMode)) }) },
+                    { SettingsRow(Icons.Rounded.Image, "照片类型", settingsPhotoTypeLabel(settings.photoMediaType), color = Color(0xFF86A7FF), onClick = { onTick(); viewModel.setPhotoTypeFilter(nextSettingsPhotoType(settings.photoMediaType)) }) },
+                    { SettingsRow(Icons.Rounded.Tune, "排序", settingsSortLabel(settings.photoSortOrder), color = Color(0xFF86A7FF), onClick = { onTick(); viewModel.setPhotoSortOrder(nextSettingsSortOrder(settings.photoSortOrder)) }) },
+                    { SettingsRow(Icons.Rounded.Layers, "每组数量", settings.photoBatchSize.toString(), color = Color(0xFF86A7FF), onClick = { onTick(); viewModel.setPhotoBatchSize(nextSettingsBatchSize(settings.photoBatchSize)) }) },
+                ))
+                SectionTitle("视频默认")
+                SettingsGroup(listOf<@Composable () -> Unit>(
+                    { SettingsRow(Icons.Rounded.CalendarToday, "整理范围", organizerDateModeLabel(settings.videoDateMode), color = Color(0xFFB8E95E), onClick = { onTick(); viewModel.setVideoDateMode(nextSettingsDateMode(settings.videoDateMode)) }) },
+                    { SettingsRow(Icons.Rounded.Tune, "排序", settingsSortLabel(settings.videoSortOrder), color = Color(0xFFB8E95E), onClick = { onTick(); viewModel.setVideoSortOrder(nextSettingsSortOrder(settings.videoSortOrder)) }) },
+                    { SettingsRow(Icons.Rounded.Layers, "每组数量", settings.videoBatchSize.toString(), color = Color(0xFFB8E95E), onClick = { onTick(); viewModel.setVideoBatchSize(nextSettingsBatchSize(settings.videoBatchSize)) }) },
+                    { SettingsSwitchRow(Icons.Rounded.Movie, "视频进度条", if (settings.videoShowProgressBar) "细条常驻显示" else "已隐藏", checked = settings.videoShowProgressBar, onCheckedChange = { onTick(); viewModel.setVideoShowProgressBar(it) }, color = Color(0xFFB8E95E)) },
+                ))
                 SectionTitle("整理方式")
                 SettingsGroup(listOf<@Composable () -> Unit>(
                     { SettingsRow(Icons.Rounded.Delete, "删除模式", stringResource(settings.deleteMode.labelRes), color = Color(0xFFDD5A56), onClick = { onTick(); viewModel.cycleDeleteMode() }) },
@@ -417,6 +449,7 @@ private fun SettingsPageContent(
             SettingsPage.APPEARANCE -> {
                 SectionTitle("外观显示")
                 SettingsGroup(listOf<@Composable () -> Unit>(
+                    { SettingsRow(Icons.Rounded.Palette, "界面风格", visualStyleSummary(settings.appVisualStyle), onClick = { onTick(); viewModel.cycleAppVisualStyle() }) },
                     { SettingsRow(Icons.Rounded.Palette, "主题模式", stringResource(settings.themeMode.labelRes), trailingContent = { ThemeModeDots(settings.themeMode.ordinal) }, onClick = { onTick(); viewModel.cycleThemeMode() }) },
                     { SettingsRow(Icons.Rounded.ColorLens, "选择主题色", "点击切换应用主题色", trailingContent = { ColorDot(settings.accentColor) }, onClick = { onTick(); viewModel.cycleAccentColor() }) },
                     { SettingsRow(Icons.Rounded.Folder, "文件夹显示", stringResource(settings.folderDisplay.labelRes), onClick = { onTick(); viewModel.cycleFolderDisplay() }) },
@@ -440,7 +473,7 @@ private fun SettingsPageContent(
             SettingsPage.PRIVACY -> { SectionTitle("隐私政策"); PrivacyPolicyContent() }
             SettingsPage.HELP -> { SectionTitle("使用帮助"); HelpContent() }
             SettingsPage.DIAGNOSIS -> {
-                SectionTitle("诊断排障")
+                SectionTitle("高级设置")
                 SettingsGroup(listOf<@Composable () -> Unit>(
                     { SettingsRow(Icons.Rounded.CleaningServices, "照片清理模式", stringResource(settings.photoCleanMode.labelRes), onClick = { openSheet(SettingsSheet.PHOTO_CLEAN_MODE) }) },
                 ))
@@ -450,13 +483,97 @@ private fun SettingsPageContent(
     }
 }
 
+private fun visualStyleLabel(style: AppVisualStyle): String = when (style) {
+    AppVisualStyle.LIQUID_GLASS -> "经典玻璃"
+    AppVisualStyle.IMMERSIVE_PHOTO -> "沉浸照片"
+}
+
+private fun visualStyleSummary(style: AppVisualStyle): String = when (style) {
+    AppVisualStyle.LIQUID_GLASS -> "保留当前 Liquid Glass 布局"
+    AppVisualStyle.IMMERSIVE_PHOTO -> "暗色沉浸布局，照片优先，控制收进胶囊"
+}
+
+private fun cleaningDisplaySummary(settings: AppSettings): String {
+    val photo = if (settings.photoFocusMode) "照片专注" else "完整控制"
+    val video = if (settings.videoShowProgressBar) "视频细进度" else "视频极简"
+    return photo + " · " + video
+}
+
+private fun settingsSortLabel(order: String): String = if (order == "newest") "最新在前" else "随机"
+
+private fun nextSettingsSortOrder(order: String): String = if (order == "random") "newest" else "random"
+
+private fun nextSettingsBatchSize(current: Int): Int = when (current) {
+    10 -> 20
+    20 -> 30
+    30 -> 40
+    40 -> 60
+    else -> 10
+}
+
+private fun nextSettingsDateMode(mode: String): String = when (mode) {
+    "all" -> "year"
+    "year" -> "month"
+    "month" -> "seven_days"
+    "seven_days" -> "today_history"
+    else -> "all"
+}
+
+private fun settingsPhotoTypeLabel(type: String): String = when (type) {
+    "normal" -> "普通照片"
+    "screenshot" -> "截屏"
+    "selfie" -> "自拍"
+    "motion" -> "实况"
+    "long" -> "长图"
+    "gif" -> "动图"
+    "raw" -> "RAW"
+    else -> "全部照片"
+}
+
+private fun nextSettingsPhotoType(type: String): String = when (type) {
+    "all" -> "screenshot"
+    "screenshot" -> "selfie"
+    "selfie" -> "motion"
+    "motion" -> "gif"
+    "gif" -> "long"
+    "long" -> "raw"
+    else -> "all"
+}
+
 @Composable
 private fun SettingsHeader(title: String, subtitle: String, onBack: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = stringResource(R.string.a11y_back)) }
+    val isHome = title == SettingsPage.HOME.title
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.headlineMedium)
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                title,
+                style = if (isHome) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            if (!isHome) {
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Surface(
+            onClick = onBack,
+            modifier = Modifier.size(56.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    if (isHome) Icons.Rounded.Close else Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.a11y_back),
+                    modifier = Modifier.size(if (isHome) 28.dp else 26.dp),
+                )
+            }
         }
     }
 }
@@ -1088,6 +1205,7 @@ private fun OrganizerDisplayCustomizer(
     settings: AppSettings,
     selectedTab: String,
     onSelectTab: (String) -> Unit,
+    onTogglePhotoFocusMode: () -> Unit,
     onTogglePhotoTopBar: () -> Unit,
     onTogglePhotoFilterChips: () -> Unit,
     onTogglePhotoFolderChips: () -> Unit,
@@ -1101,6 +1219,18 @@ private fun OrganizerDisplayCustomizer(
     onToggleVideoShuffleButton: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        SettingsGroup(listOf<@Composable () -> Unit>(
+            {
+                SettingsSwitchRow(
+                    Icons.Rounded.Visibility,
+                    "照片整理辅助控件",
+                    if (settings.photoFocusMode) "整理页只保留照片和一个显示控件入口" else "整理页显示筛选、进度、相册和图片信息",
+                    checked = !settings.photoFocusMode,
+                    onCheckedChange = { onTogglePhotoFocusMode() },
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+        ))
         GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), tonalAlpha = 0.82f) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("实时预览", style = MaterialTheme.typography.titleLarge)
@@ -1560,7 +1690,8 @@ private fun PreviewCircle(text: String, onClick: () -> Unit) {
 private fun customizationSummary(settings: AppSettings): String {
     val photo = enabledCount(listOf(settings.photoShowTopBar, settings.photoShowFilterChips, settings.photoShowFolderChips, settings.photoShowInfoBar, settings.photoShowGestureHint, settings.photoShowShuffleButton))
     val video = enabledCount(listOf(settings.videoShowTopBar, settings.videoShowActionRail, settings.videoShowInfoPanel, settings.videoShowProgressBar, settings.videoShowShuffleButton))
-    return "照片显示 " + photo + "/6 · 视频显示 " + video + "/5"
+    val photoMode = if (settings.photoFocusMode) "照片辅助控件已隐藏" else "照片显示 " + photo + "/6"
+    return photoMode + " · 视频显示 " + video + "/5"
 }
 
 private fun enabledCount(values: List<Boolean>): Int = values.count { it }
@@ -1610,14 +1741,19 @@ private fun ManualExcludeFolderEditor(
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 6.dp))
+    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 24.dp, top = 2.dp))
 }
 
 @Composable
 private fun SettingsGroup(rows: List<@Composable () -> Unit>) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), tonalAlpha = 0.78f) {
-        Column(modifier = Modifier.padding(vertical = 4.dp)) {
-            rows.forEach { row -> row() }
+    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), tonalAlpha = 0.88f) {
+        Column(modifier = Modifier.padding(vertical = 2.dp)) {
+            rows.forEachIndexed { index, row ->
+                row()
+                if (index != rows.lastIndex) {
+                    Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp).height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)))
+                }
+            }
         }
     }
 }
@@ -1641,22 +1777,25 @@ private fun SettingsRow(
     badge: String? = null,
     color: Color = MaterialTheme.colorScheme.primary,
     trailingContent: (@Composable () -> Unit)? = null,
+    showIcon: Boolean = true,
     onClick: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 22.dp, vertical = if (showIcon) 15.dp else 19.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconTile(icon, color)
+        if (showIcon) IconTile(icon, color)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 if (badge != null) BadgeText(badge)
             }
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (subtitle.isNotBlank()) {
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            }
         }
-        trailingContent?.invoke() ?: Icon(Icons.AutoMirrored.Rounded.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        trailingContent?.invoke() ?: Icon(Icons.AutoMirrored.Rounded.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f))
     }
 }
 
@@ -1669,19 +1808,22 @@ private fun SettingsSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     badge: String? = null,
     color: Color = MaterialTheme.colorScheme.primary,
+    showIcon: Boolean = true,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = if (showIcon) 15.dp else 17.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconTile(icon, color)
+        if (showIcon) IconTile(icon, color)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 if (badge != null) BadgeText(badge)
             }
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (subtitle.isNotBlank()) {
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            }
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
@@ -1690,10 +1832,10 @@ private fun SettingsSwitchRow(
 @Composable
 private fun IconTile(icon: ImageVector, color: Color) {
     Box(
-        modifier = Modifier.size(40.dp).background(color.copy(alpha = 0.10f), RoundedCornerShape(10.dp)),
+        modifier = Modifier.size(40.dp).background(color.copy(alpha = 0.10f), RoundedCornerShape(13.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = color.copy(alpha = 0.88f), modifier = Modifier.size(21.dp))
     }
 }
 

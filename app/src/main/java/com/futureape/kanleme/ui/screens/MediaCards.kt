@@ -80,8 +80,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.layout.ContentScale
@@ -94,6 +96,7 @@ import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.data.settings.AppSettings
+import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.data.settings.GestureDirection
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.util.HapticKit
@@ -113,6 +116,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.sqrt
 import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
@@ -307,11 +311,13 @@ fun PhotoDeckStage(
     onOpen: (PhotoEntity) -> Unit = {},
     onTopCardPositioned: (Rect) -> Unit = {},
     onSwipeFeedbackChanged: (PhotoSwipeFeedback) -> Unit = {},
+    onPinchToMemory: (() -> Unit)? = null,
     undoAnimation: PhotoUndoAnimation? = null,
     onUndoAnimationConsumed: (Long) -> Unit = {},
     onAction: (PhotoEntity, SwipeAction, Float, Float, Float, Float) -> Unit,
 ) {
     val top = photos.firstOrNull() ?: return
+    val immersiveStyle = settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO
     val deckPromotion = remember(top.id) { Animatable(0f) }
     var exitingPhotoCard by remember { mutableStateOf<ExitingPhotoCard?>(null) }
 
@@ -321,26 +327,77 @@ fun PhotoDeckStage(
         if (exitingPhotoCard?.sequence == card.sequence) exitingPhotoCard = null
     }
 
-    Box(modifier, contentAlignment = Alignment.Center) {
+    val pinchToMemory = onPinchToMemory
+    val stageModifier = if (pinchToMemory == null) {
+        modifier
+    } else {
+        modifier.pointerInput(top.id, pinchToMemory) {
+            awaitEachGesture {
+                var initialDistance = 0f
+                var previousDistance = 0f
+                var cumulativeScale = 1f
+                while (true) {
+                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                    val pressed = event.changes.filter { it.pressed }
+                    if (pressed.size < 2) {
+                        if (pressed.isEmpty()) break
+                        continue
+                    }
+                    val a = pressed[0].position
+                    val b = pressed[1].position
+                    val dx = a.x - b.x
+                    val dy = a.y - b.y
+                    val distance = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+                    if (initialDistance <= 0f) {
+                        initialDistance = distance
+                        previousDistance = distance
+                    } else {
+                        cumulativeScale *= distance / previousDistance.coerceAtLeast(1f)
+                        previousDistance = distance
+                        if (distance / initialDistance < 0.97f || cumulativeScale < 0.97f || initialDistance - distance > viewConfiguration.touchSlop * 0.20f) {
+                            pressed.forEach { it.consume() }
+                            haptics.threshold()
+                            pinchToMemory()
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Box(
+        stageModifier,
+        contentAlignment = Alignment.Center,
+    ) {
         photos.drop(1).take(3).reversed().forEachIndexed { index, photo ->
             val depth = 3 - index
             val promotion = deckPromotion.value.coerceIn(0f, 1f)
             val easedPromotion = smoothDeckPromotion(promotion)
             val effectiveDepth = (depth - easedPromotion).coerceAtLeast(0f)
-            fun fillForDepth(value: Float): Float = (0.88f - value * 0.028f).coerceAtLeast(0.76f)
-            fun scaleForDepth(value: Float): Float = 1f - value * 0.058f
-            fun alphaForDepth(value: Float): Float = if (value <= 1f) 1f else (1f - (value - 1f) * 0.16f).coerceIn(0.70f, 1f)
-            fun rotationForDepth(value: Int): Float = when (value) { 0, 1 -> 0f; 2 -> 2.2f; else -> -1.2f }
+            fun fillForDepth(value: Float): Float = if (immersiveStyle) {
+                (0.96f - value * 0.048f).coerceAtLeast(0.78f)
+            } else {
+                (0.88f - value * 0.028f).coerceAtLeast(0.76f)
+            }
+            fun scaleForDepth(value: Float): Float = if (immersiveStyle) 1f - value * 0.045f else 1f - value * 0.058f
+            fun alphaForDepth(value: Float): Float = if (value <= 1f) 1f else (1f - (value - 1f) * if (immersiveStyle) 0.10f else 0.16f).coerceIn(0.70f, 1f)
+            fun rotationForDepth(value: Int): Float = if (immersiveStyle) {
+                when (value) { 0 -> 0f; 1 -> -3.8f; 2 -> 4.8f; else -> -2.6f }
+            } else {
+                when (value) { 0, 1 -> 0f; 2 -> 2.2f; else -> -1.2f }
+            }
             val fillWidth = if (depth == 1) {
                 val start = fillForDepth(depth.toFloat())
-                start + (0.96f - start) * easedPromotion
+                start + ((if (immersiveStyle) 0.99f else 0.96f) - start) * easedPromotion
             } else {
                 fillForDepth(effectiveDepth)
             }
-            val liftDp = effectiveDepth * 34f
+            val liftDp = effectiveDepth * if (immersiveStyle) 18f else 34f
             val rotation = rotationForDepth(depth) + (rotationForDepth((depth - 1).coerceAtLeast(0)) - rotationForDepth(depth)) * easedPromotion
             val scale = scaleForDepth(effectiveDepth)
             val cardAlpha = alphaForDepth(effectiveDepth)
+            val backShape = RoundedCornerShape(if (immersiveStyle) 26.dp else 30.dp)
             Box(
                 modifier = Modifier
                     .fillMaxWidth(fillWidth)
@@ -352,8 +409,8 @@ fun PhotoDeckStage(
                         scaleY = scale
                         alpha = cardAlpha
                     }
-                    .shadow(28.dp, RoundedCornerShape(30.dp), ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.20f))
-                    .clip(RoundedCornerShape(30.dp)),
+                    .shadow(if (immersiveStyle) 28.dp else 20.dp, backShape, ambientColor = Color.Black.copy(alpha = if (immersiveStyle) 0.24f else 0.12f), spotColor = Color.Black.copy(alpha = if (immersiveStyle) 0.30f else 0.14f))
+                    .clip(backShape),
             ) {
                 PhotoFitImageWithSoftFill(
                     photo = photo,
@@ -368,6 +425,7 @@ fun PhotoDeckStage(
             haptics = haptics,
             onOpen = { onOpen(top) },
             onSwipeFeedbackChanged = onSwipeFeedbackChanged,
+            onPinchToMemory = onPinchToMemory,
             undoAnimation = undoAnimation?.takeIf { it.mediaStoreId == top.mediaStoreId },
             onUndoAnimationConsumed = onUndoAnimationConsumed,
             onDeckPromotionChanged = { value ->
@@ -386,30 +444,20 @@ fun PhotoDeckStage(
                 }
             },
             onAction = { action, startX, startY, targetX, targetY ->
-                exitingPhotoCard = null
-                exitingPhotoCard = ExitingPhotoCard(
-                    photo = top,
-                    startX = startX,
-                    startY = startY,
-                    targetX = targetX,
-                    targetY = targetY,
-                )
                 onAction(top, action, startX, startY, targetX, targetY)
             },
             modifier = Modifier
-                .fillMaxWidth(0.96f)
+                .fillMaxWidth(if (immersiveStyle) 0.99f else 0.96f)
                 .onGloballyPositioned { coordinates -> onTopCardPositioned(coordinates.boundsInRoot()) },
         )
         exitingPhotoCard?.let { exiting ->
-            if (photos.none { it.mediaStoreId == exiting.photo.mediaStoreId }) {
-                ExitingPhotoOverlay(
-                    exiting = exiting,
-                    modifier = Modifier.fillMaxWidth(0.96f),
-                    onFinished = {
-                        if (exitingPhotoCard?.sequence == exiting.sequence) exitingPhotoCard = null
-                    },
-                )
-            }
+            ExitingPhotoOverlay(
+                exiting = exiting,
+                modifier = Modifier.fillMaxWidth(if (immersiveStyle) 0.99f else 0.96f),
+                onFinished = {
+                    if (exitingPhotoCard?.sequence == exiting.sequence) exitingPhotoCard = null
+                },
+            )
         }
     }
 }
@@ -421,6 +469,7 @@ fun SwipePhotoCard(
     haptics: HapticKit,
     onOpen: () -> Unit = {},
     onSwipeFeedbackChanged: (PhotoSwipeFeedback) -> Unit = {},
+    onPinchToMemory: (() -> Unit)? = null,
     undoAnimation: PhotoUndoAnimation? = null,
     onUndoAnimationConsumed: (Long) -> Unit = {},
     onDeckPromotionChanged: suspend (Float) -> Unit = {},
@@ -429,6 +478,8 @@ fun SwipePhotoCard(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val immersiveStyle = settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO
+    val cardShape = RoundedCornerShape(if (immersiveStyle) 26.dp else 32.dp)
     val photoRatio = remember(photo.id, photo.width, photo.height, photo.exifWidth, photo.exifHeight) { photoDisplayAspectRatio(photo) }
     val canInlinePlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
     var inlineMotionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
@@ -440,6 +491,7 @@ fun SwipePhotoCard(
     var lastZone by remember(photo.id) { mutableStateOf("") }
     var activeHint by remember(photo.id) { mutableStateOf<SwipeAction?>(null) }
     var actionCommitted by remember(photo.id) { mutableStateOf(false) }
+    val pinchToMemory = onPinchToMemory
     val feedbackAlpha by animateFloatAsState(
         targetValue = (abs(offsetX.value) / 260f + abs(offsetY.value) / 260f).coerceIn(0f, 1f),
         animationSpec = tween(120),
@@ -534,6 +586,21 @@ fun SwipePhotoCard(
         return null
     }
 
+    fun classifyWithVelocity(x: Float, y: Float, velocityX: Float, velocityY: Float): SwipeAction? {
+        classify(x, y)?.let { return it }
+        val absX = abs(x)
+        val absY = abs(y)
+        val absVelocityX = abs(velocityX)
+        val absVelocityY = abs(velocityY)
+        if (absVelocityY > 1350f && absVelocityY > absVelocityX * 1.25f && absY > 76f) {
+            return verticalAction(velocityY)
+        }
+        if (absVelocityX > 1450f && absVelocityX > absVelocityY * 1.18f && absX > 70f) {
+            return SwipeAction.Keep
+        }
+        return null
+    }
+
     fun visualFeedback(x: Float, y: Float): PhotoSwipeFeedback {
         val absX = abs(x)
         val absY = abs(y)
@@ -565,18 +632,23 @@ fun SwipePhotoCard(
                 val distance = (abs(offsetX.value) + abs(offsetY.value)).coerceAtMost(520f) / 520f
                 scaleX = 1f - distance * 0.035f
                 scaleY = 1f - distance * 0.035f
-                alpha = if (actionCommitted) 0f else 1f
             }
             .then(
                 if (actionCommitted) {
                     Modifier
                 } else {
-                    Modifier.pointerInput(photo.id, settings) {
+                    Modifier.pointerInput(photo.id, settings, pinchToMemory) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            val velocityTracker = VelocityTracker()
+                            velocityTracker.addPosition(down.uptimeMillis, down.position)
                             var totalX = 0f
                             var totalY = 0f
                             var dragging = false
+                            var initialPinchDistance = 0f
+                            var previousPinchDistance = 0f
+                            var cumulativePinchScale = 1f
+                            var pinchHandled = false
                             val slop = viewConfiguration.touchSlop
                             val dragStartSlop = slop * 1.35f
                             val tapSlop = slop * 1.10f
@@ -593,10 +665,50 @@ fun SwipePhotoCard(
                             }
                             while (true) {
                                 val event = awaitPointerEvent()
+                                val pressed = event.changes.filter { it.pressed }
+                                if (pinchToMemory == null && pressed.size >= 2) {
+                                    longPressHandled = true
+                                    longPressJob.cancel()
+                                    continue
+                                }
+                                if (pinchToMemory != null && !pinchHandled && pressed.size >= 2) {
+                                    val a = pressed[0].position
+                                    val b = pressed[1].position
+                                    val dx = a.x - b.x
+                                    val dy = a.y - b.y
+                                    val distance = sqrt(dx * dx + dy * dy)
+                                    if (initialPinchDistance <= 0f && distance > slop) {
+                                        initialPinchDistance = distance
+                                        previousPinchDistance = distance
+                                        cumulativePinchScale = 1f
+                                    } else if (previousPinchDistance > 0f) {
+                                        cumulativePinchScale *= (distance / previousPinchDistance.coerceAtLeast(1f))
+                                        previousPinchDistance = distance
+                                    }
+                                    val hasPinchedIn = initialPinchDistance > 0f &&
+                                        (distance / initialPinchDistance < 0.94f || cumulativePinchScale < 0.94f || initialPinchDistance - distance > slop * 0.35f)
+                                    if (initialPinchDistance > 0f && hasPinchedIn) {
+                                        pinchHandled = true
+                                        longPressHandled = true
+                                        dragging = false
+                                        longPressJob.cancel()
+                                        pressed.forEach { it.consume() }
+                                        onSwipeFeedbackChanged(PhotoSwipeFeedback())
+                                        scope.launch { onDeckPromotionChanged(0f) }
+                                        haptics.threshold()
+                                        pinchToMemory()
+                                        break
+                                    }
+                                } else if (pressed.size < 2) {
+                                    initialPinchDistance = 0f
+                                    previousPinchDistance = 0f
+                                    cumulativePinchScale = 1f
+                                }
                                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
                                 if (change.changedToUpIgnoreConsumed()) break
                                 val delta = change.positionChange()
                                 if (delta.x != 0f || delta.y != 0f) {
+                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
                                     totalX += delta.x
                                     totalY += delta.y
                                     if (canInlinePlayMotion && !dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop && SystemClock.uptimeMillis() - longPressStartMillis >= fastLongPressTimeout) {
@@ -639,7 +751,8 @@ fun SwipePhotoCard(
                                 haptics.tick()
                                 onOpen()
                             } else {
-                                val action = if (dragging) classify(offsetX.value, offsetY.value) else null
+                                val velocity = velocityTracker.calculateVelocity()
+                                val action = if (dragging) classifyWithVelocity(offsetX.value, offsetY.value, velocity.x, velocity.y) else null
                                 if (action == null) {
                                     activeHint = null
                                     onSwipeFeedbackChanged(PhotoSwipeFeedback())
@@ -648,20 +761,30 @@ fun SwipePhotoCard(
                                     scope.launch { offsetY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) }
                                 } else {
                                     scope.launch { onDeckPromotionChanged(1f) }
+                                    val flingX = (velocity.x * 0.14f).coerceIn(-520f, 520f)
+                                    val flingY = (velocity.y * 0.14f).coerceIn(-520f, 520f)
+                                    val flyOutX = (size.width.toFloat() + 560f + abs(flingX) * 0.35f).coerceAtLeast(1120f)
+                                    val flyOutY = (size.height.toFloat() + 560f + abs(flingY) * 0.35f).coerceAtLeast(1280f)
                                     val targetX = when (action) {
-                                        SwipeAction.Keep -> if (offsetX.value < 0) -980f else 980f
-                                        else -> offsetX.value * 1.75f
+                                        SwipeAction.Keep -> if (offsetX.value + flingX < 0) -flyOutX else flyOutX
+                                        else -> (offsetX.value + flingX).coerceIn(-520f, 520f)
                                     }
                                     val targetY = when (action) {
-                                        SwipeAction.Delete -> if (settings.gestureDirection == GestureDirection.DEFAULT) -1260f else 1260f
-                                        SwipeAction.Favorite -> if (settings.gestureDirection == GestureDirection.DEFAULT) 1260f else -1260f
+                                        SwipeAction.Delete -> if (settings.gestureDirection == GestureDirection.DEFAULT) -flyOutY else flyOutY
+                                        SwipeAction.Favorite -> if (settings.gestureDirection == GestureDirection.DEFAULT) flyOutY else -flyOutY
                                         SwipeAction.Keep -> offsetY.value
                                     }
                                     actionCommitted = true
-                                    onAction(action, offsetX.value, offsetY.value, targetX, targetY)
                                     activeHint = null
                                     onSwipeFeedbackChanged(PhotoSwipeFeedback())
                                     lastZone = ""
+                                    scope.launch {
+                                        val xJob = launch { offsetX.animateTo(targetX, tween(190, easing = FastOutSlowInEasing)) }
+                                        val yJob = launch { offsetY.animateTo(targetY, tween(190, easing = FastOutSlowInEasing)) }
+                                        xJob.join()
+                                        yJob.join()
+                                        onAction(action, offsetX.value, offsetY.value, targetX, targetY)
+                                    }
                                 }
                             }
                         }
@@ -673,8 +796,7 @@ fun SwipePhotoCard(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(photoRatio)
-                .clip(RoundedCornerShape(32.dp))
-                .background(Color.Black)
+                .clip(cardShape)
         ) {
             val motionPreview = inlineMotionSource
             if (motionPreview != null) {
@@ -685,27 +807,33 @@ fun SwipePhotoCard(
                     onEnded = { inlineMotionSource = null; inlineMotionManualHint = true },
                 )
             } else {
-                PlainFitPhotoImage(photo = photo, modifier = Modifier.fillMaxSize(), contentDescription = photo.displayName)
+                PhotoFitImageWithSoftFill(photo = photo, modifier = Modifier.fillMaxSize(), contentDescription = photo.displayName)
             }
-            PhotoDynamicBadgeRow(
-                photo = photo,
-                modifier = Modifier.align(Alignment.TopStart).padding(14.dp),
-            )
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.04f), Color.Black.copy(alpha = 0.16f))
+            if (!settings.photoFocusMode && !immersiveStyle) {
+                PhotoDynamicBadgeRow(
+                    photo = photo,
+                    modifier = Modifier.align(Alignment.TopStart).padding(14.dp),
+                )
+            }
+            if (!immersiveStyle) {
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.04f), Color.Black.copy(alpha = 0.16f))
+                        )
                     )
                 )
-            )
-            InlineMotionStatusPill(
-                isVisible = canInlinePlayMotion,
-                isPlaying = motionPreview != null,
-                isLoading = inlineMotionLoading,
-                isUnavailable = inlineMotionUnavailable,
-                manualHint = inlineMotionManualHint,
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp),
-            )
+            }
+            if (!settings.photoFocusMode && !immersiveStyle) {
+                InlineMotionStatusPill(
+                    isVisible = canInlinePlayMotion,
+                    isPlaying = motionPreview != null,
+                    isLoading = inlineMotionLoading,
+                    isUnavailable = inlineMotionUnavailable,
+                    manualHint = inlineMotionManualHint,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp),
+                )
+            }
         }
     }
 }
@@ -745,20 +873,12 @@ private fun ExitingPhotoOverlay(
                 scaleY = 1f - distance * 0.035f
             }
             .aspectRatio(ratio)
-            .clip(RoundedCornerShape(32.dp))
-            .background(Color.Black),
+            .clip(RoundedCornerShape(32.dp)),
     ) {
-        PlainFitPhotoImage(
+        PhotoFitImageWithSoftFill(
             photo = exiting.photo,
             modifier = Modifier.fillMaxSize(),
             contentDescription = exiting.photo.displayName,
-        )
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.04f), Color.Black.copy(alpha = 0.16f))
-                )
-            )
         )
     }
 }
@@ -769,7 +889,22 @@ private fun PhotoFitImageWithSoftFill(
     modifier: Modifier = Modifier,
     contentDescription: String? = photo.displayName,
 ) {
-    PlainFitPhotoImage(photo = photo, modifier = modifier.background(Color.Black), contentDescription = contentDescription)
+    val context = LocalContext.current
+    val model = remember(photo.uri) {
+        ImageRequest.Builder(context)
+            .data(Uri.parse(photo.uri))
+            .memoryCacheKey(photo.uri)
+            .diskCacheKey(photo.uri)
+            .placeholderMemoryCacheKey(photo.uri)
+            .crossfade(false)
+            .build()
+    }
+    AsyncImage(
+        model = model,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = ContentScale.Crop,
+    )
 }
 
 @Composable
@@ -1365,8 +1500,8 @@ fun VideoCard(video: VideoEntity, onAction: (SwipeAction) -> Unit) {
 }
 
 private fun photoDisplayAspectRatio(photo: PhotoEntity): Float {
-    val width = photo.exifWidth?.takeIf { it > 0 } ?: photo.width.takeIf { it > 0 } ?: 1
-    val height = photo.exifHeight?.takeIf { it > 0 } ?: photo.height.takeIf { it > 0 } ?: 1
+    val width = photo.width.takeIf { it > 0 } ?: photo.exifWidth?.takeIf { it > 0 } ?: 1
+    val height = photo.height.takeIf { it > 0 } ?: photo.exifHeight?.takeIf { it > 0 } ?: 1
     val raw = width.toFloat() / height.toFloat()
     val minRatio = when {
         photo.isLongImage -> 0.42f

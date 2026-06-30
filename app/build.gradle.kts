@@ -14,8 +14,8 @@ android {
         applicationId = "com.futureape.kanleme"
         minSdk = 30
         targetSdk = 35
-        versionCode = 59
-        versionName = "2.3.3"
+        versionCode = 60
+        versionName = "2.3.4"
 
         vectorDrawables.useSupportLibrary = true
     }

@@ -2,7 +2,6 @@ package com.futureape.kanleme.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,45 +13,36 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.Feedback
-import androidx.compose.material.icons.rounded.Help
 import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.PrivacyTip
+import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material.icons.rounded.TipsAndUpdates
-import androidx.compose.material.icons.rounded.EmojiEvents
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.futureape.kanleme.R
+import com.futureape.kanleme.data.repository.DashboardStats
 import com.futureape.kanleme.ui.components.AdaptiveCenter
-import com.futureape.kanleme.ui.components.GlassSurface
-import com.futureape.kanleme.ui.components.MetricPill
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import com.futureape.kanleme.ui.i18n.Text
@@ -73,209 +63,299 @@ fun MeScreen(
     onDiagnosis: () -> Unit,
 ) {
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
-    val personality = remember(dashboard) { buildPersonality(dashboard) }
-    val keptCount = (dashboard.processedCount - dashboard.favoriteCount - dashboard.pendingDeleteCount).coerceAtLeast(0)
-    AdaptiveCenter(maxWidth = 1080.dp) {
-        LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 58.dp, bottom = contentPadding.calculateBottomPadding()),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+    val photoTypeStats by viewModel.photoTypeStats.collectAsStateWithLifecycle()
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF050607),
+                        Color(0xFF090B0E),
+                        Color.Black,
+                    )
+                )
+            )
     ) {
-        item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
-                Surface(shape = RoundedCornerShape(999.dp), color = adaptiveSurfaceColor(0.36f), border = BorderStroke(1.dp, adaptiveBorderColor(0.50f))) {
-                    Row(Modifier.clickable(onClick = onSettings).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Rounded.Settings, contentDescription = null)
-                        Text("设置", style = MaterialTheme.typography.titleMedium)
+        AdaptiveCenter(maxWidth = 760.dp) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 22.dp,
+                    end = 22.dp,
+                    top = 46.dp,
+                    bottom = contentPadding.calculateBottomPadding(),
+                ),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            "我的",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.Black,
+                        )
+                        RoundIconSurface(icon = Icons.Rounded.Settings, onClick = onSettings)
+                    }
+                }
+
+                item {
+                    UsageHeroCard(
+                        dashboard = dashboard,
+                        onRefresh = { viewModel.refreshLibrary() },
+                    )
+                }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        MediaStatCard(
+                            icon = Icons.Rounded.Image,
+                            title = "照片",
+                            viewed = dashboard.processedPhotoCount,
+                            deleted = dashboard.photoPendingDeleteCount,
+                            cleaned = dashboard.photoPendingDeleteBytes,
+                            accent = Color(0xFF86A7FF),
+                        )
+                        MediaStatCard(
+                            icon = Icons.Rounded.Movie,
+                            title = "视频",
+                            viewed = dashboard.processedVideoCount,
+                            deleted = dashboard.videoPendingDeleteCount,
+                            cleaned = dashboard.videoPendingDeleteBytes,
+                            accent = Color(0xFFB884FF),
+                        )
+                        MediaStatCard(
+                            icon = Icons.Rounded.Image,
+                            title = "截屏",
+                            viewed = photoTypeStats.screenshot,
+                            deleted = 0,
+                            cleaned = 0L,
+                            accent = Color(0xFF5DD9CB),
+                        )
+                    }
+                }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ProfileRow(
+                            icon = Icons.Rounded.FavoriteBorder,
+                            title = "收藏",
+                            subtitle = dashboard.favoriteCount.toString() + " 个项目",
+                            accent = Color(0xFFFF6F7F),
+                            onClick = onFavorites,
+                        )
+                        ProfileRow(
+                            icon = Icons.Rounded.Delete,
+                            title = "回收站",
+                            subtitle = dashboard.trashCount.toString() + " 个待确认项目",
+                            accent = Color(0xFFE46A62),
+                            onClick = onTrash,
+                        )
                     }
                 }
             }
         }
-        item {
-            GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), tonalAlpha = 0.60f) {
-                Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Surface(modifier = Modifier.size(58.dp), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+    }
+
+    // Keep callback parameters wired for navigation compatibility while the visible entries are intentionally hidden.
+    listOf(onSimilar, onAchievements, onAnnualReport, onHelp, onPrivacy, onChangelog, onDiagnosis)
+}
+
+@Composable
+private fun UsageHeroCard(
+    dashboard: DashboardStats,
+    onRefresh: () -> Unit,
+) {
+    val freed = dashboard.pendingDeleteBytes
+    val progress = dashboard.progress.coerceIn(0f, 1f)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(30.dp),
+        color = Color(0xFF121417).copy(alpha = 0.94f),
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("使用统计", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Black)
+                    Text(
+                        formatSize(freed),
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Text("预计可释放", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.58f), fontWeight = FontWeight.Bold)
+                }
+                RoundIconSurface(icon = Icons.Rounded.Refresh, onClick = onRefresh)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HeroMetric("已浏览", dashboard.processedCount.toString(), Modifier.weight(1f))
+                HeroMetric("待确认", dashboard.pendingDeleteCount.toString(), Modifier.weight(1f))
+                HeroMetric("回收站", dashboard.trashCount.toString(), Modifier.weight(1f))
+            }
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(5.dp),
+                color = Color(0xFF86A7FF),
+                trackColor = Color.White.copy(alpha = 0.10f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeroMetric(label: String, value: String, modifier: Modifier) {
+    Surface(
+        modifier = modifier.height(72.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White.copy(alpha = 0.055f),
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.Center) {
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, maxLines = 1)
+            Text(label, style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.56f), maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun MediaStatCard(
+    icon: ImageVector,
+    title: String,
+    viewed: Int,
+    deleted: Int,
+    cleaned: Long,
+    accent: Color,
+) {
+    val progress = when {
+        viewed <= 0 && deleted <= 0 -> 0f
+        viewed <= 0 -> 1f
+        else -> (deleted.toFloat() / viewed.toFloat()).coerceIn(0f, 1f)
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = Color(0xFF121417).copy(alpha = 0.90f),
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.09f)),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(
+                    modifier = Modifier.size(42.dp),
+                    shape = RoundedCornerShape(13.dp),
+                    color = accent.copy(alpha = 0.20f),
+                    contentColor = accent,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
                     }
-                    Column(Modifier.weight(1f)) {
-                        Text("本地相册整理", style = MaterialTheme.typography.headlineSmall)
-                        Text("无需登录，所有整理能力本地可用", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Button(onClick = { viewModel.refreshLibrary() }, shape = RoundedCornerShape(999.dp)) { Text("同步") }
+                }
+                Text(title, modifier = Modifier.width(54.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, maxLines = 1)
+                StatColumn("浏览", viewed.toString(), Color(0xFF86A7FF), Modifier.weight(1f))
+                StatColumn("待确认", deleted.toString(), Color(0xFFFF7B70), Modifier.weight(1f))
+                StatColumn("预计释放", if (cleaned > 0L) formatSize(cleaned) else "0 字节", Color(0xFFC8EF67), Modifier.weight(1.15f))
+            }
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(5.dp),
+                color = accent.copy(alpha = 0.88f),
+                trackColor = Color.White.copy(alpha = 0.09f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatColumn(label: String, value: String, accent: Color, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = accent, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(value, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun SpaceFreedCard(dashboard: DashboardStats) {
+    val total = dashboard.pendingDeleteBytes.coerceAtLeast(0L)
+    val photoWeight = if (total == 0L) 0f else (dashboard.photoPendingDeleteBytes.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(30.dp),
+        color = Color(0xFF121417).copy(alpha = 0.90f),
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.09f)),
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Rounded.Storage, contentDescription = null, tint = Color.White.copy(alpha = 0.42f))
+                Text("预计释放", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+            }
+            Text(formatSize(total), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
+            LinearProgressIndicator(
+                progress = { photoWeight.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(8.dp),
+                color = Color(0xFF86A7FF),
+                trackColor = Color.White.copy(alpha = 0.10f),
+            )
+            Text("照片待确认 " + (photoWeight * 100).toInt() + "%", style = MaterialTheme.typography.titleSmall, color = Color.White.copy(alpha = 0.58f))
+        }
+    }
+}
+
+@Composable
+private fun ProfileRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    accent: Color,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        color = Color(0xFF121417).copy(alpha = 0.90f),
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 18.dp, vertical = 17.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Surface(modifier = Modifier.size(46.dp), shape = CircleShape, color = accent.copy(alpha = 0.16f), contentColor = accent) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(23.dp))
                 }
             }
-        }
-        item {
-            GlassSurface(modifier = Modifier.fillMaxWidth().clickable(onClick = onAnnualReport), shape = RoundedCornerShape(28.dp), tonalAlpha = 0.66f) {
-                Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                    Surface(modifier = Modifier.size(58.dp), shape = CircleShape, color = personality.color.copy(alpha = 0.12f)) {
-                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Person, contentDescription = null, tint = personality.color) }
-                    }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text("你的整理性格", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(personality.title, style = MaterialTheme.typography.headlineSmall)
-                        Text(personality.description, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        LinearProgressIndicator(progress = { personality.progress }, modifier = Modifier.fillMaxWidth().height(6.dp), color = personality.color.copy(alpha = 0.70f), trackColor = MaterialTheme.colorScheme.surfaceVariant)
-                    }
-                    Surface(modifier = Modifier.size(96.dp), shape = RoundedCornerShape(22.dp), color = adaptiveSurfaceColor(0.42f), border = BorderStroke(1.dp, adaptiveBorderColor(0.48f))) {
-                        Box(contentAlignment = Alignment.Center) { Text((personality.progress * 100).toInt().toString() + "%", color = personality.color) }
-                    }
-                }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.54f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, tint = Color.White.copy(alpha = 0.42f))
         }
-        item {
-            GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), tonalAlpha = 0.72f) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("  媒体统计", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { viewModel.refreshLibrary() }) { Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.a11y_refresh)) }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                        MetricPill("总文件", (dashboard.photoCount + dashboard.videoCount).toString(), modifier = Modifier.weight(1f))
-                        MetricPill("已处理", (dashboard.progress * 100).toInt().toString() + "%", modifier = Modifier.weight(1f))
-                        MetricPill("已移出", dashboard.trashCount.toString(), modifier = Modifier.weight(1f))
-                    }
-                    StatLine(Icons.Rounded.Image, "照片", dashboard.processedPhotoCount.toString() + "/" + dashboard.photoCount.toString(), if (dashboard.photoCount == 0) 0f else dashboard.processedPhotoCount.toFloat() / dashboard.photoCount)
-                    StatLine(Icons.Rounded.Image, "视频", dashboard.processedVideoCount.toString() + "/" + dashboard.videoCount.toString(), if (dashboard.videoCount == 0) 0f else dashboard.processedVideoCount.toFloat() / dashboard.videoCount)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Dot(Color(0xFF5AAF68)); Text("收藏 " + dashboard.favoriteCount, style = MaterialTheme.typography.bodyMedium)
-                        Dot(Color(0xFF4CA3CF)); Text("保留 " + keptCount, style = MaterialTheme.typography.bodyMedium)
-                        Dot(Color(0xFFE45A5A)); Text("删除 " + dashboard.trashCount, style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Surface(modifier = Modifier.fillMaxWidth().height(66.dp).clickable(onClick = onAnnualReport), shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)) {
-                        Row(Modifier.padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Icon(Icons.Rounded.TipsAndUpdates, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Column(Modifier.weight(1f)) {
-                                Text("累计整理成果", style = MaterialTheme.typography.titleLarge)
-                                Text("累计清理 " + dashboard.processedCount + " · 释放 " + formatSize(dashboard.userStats?.totalStorageFreed ?: 0L), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null)
-                        }
-                    }
-                }
-            }
-        }
-        item { SectionTitleInline("常用功能") }
-        item {
-            GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), tonalAlpha = 0.66f) {
-                Row(Modifier.padding(vertical = 18.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    FunctionIcon("收藏", Icons.Rounded.FavoriteBorder, Color(0xFF54A76A), onFavorites)
-                    FunctionIcon("回收站", Icons.Rounded.Delete, Color(0xFFD85C5C), onTrash)
-                    FunctionIcon("相似", Icons.Rounded.Image, Color(0xFF7A6AA6), onSimilar)
-                    FunctionIcon("成就", Icons.Rounded.EmojiEvents, Color(0xFFE4B83A), onAchievements)
-                }
-            }
-        }
-        item { SectionTitleInline("服务与支持") }
-        item {
-            GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), tonalAlpha = 0.76f) {
-                Column {
-                    SupportRow("反馈与诊断", "进入诊断排障和媒体库维护", Icons.Rounded.Feedback, onDiagnosis)
-                    SupportRow("使用帮助", "与设置页使用帮助保持一致", Icons.Rounded.Help, onHelp)
-                    SupportRow("整理引导", "查看照片、视频手势和相册规则", Icons.Rounded.Refresh, onHelp)
-                    SupportRow("隐私政策", "本地存储、相册权限、删除移动说明", Icons.Rounded.PrivacyTip, onPrivacy)
-                    SupportRow("更新日志", "查看版本变化和修复记录", Icons.Rounded.TipsAndUpdates, onChangelog)
-                }
-            }
-        }
-    }
     }
 }
 
 @Composable
-private fun SectionTitleInline(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp))
-}
-
-@Composable
-private fun StatLine(icon: ImageVector, label: String, value: String, progress: Float) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(label, style = MaterialTheme.typography.titleMedium)
-        LinearProgressIndicator(progress = { progress }, modifier = Modifier.weight(1f).height(8.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.62f), trackColor = MaterialTheme.colorScheme.surfaceVariant)
-        Text(value, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-    }
-}
-
-@Composable
-private fun Dot(color: Color) {
-    Box(Modifier.size(8.dp).background(color, CircleShape))
-}
-
-@Composable
-private fun FunctionIcon(label: String, icon: ImageVector, color: Color, onClick: () -> Unit, badge: String? = null) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.clickable(onClick = onClick)) {
-        Box {
-            Surface(modifier = Modifier.size(62.dp), shape = CircleShape, color = color.copy(alpha = 0.14f)) {
-                Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = label, tint = color, modifier = Modifier.size(28.dp)) }
-            }
-            if (badge != null) {
-                Box(Modifier.align(Alignment.TopEnd).background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                    Text(badge, style = MaterialTheme.typography.labelSmall, color = Color.White)
-                }
-            }
+private fun RoundIconSurface(icon: ImageVector, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.size(52.dp),
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.13f),
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
         }
-        Text(label, style = MaterialTheme.typography.titleMedium)
     }
-}
-
-@Composable
-private fun SupportRow(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        Surface(modifier = Modifier.size(42.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)) {
-            Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-        }
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-
-private data class PersonalityUi(
-    val title: String,
-    val description: String,
-    val progress: Float,
-    val color: Color,
-)
-
-private fun buildPersonality(dashboard: com.futureape.kanleme.data.repository.DashboardStats): PersonalityUi {
-    val processed = dashboard.processedCount.coerceAtLeast(0)
-    if (processed < 5) {
-        return PersonalityUi(
-            title = "正在形成中",
-            description = "再整理 " + (5 - processed).coerceAtLeast(0) + " 个媒体后，会根据真实操作生成画像。",
-            progress = (processed / 5f).coerceIn(0f, 1f),
-            color = Color(0xFF7CC6F2),
-        )
-    }
-    val favoriteRatio = dashboard.favoriteCount.toFloat() / processed.coerceAtLeast(1).toFloat()
-    val deleteRatio = dashboard.pendingDeleteCount.toFloat() / processed.coerceAtLeast(1).toFloat()
-    val videoRatio = dashboard.processedVideoCount.toFloat() / processed.coerceAtLeast(1).toFloat()
-    val undoRatio = (dashboard.userStats?.totalUndoCount ?: 0).toFloat() / processed.coerceAtLeast(1).toFloat()
-    return when {
-        undoRatio > 0.12f -> PersonalityUi("谨慎校准型", "你会反复确认结果，撤销和回看比例更高，适合保守清理模式。", processedForUi(processed), Color(0xFF7A6AA6))
-        deleteRatio > 0.45f -> PersonalityUi("果断断舍离型", "你更愿意清出空间，待删比例明显高于收藏比例。", processedForUi(processed), Color(0xFFE66A6A))
-        favoriteRatio > 0.35f -> PersonalityUi("珍藏策展型", "你更常把照片留下来收藏，整理方式偏向筛选记忆。", processedForUi(processed), Color(0xFFE6A63E))
-        videoRatio > 0.38f -> PersonalityUi("影像流整理型", "你处理的视频占比较高，更适合短视频式连续整理。", processedForUi(processed), Color(0xFF68A7D8))
-        else -> PersonalityUi("稳健平衡型", "你的保留、收藏、待删比较均衡，适合持续小批量整理。", processedForUi(processed), Color(0xFF5AAF68))
-    }
-}
-
-private fun processedForUi(value: Int): Float = (value / 100f).coerceIn(0.08f, 1f)
-
-
-@Composable
-private fun adaptiveSurfaceColor(lightAlpha: Float): Color {
-    val oledDark = MaterialTheme.colorScheme.background.luminance() < 0.03f
-    return if (oledDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f) else Color.White.copy(alpha = lightAlpha)
-}
-
-@Composable
-private fun adaptiveBorderColor(lightAlpha: Float): Color {
-    val oledDark = MaterialTheme.colorScheme.background.luminance() < 0.03f
-    return if (oledDark) MaterialTheme.colorScheme.outline.copy(alpha = 0.58f) else Color.White.copy(alpha = lightAlpha)
 }

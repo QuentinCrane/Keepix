@@ -3,8 +3,15 @@ package com.futureape.kanleme.ui.screens
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalDensity
@@ -17,10 +24,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,41 +49,56 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Swipe
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
+import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.EmptyState
@@ -81,12 +108,21 @@ import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import com.futureape.kanleme.ui.i18n.Text
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
+import kotlinx.coroutines.launch
 
 @Composable
 fun PhotoCleanScreen(
     viewModel: KanlemeViewModel,
     onBack: () -> Unit,
     onOpenPhoto: (PhotoEntity) -> Unit,
+    onBatchFinished: () -> Unit,
 ) {
     val deck by viewModel.photoDeck.collectAsStateWithLifecycle()
     val deckPreparing by viewModel.photoDeckPreparing.collectAsStateWithLifecycle()
@@ -100,11 +136,15 @@ fun PhotoCleanScreen(
     val undoAnimation by viewModel.photoUndoAnimation.collectAsStateWithLifecycle()
     val haptics = rememberHapticKit(settings)
     val context = LocalContext.current
+    val chromeVisible = !settings.photoFocusMode
     var showGuide by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showFolderPicker by remember { mutableStateOf(false) }
+    var showDayMemory by remember { mutableStateOf(false) }
     var photoSwipeFeedback by remember { mutableStateOf(PhotoSwipeFeedback()) }
     var guideTargets by remember { mutableStateOf<Map<PhotoGuideTarget, Rect>>(emptyMap()) }
+    var batchFinishing by remember { mutableStateOf(false) }
+    var batchHasDelete by remember { mutableStateOf(false) }
 
     fun leaveCleaning() {
         viewModel.resetPhotoSessionDateMode()
@@ -113,6 +153,14 @@ fun PhotoCleanScreen(
     }
 
     BackHandler(onBack = ::leaveCleaning)
+
+    LaunchedEffect(batchFinishing) {
+        if (!batchFinishing) return@LaunchedEffect
+        kotlinx.coroutines.delay(650)
+        viewModel.resetPhotoSessionDateMode()
+        viewModel.finishPhotoCleaningSession()
+        if (batchHasDelete) onBatchFinished() else onBack()
+    }
 
     fun updateGuideTarget(target: PhotoGuideTarget, rect: Rect) {
         guideTargets = guideTargets + (target to rect)
@@ -128,7 +176,7 @@ fun PhotoCleanScreen(
         if (deck.isEmpty() && !deckPreparing && dashboard.processedPhotoCount < dashboard.photoCount) viewModel.loadPhotoDeck(scope)
     }
     LaunchedEffect(deck, settings.photoGuideShown) {
-        if (deck.isNotEmpty() && !settings.photoGuideShown) showGuide = true
+        showGuide = false
         deck.take(3).forEach { photo ->
             context.imageLoader.enqueue(
                 ImageRequest.Builder(context)
@@ -140,24 +188,72 @@ fun PhotoCleanScreen(
         }
     }
 
+    if (deck.isEmpty() && deckPreparing) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) Color.Black else MaterialTheme.colorScheme.background)
+                .statusBarsPadding()
+                .padding(18.dp),
+        ) {
+            if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
+                KeepixRoundButton(
+                    icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.a11y_back),
+                    onClick = ::leaveCleaning,
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
+            }
+        }
+        return
+    }
+
     if (deck.isEmpty()) {
-        Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-            ScreenHeader("照片整理", "连续整理模式，不按固定轮次停止", ::leaveCleaning)
-            Box(Modifier.fillMaxSize().padding(18.dp), contentAlignment = Alignment.Center) {
-                if (deckPreparing) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        CircularProgressIndicator()
-                        Text("正在准备整理队列", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text("会直接进入当前随机 / 最新顺序，不再先闪出暂无队列", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                } else {
-                    EmptyState(
-                        title = "当前筛选下暂无待整理照片",
-                        message = "连续整理不会按轮次停止；这里为空通常表示当前筛选、排除文件夹或相册权限下已经没有可整理内容。",
-                        actionText = "重新读取队列",
-                        onAction = { haptics.success(); if (dashboard.photoCount == 0) viewModel.refreshLibrary() else viewModel.loadPhotoDeck(scope) },
+        // New Keepix empty state uses the immersive controls from ImmersivePhotoCleanScreen.kt.
+        if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .statusBarsPadding()
+                    .padding(18.dp),
+            ) {
+                KeepixRoundButton(
+                    icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.a11y_back),
+                    onClick = ::leaveCleaning,
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
+                Column(
+                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        "当前没有待整理照片",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "可以回到首页调整整理范围",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.58f),
+                        textAlign = TextAlign.Center,
                     )
                 }
+            }
+            return
+        }
+        Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
+            ScreenHeader("照片整理", "按每组数量完成一轮整理", ::leaveCleaning)
+            Box(Modifier.fillMaxSize().padding(18.dp), contentAlignment = Alignment.Center) {
+                EmptyState(
+                    title = "当前筛选下暂无待整理照片",
+                    message = "这里为空通常表示当前筛选、排除文件夹或相册权限下已经没有可整理内容。",
+                    actionText = "重新读取队列",
+                    onAction = { haptics.success(); if (dashboard.photoCount == 0) viewModel.refreshLibrary() else viewModel.loadPhotoDeck(scope) },
+                )
             }
         }
         return
@@ -168,15 +264,111 @@ fun PhotoCleanScreen(
     val dimAlpha by animateFloatAsState(targetValue = if (showGuide) 0.46f else 0f, label = "guide_dim")
 
     fun perform(photo: PhotoEntity, action: SwipeAction, exitTargetX: Float, exitTargetY: Float) {
+        if (batchFinishing) return
         when (action) {
             SwipeAction.Keep -> haptics.keep()
             SwipeAction.Delete -> haptics.delete()
             SwipeAction.Favorite -> haptics.favorite()
         }
+        val nextHasDelete = batchHasDelete || action == SwipeAction.Delete
+        batchHasDelete = nextHasDelete
         viewModel.onPhotoAction(photo, action, exitTargetX, exitTargetY)
+        val nextActionCount = sessionActionCount + 1
+        if (nextActionCount >= settings.photoBatchSize.coerceIn(1, 100)) {
+            batchFinishing = true
+        }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    val progressPercent = if (dashboard.photoCount > 0) {
+        ((dashboard.processedPhotoCount * 100f) / dashboard.photoCount).toInt().coerceIn(0, 100)
+    } else {
+        0
+    }
+
+    // New Keepix visual path lives in ImmersivePhotoCleanScreen.kt.
+    if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .detectScreenPinchToMemory(currentPhoto.id, showDayMemory) {
+                    haptics.threshold()
+                    showDayMemory = true
+                },
+        ) {
+            ImmersivePhotoCleanContent(
+                photos = deck.take(3),
+                currentPhoto = currentPhoto,
+                settings = settings,
+                haptics = haptics,
+                progressPercent = progressPercent,
+                remaining = remainingPhotos,
+                sessionActionCount = sessionActionCount,
+                undoAnimation = undoAnimation,
+                onBack = ::leaveCleaning,
+                onOpenPhoto = { photo -> haptics.tick(); onOpenPhoto(photo) },
+                onSwipeFeedbackChanged = { photoSwipeFeedback = it },
+                photoSwipeFeedback = photoSwipeFeedback,
+                onOpenDayMemory = {
+                    showDayMemory = true
+                },
+                onTopCardPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.PhotoCard, rect) },
+                onUndoAnimationConsumed = { sequence -> viewModel.clearPhotoUndoAnimation(sequence) },
+                onAction = { photo, action, _, _, targetX, targetY -> perform(photo, action, targetX, targetY) },
+                onFavorite = { perform(currentPhoto, SwipeAction.Favorite, 0f, 560f) },
+                onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
+                onToggleFocus = { haptics.tick(); viewModel.setPhotoFocusMode(!settings.photoFocusMode) },
+                onDateClick = { haptics.tick(); showDatePicker = true },
+                onFolderClick = { haptics.tick(); showFolderPicker = true },
+            )
+            if (dimAlpha > 0.01f) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dimAlpha)))
+            }
+            androidx.compose.animation.AnimatedVisibility(visible = showGuide, modifier = Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    PhotoGuideDialog(onDismiss = { haptics.tick(); showGuide = false; viewModel.markPhotoGuideShown() })
+                }
+            }
+            OrganizerDatePickerAnimatedOverlay(
+                visible = showDatePicker,
+                title = "照片时间筛选",
+                currentMode = scope.dateMode,
+                onApply = { mode -> haptics.tick(); viewModel.setPhotoSessionDateMode(mode) },
+                onDismiss = { showDatePicker = false },
+            )
+            OrganizerFolderPickerOverlay(
+                visible = showFolderPicker,
+                title = "归档当前照片",
+                folders = folders.ifEmpty { listOf("DCIM/Camera/", "Pictures/", "Download/") },
+                onArchive = { path -> haptics.keep(); viewModel.archivePhotoToFolder(currentPhoto, path) },
+                onDismiss = { showFolderPicker = false },
+            )
+            KeepixDayMemoryOverlay(
+                visible = showDayMemory,
+                currentPhoto = currentPhoto,
+                photos = deck,
+                onDismiss = { showDayMemory = false },
+                onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
+                onDelete = { photo -> perform(photo, SwipeAction.Delete, 0f, -620f) },
+                onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
+                onApply = { mode ->
+                    haptics.threshold()
+                    viewModel.setPhotoSessionDateMode(mode)
+                    showDayMemory = false
+                },
+            )
+        }
+        return
+    }
+
+    // Legacy Liquid Glass photo cleaning path. Keep old visual code here only.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .detectScreenPinchToMemory(currentPhoto.id, showDayMemory) {
+                haptics.threshold()
+                showDayMemory = true
+            },
+    ) {
         Crossfade(
             targetState = currentPhoto.uri,
             animationSpec = tween(durationMillis = 560),
@@ -203,17 +395,13 @@ fun PhotoCleanScreen(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color.Black.copy(alpha = 0.32f),
-                            Color.Black.copy(alpha = 0.18f),
-                            Color.Black.copy(alpha = 0.38f),
+                            Color.Black.copy(alpha = if (chromeVisible) 0.24f else 0.10f),
+                            Color.Black.copy(alpha = if (chromeVisible) 0.10f else 0.04f),
+                            Color.Black.copy(alpha = if (chromeVisible) 0.30f else 0.12f),
                         )
                     )
                 )
         )
-        if (settings.photoShowGestureHint) {
-            PhotoEdgeGlow(feedback = photoSwipeFeedback)
-        }
-
         AdaptiveWidthInfo { _, isExpanded ->
             Box(
                 modifier = Modifier
@@ -243,7 +431,7 @@ fun PhotoCleanScreen(
                     onAction = { photo, action, _, _, targetX, targetY -> perform(photo, action, targetX, targetY) },
                 )
 
-                if (settings.photoShowInfoBar || settings.photoShowFolderChips) {
+                if (chromeVisible && (settings.photoShowInfoBar || settings.photoShowFolderChips)) {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier
@@ -271,10 +459,10 @@ fun PhotoCleanScreen(
                 }
             }
         }
-        if (settings.photoShowTopBar || settings.photoShowShuffleButton || settings.photoShowFilterChips) {
+        if (chromeVisible && (settings.photoShowTopBar || settings.photoShowShuffleButton || settings.photoShowFilterChips)) {
             PhotoOrganizerTopControls(
                 remainingCount = remainingPhotos,
-                progressPercent = if (dashboard.photoCount > 0) ((dashboard.processedPhotoCount * 100f) / dashboard.photoCount).toInt().coerceIn(0, 100) else 0,
+                progressPercent = progressPercent,
                 deletedSizeBytes = dashboard.pendingDeleteBytes,
                 mediaCounts = listOf(
                     "全部" to typeStats.all.toString(),
@@ -308,8 +496,18 @@ fun PhotoCleanScreen(
                     },
             )
         }
-        if (settings.photoShowGestureHint) {
-            PhotoFloatingActionHint(feedback = photoSwipeFeedback)
+        PhotoChromeControl(
+            focusMode = settings.photoFocusMode,
+            actionCount = sessionActionCount,
+            onToggle = { haptics.tick(); viewModel.setPhotoFocusMode(!settings.photoFocusMode) },
+            onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 64.dp, end = 18.dp),
+        )
+        if (chromeVisible && settings.photoShowGestureHint) {
+            PhotoEdgeGlow(feedback = photoSwipeFeedback)
         }
 
         if (dimAlpha > 0.01f) {
@@ -327,13 +525,66 @@ fun PhotoCleanScreen(
             onApply = { mode -> haptics.tick(); viewModel.setPhotoSessionDateMode(mode) },
             onDismiss = { showDatePicker = false },
         )
-        if (showFolderPicker) {
-            OrganizerFolderPickerOverlay(
-                title = "归档当前照片",
-                folders = folders.ifEmpty { listOf("DCIM/Camera/", "Pictures/", "Download/") },
-                onArchive = { path -> haptics.keep(); viewModel.archivePhotoToFolder(currentPhoto, path) },
-                onDismiss = { showFolderPicker = false },
-            )
+        OrganizerFolderPickerOverlay(
+            visible = showFolderPicker,
+            title = "归档当前照片",
+            folders = folders.ifEmpty { listOf("DCIM/Camera/", "Pictures/", "Download/") },
+            onArchive = { path -> haptics.keep(); viewModel.archivePhotoToFolder(currentPhoto, path) },
+            onDismiss = { showFolderPicker = false },
+        )
+        KeepixDayMemoryOverlay(
+            visible = showDayMemory,
+            currentPhoto = currentPhoto,
+            photos = deck,
+            onDismiss = { showDayMemory = false },
+            onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
+            onDelete = { photo -> perform(photo, SwipeAction.Delete, 0f, -620f) },
+            onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
+            onApply = { mode ->
+                haptics.threshold()
+                viewModel.setPhotoSessionDateMode(mode)
+                showDayMemory = false
+            },
+        )
+    }
+}
+
+
+private fun Modifier.detectScreenPinchToMemory(
+    key: Any,
+    disabled: Boolean,
+    onPinchIn: () -> Unit,
+): Modifier = if (disabled) {
+    this
+} else {
+    pointerInput(key) {
+        awaitEachGesture {
+            var initialDistance = 0f
+            var previousDistance = 0f
+            var cumulativeScale = 1f
+            val slop = viewConfiguration.touchSlop
+            while (true) {
+                val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                val pressed = event.changes.filter { it.pressed }
+                if (pressed.size < 2) break
+                val a = pressed[0].position
+                val b = pressed[1].position
+                val dx = a.x - b.x
+                val dy = a.y - b.y
+                val distance = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+                if (initialDistance <= 0f && distance > slop) {
+                    initialDistance = distance
+                    previousDistance = distance
+                } else if (previousDistance > 0f) {
+                    cumulativeScale *= distance / previousDistance.coerceAtLeast(1f)
+                    previousDistance = distance
+                }
+                if (initialDistance > 0f && (distance / initialDistance < 0.97f || cumulativeScale < 0.97f || initialDistance - distance > slop * 0.20f)) {
+                    pressed.forEach { it.consume() }
+                    onPinchIn()
+                    break
+                }
+            }
         }
     }
 }
@@ -577,14 +828,14 @@ private fun CompactControlPill(
     selected: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val background = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)
-    val content = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val background = if (selected) Color.White.copy(alpha = 0.26f) else Color.Black.copy(alpha = 0.24f)
+    val content = Color.White
     Surface(
         modifier = Modifier.height(42.dp).clickable(onClick = onClick),
         shape = RoundedCornerShape(999.dp),
         color = background,
         contentColor = content,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (selected) 0.10f else 0.18f)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = if (selected) 0.32f else 0.16f)),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 13.dp),
@@ -594,7 +845,7 @@ private fun CompactControlPill(
             Icon(icon, contentDescription = null, modifier = Modifier.size(17.dp), tint = content)
             Column(verticalArrangement = Arrangement.Center) {
                 Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = content.copy(alpha = 0.72f), maxLines = 1)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = content.copy(alpha = 0.68f), maxLines = 1)
             }
         }
     }
@@ -622,6 +873,56 @@ private fun RemainingCountPill(remainingCount: Int) {
 }
 
 @Composable
+private fun PhotoChromeControl(
+    focusMode: Boolean,
+    actionCount: Int,
+    onToggle: () -> Unit,
+    onUndo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (focusMode && actionCount > 0) {
+            Surface(
+                modifier = Modifier.size(46.dp).clickable(onClick = onUndo),
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.28f),
+                contentColor = Color.White,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = stringResource(R.string.a11y_back_to_previous_photo), modifier = Modifier.size(19.dp))
+                }
+            }
+        }
+        Surface(
+            modifier = Modifier.height(46.dp).clickable(onClick = onToggle),
+            shape = RoundedCornerShape(999.dp),
+            color = Color.Black.copy(alpha = 0.28f),
+            contentColor = Color.White,
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Icon(
+                    if (focusMode) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = Color.White.copy(alpha = 0.86f),
+                )
+                Text(if (focusMode) "显示控件" else "隐藏控件", style = MaterialTheme.typography.labelLarge, color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
 private fun CompactPhotoInfoBar(
     remaining: Int,
     photo: PhotoEntity,
@@ -644,9 +945,9 @@ private fun CompactPhotoInfoBar(
         Surface(
             modifier = Modifier.size(62.dp),
             shape = CircleShape,
-            color = actionColor.copy(alpha = 0.20f),
+            color = Color.Black.copy(alpha = 0.28f),
             contentColor = Color.White,
-            border = BorderStroke(1.5.dp, actionColor.copy(alpha = 0.72f)),
+            border = BorderStroke(1.dp, actionColor.copy(alpha = 0.42f)),
             onClick = onUndo,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -658,8 +959,9 @@ private fun CompactPhotoInfoBar(
             Surface(
                 modifier = Modifier.weight(1f).height(66.dp).clickable(onClick = onOpen),
                 shape = RoundedCornerShape(26.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.66f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+                color = Color.Black.copy(alpha = 0.30f),
+                contentColor = Color.White,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
             ) {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.Center) {
                     Text(
@@ -672,7 +974,7 @@ private fun CompactPhotoInfoBar(
                     Text(
                         photo.folderName + " · " + photoMediaKindLabel(photo) + " · " + formatSize(photo.size) + " · 点按查看大图",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color.White.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -688,9 +990,9 @@ private fun CompactPhotoInfoBar(
                     .onGloballyPositioned { coordinates -> onAlbumPositioned(coordinates.boundsInRoot()) }
                     .clickable(onClick = onAlbumClick),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                contentColor = MaterialTheme.colorScheme.primary,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)),
+                color = Color.Black.copy(alpha = 0.28f),
+                contentColor = Color.White,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Rounded.Folder, contentDescription = stringResource(R.string.a11y_choose_album, selectedAlbum), modifier = Modifier.size(20.dp))
@@ -702,17 +1004,17 @@ private fun CompactPhotoInfoBar(
 }
 
 private fun photoGestureColor(action: SwipeAction): Color = when (action) {
-    SwipeAction.Keep -> Color(0xFF4A9CF6)
-    SwipeAction.Favorite -> Color(0xFF58B96A)
-    SwipeAction.Delete -> Color(0xFFE74C4C)
+    SwipeAction.Keep -> Color(0xFF74A7FF)
+    SwipeAction.Favorite -> Color(0xFFE6A63E)
+    SwipeAction.Delete -> Color(0xFFFF4E4E)
 }
 
 @Composable
-private fun PhotoEdgeGlow(feedback: PhotoSwipeFeedback) {
+internal fun PhotoEdgeGlow(feedback: PhotoSwipeFeedback) {
     val action = feedback.action ?: return
     val activeColor = photoGestureColor(action)
     val edgeAlpha by animateFloatAsState(
-        targetValue = (0.18f + feedback.intensity * 0.82f).coerceIn(0f, 1f),
+        targetValue = (0.16f + feedback.intensity * 0.68f).coerceIn(0f, 1f),
         animationSpec = tween(100),
         label = "photo_edge_feedback",
     )
@@ -728,15 +1030,15 @@ private fun PhotoEdgeGlow(feedback: PhotoSwipeFeedback) {
                                 Brush.horizontalGradient(
                                     0.0f to Color.Transparent,
                                     0.48f to Color.Transparent,
-                                    0.72f to activeColor.copy(alpha = edgeAlpha * 0.10f),
-                                    0.90f to activeColor.copy(alpha = edgeAlpha * 0.30f),
-                                    1.0f to activeColor.copy(alpha = edgeAlpha * 0.72f),
+                                    0.72f to activeColor.copy(alpha = edgeAlpha * 0.06f),
+                                    0.90f to activeColor.copy(alpha = edgeAlpha * 0.18f),
+                                    1.0f to activeColor.copy(alpha = edgeAlpha * 0.46f),
                                 )
                             } else {
                                 Brush.horizontalGradient(
-                                    0.0f to activeColor.copy(alpha = edgeAlpha * 0.72f),
-                                    0.10f to activeColor.copy(alpha = edgeAlpha * 0.30f),
-                                    0.28f to activeColor.copy(alpha = edgeAlpha * 0.10f),
+                                    0.0f to activeColor.copy(alpha = edgeAlpha * 0.46f),
+                                    0.10f to activeColor.copy(alpha = edgeAlpha * 0.18f),
+                                    0.28f to activeColor.copy(alpha = edgeAlpha * 0.06f),
                                     0.52f to Color.Transparent,
                                     1.0f to Color.Transparent,
                                 )
@@ -749,8 +1051,8 @@ private fun PhotoEdgeGlow(feedback: PhotoSwipeFeedback) {
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0.0f to activeColor.copy(alpha = edgeAlpha * 0.68f),
-                            0.14f to activeColor.copy(alpha = edgeAlpha * 0.28f),
+                            0.0f to activeColor.copy(alpha = edgeAlpha * 0.42f),
+                            0.13f to activeColor.copy(alpha = edgeAlpha * 0.24f),
                             0.34f to activeColor.copy(alpha = edgeAlpha * 0.10f),
                             0.56f to Color.Transparent,
                             1.0f to Color.Transparent,
@@ -764,9 +1066,9 @@ private fun PhotoEdgeGlow(feedback: PhotoSwipeFeedback) {
                         Brush.verticalGradient(
                             0.0f to Color.Transparent,
                             0.44f to Color.Transparent,
-                            0.66f to activeColor.copy(alpha = edgeAlpha * 0.10f),
-                            0.86f to activeColor.copy(alpha = edgeAlpha * 0.28f),
-                            1.0f to activeColor.copy(alpha = edgeAlpha * 0.68f),
+                            0.64f to activeColor.copy(alpha = edgeAlpha * 0.10f),
+                            0.84f to activeColor.copy(alpha = edgeAlpha * 0.24f),
+                            1.0f to activeColor.copy(alpha = edgeAlpha * 0.46f),
                         )
                     ),
             )
@@ -780,7 +1082,7 @@ private fun BoxScope.PhotoFloatingActionHint(feedback: PhotoSwipeFeedback) {
     val color = photoGestureColor(action)
     val intensity = feedback.intensity.coerceIn(0f, 1f)
     val entrance = 2.dp + 130.dp * intensity
-    val alpha = (0.10f + intensity * 0.90f).coerceIn(0f, 1f)
+    val alpha = (0.08f + intensity * 0.78f).coerceIn(0f, 1f)
     val modifier = when (action) {
         SwipeAction.Keep -> {
             if (feedback.offsetX >= 0f) {
@@ -813,16 +1115,17 @@ private fun BoxScope.PhotoFloatingActionHint(feedback: PhotoSwipeFeedback) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Surface(
-            modifier = Modifier.size(70.dp),
+            modifier = Modifier.size(58.dp),
             shape = CircleShape,
-            color = color,
+            color = color.copy(alpha = 0.88f),
             contentColor = Color.White,
-            shadowElevation = 8.dp,
+            shadowElevation = 4.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text(arrow, style = MaterialTheme.typography.displaySmall, color = Color.White, fontWeight = FontWeight.Black)
+                Text(arrow, style = MaterialTheme.typography.headlineLarge, color = Color.White, fontWeight = FontWeight.Black)
             }
         }
-        Text(label, style = MaterialTheme.typography.titleLarge, color = color, fontWeight = FontWeight.Black)
+        Text(label, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Black)
     }
 }
+
