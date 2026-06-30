@@ -69,6 +69,7 @@ private data class PhotoSessionAction(
     val exitTargetX: Float,
     val exitTargetY: Float,
     val undoPersistedAction: suspend (Long) -> Unit,
+    val affectsDeck: Boolean = true,
 )
 
 @HiltViewModel
@@ -270,8 +271,9 @@ class KanlemeViewModel @Inject constructor(
         exitTargetX: Float,
         exitTargetY: Float,
         undoPersistedAction: suspend (Long) -> Unit = { id -> repository.undoOperation(id) },
+        affectsDeck: Boolean = true,
     ) {
-        photoSessionActions.addLast(PhotoSessionAction(photo, action, operationId, exitTargetX, exitTargetY, undoPersistedAction))
+        photoSessionActions.addLast(PhotoSessionAction(photo, action, operationId, exitTargetX, exitTargetY, undoPersistedAction, affectsDeck))
     }
 
     private fun clearPhotoActionHistory() {
@@ -291,6 +293,9 @@ class KanlemeViewModel @Inject constructor(
             if (index != dropIndex) photoSessionActions.addLast(action)
         }
     }
+
+    private fun hasPhotoSessionAction(operationId: Deferred<Long>): Boolean =
+        photoSessionActions.any { it.operationId === operationId }
 
     private fun applyOptimisticPhotoAction(photo: PhotoEntity, action: SwipeAction): Boolean {
         if (photo.mediaStoreId in pendingPhotoActionMediaIds || photo.mediaStoreId in handledPhotoActionMediaIds) return false
@@ -319,6 +324,11 @@ class KanlemeViewModel @Inject constructor(
 
     private fun restorePhotoSessionAction(snapshot: PhotoSessionAction) {
         val photo = snapshot.photo
+        if (!snapshot.affectsDeck) {
+            _lastPhotoAction.value = snapshot.action
+            _message.value = uiText(R.string.message_photo_back_success)
+            return
+        }
         pendingPhotoActionMediaIds -= photo.mediaStoreId
         handledPhotoActionMediaIds -= photo.mediaStoreId
         invalidatePhotoDeckLoads()
@@ -687,9 +697,23 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun markPhotoForTrashOutsideCleaning(photo: PhotoEntity) = viewModelScope.launch {
-        runCatching { repository.handlePhotoAction(photo, SwipeAction.Delete) }
-            .onSuccess { _message.value = dynamicUiText("已加入待删区") }
-            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
+        val operationId = viewModelScope.async { repository.handlePhotoAction(photo, SwipeAction.Delete) }
+        rememberPhotoSessionAction(
+            photo = photo,
+            action = SwipeAction.Delete,
+            operationId = operationId,
+            exitTargetX = 0f,
+            exitTargetY = -920f,
+            affectsDeck = false,
+        )
+        runCatching { operationId.await() }
+            .onSuccess {
+                if (hasPhotoSessionAction(operationId)) _message.value = dynamicUiText("已加入待删区")
+            }
+            .onFailure {
+                dropLastPhotoSessionAction(photo.mediaStoreId)
+                _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed)
+            }
     }
 
     fun onPhotoActionWithOptionalMove(
@@ -723,7 +747,7 @@ class KanlemeViewModel @Inject constructor(
 
     fun markVideoPendingKeep(video: VideoEntity) {
         if (video.processingStatus != com.futureape.kanleme.data.local.ProcessingStatus.UNPROCESSED) return
-        if (video.mediaStoreId !in _videoDeck.value.map { it.mediaStoreId }) return
+        if (_videoDeck.value.none { it.mediaStoreId == video.mediaStoreId }) return
         val pending = _pendingVideoKeeps.value
         if (video.mediaStoreId in pending) return
         _pendingVideoKeeps.value = pending + (video.mediaStoreId to video)

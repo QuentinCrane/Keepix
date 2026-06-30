@@ -502,12 +502,16 @@ class AppRepositoryImpl @Inject constructor(
         }
 
     private suspend fun restoreTrashItemLocally(item: TrashItemEntity) {
+        val deleteOperation = operationDao.lastByMediaAndAction(item.mediaId, item.mediaType, SwipeAction.Delete.name)
+        val processingStatus = deleteOperation?.previousProcessingStatus ?: ProcessingStatus.UNPROCESSED
+        val deletionStatus = deleteOperation?.previousDeletionStatus ?: DeletionStatus.NONE
         if (item.mediaType == "photo") {
-            photoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
+            photoDao.restoreStatus(item.mediaId, processingStatus, deletionStatus)
         } else {
-            videoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
+            videoDao.restoreStatus(item.mediaId, processingStatus, deletionStatus)
         }
         trashDao.deleteById(item.id)
+        if (deleteOperation != null) operationDao.markUndone(deleteOperation.id)
     }
 
     private suspend fun markTrashItemDeletedLocally(item: TrashItemEntity) {

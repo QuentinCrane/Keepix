@@ -274,6 +274,9 @@ interface OperationDao {
     @Query("SELECT * FROM operation_history WHERE id = :id AND is_undone = 0 LIMIT 1")
     suspend fun undoableById(id: Long): OperationHistoryEntity?
 
+    @Query("SELECT * FROM operation_history WHERE media_id = :mediaId AND media_type = :mediaType AND action = :action ORDER BY created_at DESC LIMIT 1")
+    suspend fun lastByMediaAndAction(mediaId: Long, mediaType: String, action: String): OperationHistoryEntity?
+
     @Query("UPDATE operation_history SET is_undone = 1 WHERE id = :id")
     suspend fun markUndone(id: Long)
 }

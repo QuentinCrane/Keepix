@@ -22,9 +22,11 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -36,9 +38,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.Delete
@@ -210,20 +216,16 @@ private fun FavoriteMediaSelector(
 
 @Composable
 private fun FavoriteVideoGrid(videos: List<VideoEntity>, modifier: Modifier = Modifier) {
-    Column(
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
         modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 18.dp),
+            .fillMaxWidth(),
+        contentPadding = PaddingValues(bottom = 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        videos.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                row.forEach { video ->
-                    FavoriteVideoTile(video, Modifier.weight(1f))
-                }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
-            }
+        gridItems(videos, key = { it.mediaStoreId }) { video ->
+            FavoriteVideoTile(video, Modifier.fillMaxWidth())
         }
     }
 }
@@ -348,6 +350,7 @@ private fun FavoriteColumnSelector(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FavoritePhotoMasonryGrid(
     photos: List<PhotoEntity>,
@@ -355,27 +358,19 @@ private fun FavoritePhotoMasonryGrid(
     modifier: Modifier = Modifier,
     onPhotoClick: (PhotoEntity) -> Unit,
 ) {
-    val columns = remember(photos, columnCount) { distributeFavoritePhotos(photos, columnCount) }
-    val scrollState = rememberScrollState()
-    Row(
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Fixed(columnCount.coerceIn(2, 3)),
         modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState)
-            .padding(bottom = 18.dp),
+            .fillMaxWidth(),
+        contentPadding = PaddingValues(bottom = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalItemSpacing = 10.dp,
     ) {
-        columns.forEach { columnPhotos ->
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                columnPhotos.forEach { photo ->
-                    FavoritePhotoTile(
-                        photo = photo,
-                        onClick = { onPhotoClick(photo) },
-                    )
-                }
-            }
+        staggeredItems(photos, key = { it.mediaStoreId }) { photo ->
+            FavoritePhotoTile(
+                photo = photo,
+                onClick = { onPhotoClick(photo) },
+            )
         }
     }
 }
@@ -410,18 +405,6 @@ private fun FavoritePhotoTile(
             contentScale = ContentScale.Fit,
         )
     }
-}
-
-private fun distributeFavoritePhotos(photos: List<PhotoEntity>, requestedColumnCount: Int): List<List<PhotoEntity>> {
-    val columnCount = requestedColumnCount.coerceIn(2, 3)
-    val columns = List(columnCount) { mutableListOf<PhotoEntity>() }
-    val estimatedHeights = FloatArray(columnCount)
-    photos.forEach { photo ->
-        val targetIndex = estimatedHeights.indices.minByOrNull { estimatedHeights[it] } ?: 0
-        columns[targetIndex].add(photo)
-        estimatedHeights[targetIndex] += 1f / favoriteOriginalAspectRatio(photo)
-    }
-    return columns.map { it.toList() }
 }
 
 private fun favoriteOriginalAspectRatio(photo: PhotoEntity): Float {

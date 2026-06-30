@@ -271,7 +271,7 @@ fun VideoCleanScreen(
                         video = video,
                         settings = settings,
                         haptics = haptics,
-                        shouldPrepare = abs(page - activeVideoPage) <= 1,
+                        shouldPrepare = page == activeVideoPage,
                         isCurrent = page == activeVideoPage,
                         pageIndex = (dashboard.processedVideoCount + page + 1).coerceAtLeast(1),
                         total = dashboard.videoCount.coerceAtLeast(videos.size),
