@@ -7,6 +7,18 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -49,6 +61,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -126,34 +139,56 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                     selectedMediaType = selectedMediaType,
                     onTypeSelected = { selectedMediaType = it; previewItem = null },
                 )
-                if (visibleTrashItems.isEmpty()) {
-                    EmptyState(
-                        title = if (selectedMediaType == "video") "视频回收站为空" else "照片回收站为空",
-                        message = if (selectedMediaType == "video") "待删视频会单独显示在这里，不会和照片混在一起。" else "待删照片会单独显示在这里，不会和视频混在一起。",
-                        actionText = "切换类别",
-                        onAction = { selectedMediaType = if (selectedMediaType == "video") "photo" else "video" },
-                        modifier = Modifier.padding(18.dp),
-                    )
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(104.dp),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 104.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(visibleTrashItems, key = { it.id }) { item ->
-                            TrashGridTile(
-                                item = item,
-                                onPreview = { previewItem = item },
-                            )
+                AnimatedContent(
+                    targetState = selectedMediaType,
+                    modifier = Modifier.weight(1f),
+                    transitionSpec = {
+                        val forward = targetState == "video"
+                        (
+                            fadeIn(tween(150, easing = FastOutSlowInEasing)) +
+                                slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { if (forward) it / 4 else -it / 4 }
+                            ).togetherWith(
+                            fadeOut(tween(120, easing = FastOutSlowInEasing)) +
+                                slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { if (forward) -it / 5 else it / 5 }
+                        )
+                    },
+                    label = "trash_media_type",
+                ) { type ->
+                    val typedItems = if (type == "video") videoTrashItems else photoTrashItems
+                    if (typedItems.isEmpty()) {
+                        EmptyState(
+                            title = if (type == "video") "视频回收站为空" else "照片回收站为空",
+                            message = if (type == "video") "待删视频会单独显示在这里，不会和照片混在一起。" else "待删照片会单独显示在这里，不会和视频混在一起。",
+                            actionText = "切换类别",
+                            onAction = { selectedMediaType = if (type == "video") "photo" else "video" },
+                            modifier = Modifier.fillMaxSize().padding(18.dp),
+                        )
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(104.dp),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 104.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(typedItems, key = { it.id }) { item ->
+                                TrashGridTile(
+                                    item = item,
+                                    onPreview = { previewItem = item },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        if (visibleTrashItems.isNotEmpty()) {
+        AnimatedVisibility(
+            visible = visibleTrashItems.isNotEmpty(),
+            enter = fadeIn(tween(160, easing = FastOutSlowInEasing)) + slideInVertically(tween(240, easing = FastOutSlowInEasing)) { it / 3 },
+            exit = fadeOut(tween(130, easing = FastOutSlowInEasing)) + slideOutVertically(tween(180, easing = FastOutSlowInEasing)) { it / 3 },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
             TrashBottomBar(
                 items = visibleTrashItems,
                 onRestoreAll = { visibleTrashItems.forEach { viewModel.restoreTrash(it.id) } },
@@ -161,7 +196,6 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                     val targets = visibleTrashItems
                     requestSystemDeleteAuthorization(targets) { viewModel.confirmTrashDeleted(targets.map { it.id }) }
                 },
-                modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
 
@@ -232,6 +266,7 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(0.76f)
+            .trashTileEnter(item.id)
             .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onPreview),
     ) {
@@ -261,6 +296,27 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit) {
                 .padding(4.dp)
                 .size(16.dp),
         )
+    }
+}
+
+@Composable
+private fun Modifier.trashTileEnter(key: Any): Modifier {
+    var entered by remember(key) { mutableStateOf(false) }
+    LaunchedEffect(key) { entered = true }
+    val alpha by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(210, easing = FastOutSlowInEasing),
+        label = "trash_tile_alpha",
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (entered) 1f else 0.96f,
+        animationSpec = tween(250, easing = FastOutSlowInEasing),
+        label = "trash_tile_scale",
+    )
+    return this.graphicsLayer {
+        this.alpha = alpha
+        scaleX = scale
+        scaleY = scale
     }
 }
 

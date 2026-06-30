@@ -10,7 +10,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -105,7 +104,6 @@ fun PhotoViewerScreen(
     val cleaningDeck by viewModel.photoDeck.collectAsStateWithLifecycle()
     val folders by viewModel.photoFolders.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val uiScope = rememberCoroutineScope()
     var showMoveSheet by remember { mutableStateOf(false) }
     var showExifSheet by remember { mutableStateOf(false) }
 
@@ -191,11 +189,6 @@ fun PhotoViewerScreen(
                     .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                ViewerThumbnailRail(
-                    photos = photos,
-                    currentPage = pagerState.currentPage,
-                    onSelected = { index -> uiScope.launch { pagerState.animateScrollToPage(index) } },
-                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.Top,
@@ -231,55 +224,6 @@ fun PhotoViewerScreen(
     }
 }
 
-
-@Composable
-private fun ViewerThumbnailRail(
-    photos: List<PhotoEntity>,
-    currentPage: Int,
-    onSelected: (Int) -> Unit,
-) {
-    if (photos.size <= 1) return
-    val end = (currentPage + 5).coerceAtMost(photos.size)
-    val start = (end - 8).coerceAtLeast(0).coerceAtMost(currentPage.coerceAtLeast(0))
-    val visible = photos.subList(start, end)
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        visible.forEachIndexed { offset, photo ->
-            val index = start + offset
-            ViewerThumbnail(
-                photo = photo,
-                selected = index == currentPage,
-                onClick = { onSelected(index) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun ViewerThumbnail(
-    photo: PhotoEntity,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(8.dp)
-    AsyncImage(
-        model = Uri.parse(photo.uri),
-        contentDescription = photo.displayName,
-        modifier = Modifier
-            .size(width = 66.dp, height = 66.dp)
-            .clip(shape)
-            .border(
-                width = if (selected) 3.dp else 1.dp,
-                color = if (selected) Color.White else Color.White.copy(alpha = 0.18f),
-                shape = shape,
-            )
-            .clickable(onClick = onClick),
-        contentScale = ContentScale.Crop,
-    )
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

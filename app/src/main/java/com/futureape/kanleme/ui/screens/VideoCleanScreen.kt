@@ -91,6 +91,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -111,18 +112,27 @@ import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.util.HapticKit
+import com.futureape.kanleme.ui.util.formatDuration
+import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.util.shareVideo
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.futureape.kanleme.ui.i18n.Text
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
+fun VideoCleanScreen(
+    viewModel: KanlemeViewModel,
+    bottomContentPadding: Dp = 28.dp,
+    onBack: () -> Unit,
+) {
     val rawVideos by viewModel.videoDeck.collectAsStateWithLifecycle()
     val deckPreparing by viewModel.videoDeckPreparing.collectAsStateWithLifecycle()
     val videos = remember(rawVideos) { rawVideos.distinctBy { it.mediaStoreId } }
@@ -192,6 +202,10 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
         if (videos.isNotEmpty() && currentPage > lastSettledPage) {
             (lastSettledPage until currentPage).forEach { index ->
                 videos.getOrNull(index)?.let { viewModel.markVideoPendingKeep(it) }
+            }
+        } else if (videos.isNotEmpty() && currentPage < lastSettledPage) {
+            repeat(lastSettledPage - currentPage) {
+                viewModel.undoPendingVideoKeep()
             }
         }
         lastSettledPage = currentPage
@@ -265,6 +279,7 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                         lastAction = lastVideoAction,
                         chromeVisible = videoChromeVisible,
                         muted = videoMuted,
+                        bottomContentPadding = bottomContentPadding,
                         onFavorite = { performVideoAction(video, SwipeAction.Favorite) },
                         onDelete = { performVideoAction(video, SwipeAction.Delete) },
                         onChromeVisibilityChange = { visible -> viewModel.setVideoChromeVisible(visible) },
@@ -496,6 +511,7 @@ private fun VideoReelPage(
     lastAction: SwipeAction?,
     chromeVisible: Boolean,
     muted: Boolean,
+    bottomContentPadding: Dp,
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
     onChromeVisibilityChange: (Boolean) -> Unit,
@@ -745,16 +761,22 @@ private fun VideoReelPage(
         }
 
         androidx.compose.animation.AnimatedVisibility(
-            visible = chromeVisible && (settings.videoShowInfoPanel || settings.videoShowProgressBar),
+            visible = settings.videoShowInfoPanel || settings.videoShowProgressBar,
             enter = fadeIn() + slideInVertically { it / 5 },
             exit = fadeOut() + slideOutVertically { it / 5 },
             modifier = Modifier.align(Alignment.BottomStart),
         ) {
-            Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = bottomContentPadding), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (settings.videoShowInfoPanel) {
                     Column {
                         Text(simpleAgeLabel(video.dateTaken), style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Black, maxLines = 1)
-                        Text(video.folderName.ifBlank { "本地相册" }, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            videoInfoLine(video),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White.copy(alpha = 0.72f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
                 if (settings.videoShowProgressBar) {
@@ -856,6 +878,21 @@ private fun simpleAgeLabel(timeMillis: Long): String {
         days < 365 -> (days / 30).coerceAtLeast(1).toString() + " 个月前"
         else -> (days / 365).coerceAtLeast(1).toString() + " 年前"
     }
+}
+
+private fun videoInfoLine(video: VideoEntity): String {
+    return listOf(
+        detailedVideoDate(video.dateTaken),
+        formatDuration(video.duration).takeIf { video.duration > 0L },
+        formatSize(video.size).takeIf { video.size > 0L },
+        video.folderName.ifBlank { "本地相册" },
+    ).filterNotNull().joinToString(" · ")
+}
+
+private fun detailedVideoDate(timeMillis: Long): String? {
+    val normalized = if (timeMillis in 1L..10_000_000_000L) timeMillis * 1000L else timeMillis
+    if (normalized <= 0L) return null
+    return SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(normalized))
 }
 
 @Composable

@@ -131,10 +131,18 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 navController = navController,
                 startDestination = Destinations.HOME,
                 modifier = if (useSideRail) Modifier.fillMaxSize().padding(start = 92.dp) else Modifier.fillMaxSize(),
-                enterTransition = { fadeIn(tween(140)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(280)) },
-                exitTransition = { fadeOut(tween(120)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(280)) },
-                popEnterTransition = { fadeIn(tween(140)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(280)) },
-                popExitTransition = { fadeOut(tween(120)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(280)) },
+                enterTransition = {
+                    fadeIn(tween(140)) + slideIntoContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280))
+                },
+                exitTransition = {
+                    fadeOut(tween(120)) + slideOutOfContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280))
+                },
+                popEnterTransition = {
+                    fadeIn(tween(140)) + slideIntoContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280))
+                },
+                popExitTransition = {
+                    fadeOut(tween(120)) + slideOutOfContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280))
+                },
             ) {
                 composable(
                     Destinations.HOME,
@@ -218,26 +226,25 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 composable(
                     Destinations.VIDEO,
                     enterTransition = {
-                        fadeIn(tween(180, easing = LinearOutSlowInEasing)) +
-                            slideInVertically(tween(320, easing = FastOutSlowInEasing)) { it / 10 } +
-                            scaleIn(tween(320, easing = FastOutSlowInEasing), initialScale = 0.985f)
+                        fadeIn(tween(140, easing = LinearOutSlowInEasing)) +
+                            slideIntoContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280, easing = FastOutSlowInEasing))
                     },
                     exitTransition = {
-                        fadeOut(tween(140, easing = FastOutSlowInEasing)) +
-                            scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = 1.01f)
+                        fadeOut(tween(120, easing = FastOutSlowInEasing)) +
+                            slideOutOfContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280, easing = FastOutSlowInEasing))
                     },
                     popEnterTransition = {
-                        fadeIn(tween(160, easing = LinearOutSlowInEasing)) +
-                            scaleIn(tween(240, easing = FastOutSlowInEasing), initialScale = 0.99f)
+                        fadeIn(tween(140, easing = LinearOutSlowInEasing)) +
+                            slideIntoContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280, easing = FastOutSlowInEasing))
                     },
                     popExitTransition = {
-                        fadeOut(tween(170, easing = FastOutSlowInEasing)) +
-                            slideOutVertically(tween(260, easing = FastOutSlowInEasing)) { it / 10 } +
-                            scaleOut(tween(260, easing = FastOutSlowInEasing), targetScale = 0.985f)
+                        fadeOut(tween(120, easing = FastOutSlowInEasing)) +
+                            slideOutOfContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280, easing = FastOutSlowInEasing))
                     },
                 ) {
                     VideoCleanScreen(
                         viewModel,
+                        bottomContentPadding = if (useSideRail) 28.dp else 112.dp,
                         onBack = {
                             viewModel.setHomeMediaTab("photo")
                             navController.popBackStack(Destinations.HOME, false)
@@ -254,6 +261,10 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 composable(
                     route = Destinations.VIEWER,
                     arguments = listOf(navArgument(Destinations.VIEWER_ARG_PHOTO_ID) { type = NavType.LongType }),
+                    enterTransition = { fadeIn(tween(160, easing = LinearOutSlowInEasing)) },
+                    exitTransition = { fadeOut(tween(120, easing = FastOutSlowInEasing)) },
+                    popEnterTransition = { fadeIn(tween(120, easing = LinearOutSlowInEasing)) },
+                    popExitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) },
                 ) { entry ->
                     PhotoViewerScreen(
                         viewModel = viewModel,
@@ -308,21 +319,26 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 composable(Destinations.ANNUAL) { AnnualReportScreen(viewModel, onBack = { navController.popBackStack() }) }
             }
 
-            if (current in setOf(Destinations.HOME, Destinations.ME)) {
+            if (current in setOf(Destinations.HOME, Destinations.VIDEO, Destinations.ME)) {
                 val navItems = listOf(
                     "照片" to Icons.Rounded.PhotoLibrary,
                     "视频" to Icons.Rounded.Movie,
                     "我的" to Icons.Rounded.Person,
                 )
-                val selectedNavIndex = if (current == Destinations.ME) 2 else 0
+                val selectedNavIndex = when (current) {
+                    Destinations.VIDEO -> 1
+                    Destinations.ME -> 2
+                    else -> 0
+                }
                 val onNavSelected: (Int) -> Unit = { index ->
                     when (index) {
                         1 -> {
-                            haptic.tick()
-                            viewModel.setHomeMediaTab("photo")
-                            viewModel.startVideoCleaningSession()
-                            navController.navigate(Destinations.VIDEO) {
-                                launchSingleTop = true
+                            if (current != Destinations.VIDEO) {
+                                haptic.tick()
+                                viewModel.startVideoCleaningSession()
+                                navController.navigate(Destinations.VIDEO) {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                         else -> {
@@ -411,6 +427,26 @@ private fun NonBlockingStatusChip(
             }
         }
     }
+}
+
+private fun topLevelSlideDirection(
+    fromRoute: String?,
+    toRoute: String?,
+): AnimatedContentTransitionScope.SlideDirection {
+    val from = topLevelRouteIndex(fromRoute)
+    val to = topLevelRouteIndex(toRoute)
+    return if (from != null && to != null && to < from) {
+        AnimatedContentTransitionScope.SlideDirection.Right
+    } else {
+        AnimatedContentTransitionScope.SlideDirection.Left
+    }
+}
+
+private fun topLevelRouteIndex(route: String?): Int? = when (route) {
+    Destinations.HOME -> 0
+    Destinations.VIDEO -> 1
+    Destinations.ME -> 2
+    else -> null
 }
 
 

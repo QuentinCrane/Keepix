@@ -282,13 +282,39 @@ class KanlemeViewModel @Inject constructor(
     private fun popPhotoSessionAction(): PhotoSessionAction? =
         if (photoSessionActions.isEmpty()) null else photoSessionActions.removeLast()
 
-    private fun applyOptimisticPhotoAction(photo: PhotoEntity, action: SwipeAction) {
+    private fun dropLastPhotoSessionAction(mediaStoreId: Long) {
+        val actions = photoSessionActions.toList()
+        val dropIndex = actions.indexOfLast { it.photo.mediaStoreId == mediaStoreId }
+        if (dropIndex < 0) return
+        photoSessionActions.clear()
+        actions.forEachIndexed { index, action ->
+            if (index != dropIndex) photoSessionActions.addLast(action)
+        }
+    }
+
+    private fun applyOptimisticPhotoAction(photo: PhotoEntity, action: SwipeAction): Boolean {
+        if (photo.mediaStoreId in pendingPhotoActionMediaIds || photo.mediaStoreId in handledPhotoActionMediaIds) return false
         pendingPhotoActionMediaIds += photo.mediaStoreId
         handledPhotoActionMediaIds += photo.mediaStoreId
         invalidatePhotoDeckLoads()
         _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
         _photoSessionActionCount.value += 1
         _lastPhotoAction.value = action
+        return true
+    }
+
+    private fun rollbackOptimisticPhotoAction(photo: PhotoEntity) {
+        if (photo.mediaStoreId !in pendingPhotoActionMediaIds && photo.mediaStoreId !in handledPhotoActionMediaIds) return
+        pendingPhotoActionMediaIds -= photo.mediaStoreId
+        handledPhotoActionMediaIds -= photo.mediaStoreId
+        dropLastPhotoSessionAction(photo.mediaStoreId)
+        invalidatePhotoDeckLoads()
+        if (_photoDeck.value.none { it.mediaStoreId == photo.mediaStoreId }) {
+            _photoDeck.value = (listOf(photo) + _photoDeck.value)
+                .distinctBy { it.mediaStoreId }
+                .take(CONTINUOUS_PHOTO_DECK_SIZE)
+        }
+        _photoSessionActionCount.value = (_photoSessionActionCount.value - 1).coerceAtLeast(0)
     }
 
     private fun restorePhotoSessionAction(snapshot: PhotoSessionAction) {
@@ -337,6 +363,10 @@ class KanlemeViewModel @Inject constructor(
                 val operationId = actionBlock()
                 refillPhotoDeckIfNeeded()
                 operationId
+            } catch (t: Throwable) {
+                rollbackOptimisticPhotoAction(photo)
+                _message.value = t.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed)
+                throw t
             } finally {
                 pendingPhotoActionMediaIds -= photo.mediaStoreId
             }
@@ -649,11 +679,17 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun onPhotoAction(photo: PhotoEntity, action: SwipeAction, exitTargetX: Float, exitTargetY: Float) {
-        applyOptimisticPhotoAction(photo, action)
+        if (!applyOptimisticPhotoAction(photo, action)) return
         val operationId = persistPhotoAction(photo) {
             repository.handlePhotoAction(photo, action)
         }
         rememberPhotoSessionAction(photo, action, operationId, exitTargetX, exitTargetY)
+    }
+
+    fun markPhotoForTrashOutsideCleaning(photo: PhotoEntity) = viewModelScope.launch {
+        runCatching { repository.handlePhotoAction(photo, SwipeAction.Delete) }
+            .onSuccess { _message.value = dynamicUiText("已加入待删区") }
+            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
     }
 
     fun onPhotoActionWithOptionalMove(
@@ -663,7 +699,7 @@ class KanlemeViewModel @Inject constructor(
         exitTargetX: Float,
         exitTargetY: Float,
     ) {
-        applyOptimisticPhotoAction(photo, action)
+        if (!applyOptimisticPhotoAction(photo, action)) return
         val operationId = persistPhotoAction(photo) {
             val s = settingsRepository.settings.first()
             if (targetRelativePath != null && s.autoMoveOnKeepFavorite && action in setOf(SwipeAction.Keep, SwipeAction.Favorite)) {
@@ -702,6 +738,16 @@ class KanlemeViewModel @Inject constructor(
         return true
     }
 
+    fun undoPendingVideoKeep(): Long? {
+        val pending = _pendingVideoKeeps.value
+        if (pending.isEmpty()) return null
+        val mediaStoreId = pending.keys.last()
+        _pendingVideoKeeps.value = pending - mediaStoreId
+        _videoSessionActionCount.value = (_videoSessionActionCount.value - 1).coerceAtLeast(0)
+        _lastVideoAction.value = SwipeAction.Keep
+        return mediaStoreId
+    }
+
     fun finishVideoCleaningSession(currentVideo: VideoEntity?) = viewModelScope.launch {
         currentVideo?.let { markVideoPendingKeep(it) }
         val pending = _pendingVideoKeeps.value
@@ -718,12 +764,7 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun undoVideoCleaningAction(): Long? {
-        val pending = _pendingVideoKeeps.value
-        if (pending.isNotEmpty()) {
-            val mediaStoreId = pending.keys.last()
-            _pendingVideoKeeps.value = pending - mediaStoreId
-            _videoSessionActionCount.value = (_videoSessionActionCount.value - 1).coerceAtLeast(0)
-            _lastVideoAction.value = SwipeAction.Keep
+        undoPendingVideoKeep()?.let { mediaStoreId ->
             _message.value = uiText(R.string.message_back_to_previous_video)
             return mediaStoreId
         }
@@ -983,6 +1024,8 @@ class KanlemeViewModel @Inject constructor(
         settingsRepository.setDeleteMode(next)
     }
 
+    fun setDeleteMode(value: DeleteMode) = viewModelScope.launch { settingsRepository.setDeleteMode(value) }
+
     fun cycleBatchSize() = viewModelScope.launch {
         // Kept for old settings compatibility. The organizer now uses a continuous rolling buffer,
         // so this no longer limits a cleaning round.
@@ -1002,10 +1045,14 @@ class KanlemeViewModel @Inject constructor(
         settingsRepository.setSwipeSensitivity(values[(values.indexOf(settings.value.swipeSensitivity) + 1) % values.size])
     }
 
+    fun setSwipeSensitivity(value: SwipeSensitivity) = viewModelScope.launch { settingsRepository.setSwipeSensitivity(value) }
+
     fun cycleGestureDirection() = viewModelScope.launch {
         val next = if (settings.value.gestureDirection == GestureDirection.DEFAULT) GestureDirection.REVERSE_VERTICAL else GestureDirection.DEFAULT
         settingsRepository.setGestureDirection(next)
     }
+
+    fun setGestureDirection(value: GestureDirection) = viewModelScope.launch { settingsRepository.setGestureDirection(value) }
 
     fun setQuickActionButtons(value: Boolean) = viewModelScope.launch { settingsRepository.setQuickActionButtons(value) }
     fun setSwapShareAndUndo(value: Boolean) = viewModelScope.launch { settingsRepository.setSwapShareAndUndo(value) }
@@ -1016,6 +1063,8 @@ class KanlemeViewModel @Inject constructor(
         val values = VideoDisplayMode.entries
         settingsRepository.setVideoDisplayMode(values[(values.indexOf(settings.value.videoDisplayMode) + 1) % values.size])
     }
+
+    fun setVideoDisplayMode(value: VideoDisplayMode) = viewModelScope.launch { settingsRepository.setVideoDisplayMode(value) }
 
     fun toggleVideoDisplayModeQuick() = viewModelScope.launch {
         val next = if (settings.value.videoDisplayMode == VideoDisplayMode.FIT_SCREEN) {

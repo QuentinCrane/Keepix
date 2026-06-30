@@ -72,6 +72,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -141,15 +142,47 @@ fun PhotoCleanScreen(
     var showGuide by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showFolderPicker by remember { mutableStateOf(false) }
-    var showDayMemory by remember { mutableStateOf(false) }
+    var showDayMemory by rememberSaveable { mutableStateOf(false) }
     var photoSwipeFeedback by remember { mutableStateOf(PhotoSwipeFeedback()) }
     var guideTargets by remember { mutableStateOf<Map<PhotoGuideTarget, Rect>>(emptyMap()) }
     var batchFinishing by remember { mutableStateOf(false) }
-    var batchHasDelete by remember { mutableStateOf(false) }
+    var batchKeepCount by rememberSaveable { mutableIntStateOf(0) }
+    var batchFavoriteCount by rememberSaveable { mutableIntStateOf(0) }
+    var batchDeleteCount by rememberSaveable { mutableIntStateOf(0) }
+    var batchDeleteBytes by rememberSaveable { mutableStateOf(0L) }
+    var batchSummary by remember { mutableStateOf<PhotoBatchSummary?>(null) }
+    var dayMemoryPinch by remember { mutableStateOf(DayMemoryPinchState()) }
+
+    fun clearBatchCounters() {
+        batchKeepCount = 0
+        batchFavoriteCount = 0
+        batchDeleteCount = 0
+        batchDeleteBytes = 0L
+    }
+
+    fun closeDayMemory() {
+        showDayMemory = false
+        dayMemoryPinch = DayMemoryPinchState()
+    }
+
+    fun previewDayMemory(progress: Float, scale: Float) {
+        dayMemoryPinch = DayMemoryPinchState(progress = progress, scale = scale, active = true)
+    }
+
+    fun commitDayMemory() {
+        if (dayMemoryPinch.progress > 0.04f) {
+            showDayMemory = true
+            dayMemoryPinch = dayMemoryPinch.copy(progress = 1f, active = false)
+            haptics.threshold()
+        } else {
+            dayMemoryPinch = DayMemoryPinchState()
+        }
+    }
 
     fun leaveCleaning() {
         viewModel.resetPhotoSessionDateMode()
         viewModel.finishPhotoCleaningSession()
+        clearBatchCounters()
         onBack()
     }
 
@@ -158,9 +191,15 @@ fun PhotoCleanScreen(
     LaunchedEffect(batchFinishing) {
         if (!batchFinishing) return@LaunchedEffect
         kotlinx.coroutines.delay(650)
-        viewModel.resetPhotoSessionDateMode()
+        batchSummary = PhotoBatchSummary(
+            total = batchKeepCount + batchFavoriteCount + batchDeleteCount,
+            kept = batchKeepCount,
+            favorited = batchFavoriteCount,
+            deleted = batchDeleteCount,
+            deletedBytes = batchDeleteBytes,
+        )
         viewModel.finishPhotoCleaningSession()
-        if (batchHasDelete) onBatchFinished() else onBack()
+        batchFinishing = false
     }
 
     fun updateGuideTarget(target: PhotoGuideTarget, rect: Rect) {
@@ -263,6 +302,9 @@ fun PhotoCleanScreen(
     val currentPhoto = deck.first()
     val memoryPhotos = timelinePhotos.ifEmpty { deck }
     val remainingPhotos = (dashboard.photoCount - dashboard.processedPhotoCount).coerceAtLeast(deck.size)
+    val remainingInBatch = (settings.photoBatchSize.coerceIn(1, 100) - sessionActionCount).coerceAtLeast(1)
+    val visibleDeck = deck.take(remainingInBatch.coerceAtMost(3))
+    val dayMemoryVisible = showDayMemory || dayMemoryPinch.progress > 0.001f
     val dimAlpha by animateFloatAsState(targetValue = if (showGuide) 0.46f else 0f, label = "guide_dim")
 
     fun perform(photo: PhotoEntity, action: SwipeAction, exitTargetX: Float, exitTargetY: Float) {
@@ -272,8 +314,14 @@ fun PhotoCleanScreen(
             SwipeAction.Delete -> haptics.delete()
             SwipeAction.Favorite -> haptics.favorite()
         }
-        val nextHasDelete = batchHasDelete || action == SwipeAction.Delete
-        batchHasDelete = nextHasDelete
+        when (action) {
+            SwipeAction.Keep -> batchKeepCount += 1
+            SwipeAction.Favorite -> batchFavoriteCount += 1
+            SwipeAction.Delete -> {
+                batchDeleteCount += 1
+                batchDeleteBytes += photo.size
+            }
+        }
         viewModel.onPhotoAction(photo, action, exitTargetX, exitTargetY)
         val nextActionCount = sessionActionCount + 1
         if (nextActionCount >= settings.photoBatchSize.coerceIn(1, 100)) {
@@ -292,13 +340,16 @@ fun PhotoCleanScreen(
         Box(
             Modifier
                 .fillMaxSize()
-                .detectScreenPinchToMemory(currentPhoto.id, showDayMemory) {
-                    haptics.threshold()
-                    showDayMemory = true
-                },
+                .detectScreenPinchToMemory(
+                    key = currentPhoto.id,
+                    disabled = showDayMemory,
+                    onProgress = ::previewDayMemory,
+                    onCommit = ::commitDayMemory,
+                    onCancel = { dayMemoryPinch = DayMemoryPinchState() },
+                ),
         ) {
             ImmersivePhotoCleanContent(
-                photos = deck.take(3),
+                photos = visibleDeck,
                 currentPhoto = currentPhoto,
                 settings = settings,
                 haptics = haptics,
@@ -311,6 +362,7 @@ fun PhotoCleanScreen(
                 onSwipeFeedbackChanged = { photoSwipeFeedback = it },
                 photoSwipeFeedback = photoSwipeFeedback,
                 onOpenDayMemory = {
+                    dayMemoryPinch = DayMemoryPinchState(progress = 1f, scale = 1f, active = false)
                     showDayMemory = true
                 },
                 onTopCardPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.PhotoCard, rect) },
@@ -345,19 +397,43 @@ fun PhotoCleanScreen(
                 onDismiss = { showFolderPicker = false },
             )
             KeepixDayMemoryOverlay(
-                visible = showDayMemory,
+                visible = dayMemoryVisible,
                 currentPhoto = currentPhoto,
                 photos = memoryPhotos,
-                onDismiss = { showDayMemory = false },
+                entryProgress = if (showDayMemory) 1f else dayMemoryPinch.progress,
+                entryScale = dayMemoryPinch.scale,
+                entryActive = dayMemoryPinch.active,
+                onDismiss = ::closeDayMemory,
                 onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
-                onDelete = { photo -> perform(photo, SwipeAction.Delete, 0f, -620f) },
+                onDelete = { photo -> haptics.delete(); viewModel.markPhotoForTrashOutsideCleaning(photo) },
                 onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
                 onApply = { mode ->
                     haptics.threshold()
                     viewModel.setPhotoSessionDateMode(mode)
-                    showDayMemory = false
+                    closeDayMemory()
                 },
             )
+            batchSummary?.let { summary ->
+                PhotoBatchSummaryOverlay(
+                    summary = summary,
+                    onContinue = {
+                        batchSummary = null
+                        clearBatchCounters()
+                    },
+                    onBackHome = {
+                        batchSummary = null
+                        viewModel.resetPhotoSessionDateMode()
+                        clearBatchCounters()
+                        onBack()
+                    },
+                    onOpenTrash = {
+                        batchSummary = null
+                        viewModel.resetPhotoSessionDateMode()
+                        clearBatchCounters()
+                        onBatchFinished()
+                    },
+                )
+            }
         }
         return
     }
@@ -366,10 +442,13 @@ fun PhotoCleanScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .detectScreenPinchToMemory(currentPhoto.id, showDayMemory) {
-                haptics.threshold()
-                showDayMemory = true
-            },
+            .detectScreenPinchToMemory(
+                key = currentPhoto.id,
+                disabled = showDayMemory,
+                onProgress = ::previewDayMemory,
+                onCommit = ::commitDayMemory,
+                onCancel = { dayMemoryPinch = DayMemoryPinchState() },
+            ),
     ) {
         Crossfade(
             targetState = currentPhoto.uri,
@@ -412,7 +491,7 @@ fun PhotoCleanScreen(
                     .padding(horizontal = if (isExpanded) 34.dp else 18.dp, vertical = 10.dp),
             ) {
                 PhotoDeckStage(
-                    photos = deck.take(3),
+                    photos = visibleDeck,
                     settings = settings,
                     haptics = haptics,
                     modifier = (if (isExpanded) {
@@ -535,27 +614,122 @@ fun PhotoCleanScreen(
             onDismiss = { showFolderPicker = false },
         )
         KeepixDayMemoryOverlay(
-            visible = showDayMemory,
+            visible = dayMemoryVisible,
             currentPhoto = currentPhoto,
             photos = memoryPhotos,
-            onDismiss = { showDayMemory = false },
+            entryProgress = if (showDayMemory) 1f else dayMemoryPinch.progress,
+            entryScale = dayMemoryPinch.scale,
+            entryActive = dayMemoryPinch.active,
+            onDismiss = ::closeDayMemory,
             onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
-            onDelete = { photo -> perform(photo, SwipeAction.Delete, 0f, -620f) },
+            onDelete = { photo -> haptics.delete(); viewModel.markPhotoForTrashOutsideCleaning(photo) },
             onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
             onApply = { mode ->
                 haptics.threshold()
                 viewModel.setPhotoSessionDateMode(mode)
-                showDayMemory = false
+                closeDayMemory()
             },
         )
+        batchSummary?.let { summary ->
+            PhotoBatchSummaryOverlay(
+                summary = summary,
+                onContinue = {
+                    batchSummary = null
+                    clearBatchCounters()
+                },
+                onBackHome = {
+                    batchSummary = null
+                    viewModel.resetPhotoSessionDateMode()
+                    clearBatchCounters()
+                    onBack()
+                },
+                onOpenTrash = {
+                    batchSummary = null
+                    viewModel.resetPhotoSessionDateMode()
+                    clearBatchCounters()
+                    onBatchFinished()
+                },
+            )
+        }
     }
 }
 
 
+private data class PhotoBatchSummary(
+    val total: Int,
+    val kept: Int,
+    val favorited: Int,
+    val deleted: Int,
+    val deletedBytes: Long,
+)
+
+private data class DayMemoryPinchState(
+    val progress: Float = 0f,
+    val scale: Float = 1f,
+    val active: Boolean = false,
+)
+
+@Composable
+private fun PhotoBatchSummaryOverlay(
+    summary: PhotoBatchSummary,
+    onContinue: () -> Unit,
+    onBackHome: () -> Unit,
+    onOpenTrash: () -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .zIndex(60f)
+            .background(Color.Black.copy(alpha = 0.52f))
+            .padding(22.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(30.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)),
+        ) {
+            Column(
+                modifier = Modifier.padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text("本轮整理完毕", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+                Text(
+                    "本轮处理 " + summary.total + " 张 · 保留 " + summary.kept + " · 收藏 " + summary.favorited + " · 待删 " + summary.deleted,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    if (summary.deleted > 0) "预计释放 " + formatSize(summary.deletedBytes) else "本轮没有加入待删区的照片",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = onContinue, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) {
+                        Text("继续")
+                    }
+                    Button(onClick = onBackHome, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) {
+                        Text("回首页")
+                    }
+                }
+                if (summary.deleted > 0) {
+                    Button(onClick = onOpenTrash, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(999.dp)) {
+                        Text("去待删区")
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun Modifier.detectScreenPinchToMemory(
     key: Any,
     disabled: Boolean,
-    onPinchIn: () -> Unit,
+    onProgress: (Float, Float) -> Unit,
+    onCommit: () -> Unit,
+    onCancel: () -> Unit,
 ): Modifier = if (disabled) {
     this
 } else {
@@ -564,6 +738,7 @@ private fun Modifier.detectScreenPinchToMemory(
             var initialDistance = 0f
             var previousDistance = 0f
             var cumulativeScale = 1f
+            var currentProgress = 0f
             val slop = viewConfiguration.touchSlop
             while (true) {
                 val event = awaitPointerEvent(pass = PointerEventPass.Initial)
@@ -581,11 +756,20 @@ private fun Modifier.detectScreenPinchToMemory(
                     cumulativeScale *= distance / previousDistance.coerceAtLeast(1f)
                     previousDistance = distance
                 }
-                if (initialDistance > 0f && (distance / initialDistance < 0.97f || cumulativeScale < 0.97f || initialDistance - distance > slop * 0.20f)) {
-                    pressed.forEach { it.consume() }
-                    onPinchIn()
-                    break
+                if (initialDistance > 0f) {
+                    val ratio = (distance / initialDistance).coerceIn(0.62f, 1.18f)
+                    val shrink = maxOf(1f - ratio, 1f - cumulativeScale)
+                    currentProgress = (shrink / 0.26f).coerceIn(0f, 1f)
+                    if (currentProgress > 0f) {
+                        pressed.forEach { it.consume() }
+                        onProgress(currentProgress, ratio.coerceIn(0.66f, 1f))
+                    }
                 }
+            }
+            if (currentProgress > 0.04f) {
+                onCommit()
+            } else {
+                onCancel()
             }
         }
     }
@@ -1016,7 +1200,7 @@ internal fun PhotoEdgeGlow(feedback: PhotoSwipeFeedback) {
     val action = feedback.action ?: return
     val activeColor = photoGestureColor(action)
     val edgeAlpha by animateFloatAsState(
-        targetValue = (0.16f + feedback.intensity * 0.68f).coerceIn(0f, 1f),
+        targetValue = (0.24f + feedback.intensity * 0.76f).coerceIn(0f, 1f),
         animationSpec = tween(100),
         label = "photo_edge_feedback",
     )
@@ -1032,15 +1216,15 @@ internal fun PhotoEdgeGlow(feedback: PhotoSwipeFeedback) {
                                 Brush.horizontalGradient(
                                     0.0f to Color.Transparent,
                                     0.48f to Color.Transparent,
-                                    0.72f to activeColor.copy(alpha = edgeAlpha * 0.06f),
-                                    0.90f to activeColor.copy(alpha = edgeAlpha * 0.18f),
-                                    1.0f to activeColor.copy(alpha = edgeAlpha * 0.46f),
+                                    0.70f to activeColor.copy(alpha = edgeAlpha * 0.10f),
+                                    0.88f to activeColor.copy(alpha = edgeAlpha * 0.28f),
+                                    1.0f to activeColor.copy(alpha = edgeAlpha * 0.62f),
                                 )
                             } else {
                                 Brush.horizontalGradient(
-                                    0.0f to activeColor.copy(alpha = edgeAlpha * 0.46f),
-                                    0.10f to activeColor.copy(alpha = edgeAlpha * 0.18f),
-                                    0.28f to activeColor.copy(alpha = edgeAlpha * 0.06f),
+                                    0.0f to activeColor.copy(alpha = edgeAlpha * 0.62f),
+                                    0.12f to activeColor.copy(alpha = edgeAlpha * 0.28f),
+                                    0.30f to activeColor.copy(alpha = edgeAlpha * 0.10f),
                                     0.52f to Color.Transparent,
                                     1.0f to Color.Transparent,
                                 )
@@ -1053,9 +1237,9 @@ internal fun PhotoEdgeGlow(feedback: PhotoSwipeFeedback) {
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0.0f to activeColor.copy(alpha = edgeAlpha * 0.42f),
-                            0.13f to activeColor.copy(alpha = edgeAlpha * 0.24f),
-                            0.34f to activeColor.copy(alpha = edgeAlpha * 0.10f),
+                            0.0f to activeColor.copy(alpha = edgeAlpha * 0.62f),
+                            0.15f to activeColor.copy(alpha = edgeAlpha * 0.34f),
+                            0.36f to activeColor.copy(alpha = edgeAlpha * 0.14f),
                             0.56f to Color.Transparent,
                             1.0f to Color.Transparent,
                         )
@@ -1068,9 +1252,9 @@ internal fun PhotoEdgeGlow(feedback: PhotoSwipeFeedback) {
                         Brush.verticalGradient(
                             0.0f to Color.Transparent,
                             0.44f to Color.Transparent,
-                            0.64f to activeColor.copy(alpha = edgeAlpha * 0.10f),
-                            0.84f to activeColor.copy(alpha = edgeAlpha * 0.24f),
-                            1.0f to activeColor.copy(alpha = edgeAlpha * 0.46f),
+                            0.62f to activeColor.copy(alpha = edgeAlpha * 0.14f),
+                            0.82f to activeColor.copy(alpha = edgeAlpha * 0.34f),
+                            1.0f to activeColor.copy(alpha = edgeAlpha * 0.62f),
                         )
                     ),
             )

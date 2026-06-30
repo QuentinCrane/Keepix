@@ -491,11 +491,18 @@ fun SwipePhotoCard(
     var lastZone by remember(photo.id) { mutableStateOf("") }
     var activeHint by remember(photo.id) { mutableStateOf<SwipeAction?>(null) }
     var actionCommitted by remember(photo.id) { mutableStateOf(false) }
+    var enteredTopSlot by remember(photo.id) { mutableStateOf(false) }
     val pinchToMemory = onPinchToMemory
     val feedbackAlpha by animateFloatAsState(
         targetValue = (abs(offsetX.value) / 260f + abs(offsetY.value) / 260f).coerceIn(0f, 1f),
         animationSpec = tween(120),
         label = "swipe_feedback",
+    )
+    LaunchedEffect(photo.id) { enteredTopSlot = true }
+    val topSlotProgress by animateFloatAsState(
+        targetValue = if (enteredTopSlot) 1f else 0f,
+        animationSpec = tween(210, easing = FastOutSlowInEasing),
+        label = "photo_top_slot_promotion",
     )
     val rotation = (offsetX.value / 34f).coerceIn(-16f, 16f)
     // 手势判定改为“防误删优先”：
@@ -592,10 +599,10 @@ fun SwipePhotoCard(
         val absY = abs(y)
         val absVelocityX = abs(velocityX)
         val absVelocityY = abs(velocityY)
-        if (absVelocityY > 1350f && absVelocityY > absVelocityX * 1.25f && absY > 76f) {
-            return verticalAction(velocityY)
+        if (absVelocityY > 1350f && absVelocityY > absVelocityX * 1.25f && absY > 76f && velocityY * y > 0f) {
+            return verticalAction(y)
         }
-        if (absVelocityX > 1450f && absVelocityX > absVelocityY * 1.18f && absX > 70f) {
+        if (absVelocityX > 1450f && absVelocityX > absVelocityY * 1.18f && absX > 70f && velocityX * x > 0f) {
             return SwipeAction.Keep
         }
         return null
@@ -628,10 +635,13 @@ fun SwipePhotoCard(
             .graphicsLayer {
                 translationX = offsetX.value
                 translationY = offsetY.value
-                rotationZ = rotation
+                val entryRotation = if (photo.mediaStoreId % 2L == 0L) -3.8f else 4.8f
+                rotationZ = rotation + entryRotation * (1f - topSlotProgress)
                 val distance = (abs(offsetX.value) + abs(offsetY.value)).coerceAtMost(520f) / 520f
-                scaleX = 1f - distance * 0.035f
-                scaleY = 1f - distance * 0.035f
+                val dragScale = 1f - distance * 0.035f
+                val entryScale = 0.955f + topSlotProgress * 0.045f
+                scaleX = dragScale * entryScale
+                scaleY = dragScale * entryScale
             }
             .then(
                 if (actionCommitted) {
@@ -766,7 +776,7 @@ fun SwipePhotoCard(
                                     val flyOutX = (size.width.toFloat() + 560f + abs(flingX) * 0.35f).coerceAtLeast(1120f)
                                     val flyOutY = (size.height.toFloat() + 560f + abs(flingY) * 0.35f).coerceAtLeast(1280f)
                                     val targetX = when (action) {
-                                        SwipeAction.Keep -> if (offsetX.value + flingX < 0) -flyOutX else flyOutX
+                                        SwipeAction.Keep -> if (offsetX.value < 0) -flyOutX else flyOutX
                                         else -> (offsetX.value + flingX).coerceIn(-520f, 520f)
                                     }
                                     val targetY = when (action) {
@@ -885,30 +895,6 @@ private fun ExitingPhotoOverlay(
 
 @Composable
 private fun PhotoFitImageWithSoftFill(
-    photo: PhotoEntity,
-    modifier: Modifier = Modifier,
-    contentDescription: String? = photo.displayName,
-) {
-    val context = LocalContext.current
-    val model = remember(photo.uri) {
-        ImageRequest.Builder(context)
-            .data(Uri.parse(photo.uri))
-            .memoryCacheKey(photo.uri)
-            .diskCacheKey(photo.uri)
-            .placeholderMemoryCacheKey(photo.uri)
-            .crossfade(false)
-            .build()
-    }
-    AsyncImage(
-        model = model,
-        contentDescription = contentDescription,
-        modifier = modifier,
-        contentScale = ContentScale.Crop,
-    )
-}
-
-@Composable
-private fun PlainFitPhotoImage(
     photo: PhotoEntity,
     modifier: Modifier = Modifier,
     contentDescription: String? = photo.displayName,

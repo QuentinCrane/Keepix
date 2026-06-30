@@ -12,6 +12,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -83,8 +85,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.futureape.kanleme.BuildConfig
 import com.futureape.kanleme.data.settings.AppSettings
 import com.futureape.kanleme.data.settings.AppVisualStyle
+import com.futureape.kanleme.data.settings.DeleteMode
+import com.futureape.kanleme.data.settings.GestureDirection
 import com.futureape.kanleme.data.settings.HapticLevel
 import com.futureape.kanleme.data.settings.PhotoCleanMode
+import com.futureape.kanleme.data.settings.SwipeSensitivity
+import com.futureape.kanleme.data.settings.VideoDisplayMode
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.GlassSurface
@@ -297,19 +303,22 @@ private fun SettingsPageContent(
         when (page) {
             SettingsPage.HOME -> {
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.Layers, "每组数量", "照片 " + settings.photoBatchSize + " · 视频 " + settings.videoBatchSize, color = Color(0xFF86A7FF), showIcon = false, onClick = { goTo(SettingsPage.ORGANIZE) }) },
+                    { SettingsRow(Icons.Rounded.Layers, "整理方式", "范围、排序、批次数量、删除模式", color = Color(0xFF86A7FF), showIcon = false, onClick = { goTo(SettingsPage.ORGANIZE) }) },
+                    { SettingsRow(Icons.Rounded.Visibility, "整理页面显示", cleaningDisplaySummary(settings), color = Color(0xFF86A7FF), showIcon = false, onClick = { goTo(SettingsPage.CLEANING_DISPLAY) }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, "操作体验", stringResource(settings.swipeSensitivity.labelRes) + " · " + stringResource(settings.gestureDirection.labelRes), color = Color(0xFFD44C84), showIcon = false, onClick = { goTo(SettingsPage.EXPERIENCE) }) },
                     { SettingsSwitchRow(Icons.Rounded.Vibration, "震动反馈", stringResource(settings.hapticLevel.labelRes), checked = settings.hapticLevel != HapticLevel.OFF, onCheckedChange = { onTick(); viewModel.setHapticLevel(if (it) HapticLevel.MEDIUM else HapticLevel.OFF) }, color = Color(0xFF86A7FF), showIcon = false) },
                     { SettingsSwitchRow(Icons.Rounded.Visibility, "照片光效", if (settings.photoShowGestureHint) "删除和收藏时显示光效" else "已关闭", checked = settings.photoShowGestureHint, onCheckedChange = { onTick(); viewModel.setPhotoShowGestureHint(it) }, color = Color(0xFF86A7FF), showIcon = false) },
-                    { SettingsRow(Icons.Rounded.Movie, "视频进度条", if (settings.videoShowProgressBar) "细条" else "隐藏", color = Color(0xFFB884FF), showIcon = false, onClick = { onTick(); viewModel.setVideoShowProgressBar(!settings.videoShowProgressBar) }) },
+                    { SettingsSwitchRow(Icons.Rounded.Movie, "视频进度条", if (settings.videoShowProgressBar) "细条" else "隐藏", checked = settings.videoShowProgressBar, onCheckedChange = { onTick(); viewModel.setVideoShowProgressBar(it) }, color = Color(0xFFB884FF), showIcon = false) },
                     { SettingsRow(Icons.Rounded.Block, "排除文件夹", if (settings.excludedFolderPaths.isEmpty()) "单独管理" else "已排除 " + settings.excludedFolderPaths.size + " 个文件夹", color = Color(0xFFE46A62), showIcon = false, onClick = { goTo(SettingsPage.EXCLUDED_FOLDERS) }) },
                     { SettingsRow(Icons.Rounded.Palette, "界面风格", visualStyleLabel(settings.appVisualStyle), color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.APPEARANCE) }) },
+                    { SettingsRow(Icons.Rounded.CleaningServices, "数据与更新", "媒体库维护、更新日志、帮助、隐私", color = Color(0xFF6D9E65), showIcon = false, onClick = { goTo(SettingsPage.DATA) }) },
                 ))
                 SectionTitle("服务与支持")
                 SettingsGroup(listOf<@Composable () -> Unit>(
                     { SettingsRow(Icons.AutoMirrored.Rounded.Help, "常见问题", "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.HELP) }) },
-                    { SettingsRow(Icons.Rounded.Info, "邮箱", "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.DIAGNOSIS) }) },
-                    { SettingsRow(Icons.Rounded.TouchApp, "新功能许愿", "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.DIAGNOSIS) }) },
                     { SettingsRow(Icons.Rounded.Info, "隐私说明", "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.PRIVACY) }) },
+                    { SettingsRow(Icons.Rounded.Info, "更新日志", BuildConfig.VERSION_NAME, color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.CHANGELOG) }) },
+                    { SettingsRow(Icons.Rounded.Tune, "高级设置", "诊断和清理模式", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.DIAGNOSIS) }) },
                 ))
             }
 
@@ -336,21 +345,21 @@ private fun SettingsPageContent(
             SettingsPage.ORGANIZE -> {
                 SectionTitle("照片默认")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.CalendarToday, "整理范围", organizerDateModeLabel(settings.photoDateMode), color = Color(0xFF86A7FF), onClick = { onTick(); viewModel.setPhotoDateMode(nextSettingsDateMode(settings.photoDateMode)) }) },
-                    { SettingsRow(Icons.Rounded.Image, "照片类型", settingsPhotoTypeLabel(settings.photoMediaType), color = Color(0xFF86A7FF), onClick = { onTick(); viewModel.setPhotoTypeFilter(nextSettingsPhotoType(settings.photoMediaType)) }) },
-                    { SettingsRow(Icons.Rounded.Tune, "排序", settingsSortLabel(settings.photoSortOrder), color = Color(0xFF86A7FF), onClick = { onTick(); viewModel.setPhotoSortOrder(nextSettingsSortOrder(settings.photoSortOrder)) }) },
-                    { SettingsRow(Icons.Rounded.Layers, "每组数量", settings.photoBatchSize.toString(), color = Color(0xFF86A7FF), onClick = { onTick(); viewModel.setPhotoBatchSize(nextSettingsBatchSize(settings.photoBatchSize)) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.CalendarToday, "整理范围", organizerDateModeLabel(settings.photoDateMode), settingsDateModeOptions(), settings.photoDateMode, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoDateMode(it) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Image, "照片类型", settingsPhotoTypeLabel(settings.photoMediaType), settingsPhotoTypeOptions(), settings.photoMediaType, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoTypeFilter(it) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Tune, "排序", settingsSortLabel(settings.photoSortOrder), settingsSortOptions(), settings.photoSortOrder, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoSortOrder(it) }) },
+                    { SettingsStepperRow(Icons.Rounded.Layers, "每组数量", settings.photoBatchSize.toString() + " 张", color = Color(0xFF86A7FF), onDecrease = { onTick(); viewModel.setPhotoBatchSize(settings.photoBatchSize - 10) }, onIncrease = { onTick(); viewModel.setPhotoBatchSize(settings.photoBatchSize + 10) }) },
                 ))
                 SectionTitle("视频默认")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.CalendarToday, "整理范围", organizerDateModeLabel(settings.videoDateMode), color = Color(0xFFB8E95E), onClick = { onTick(); viewModel.setVideoDateMode(nextSettingsDateMode(settings.videoDateMode)) }) },
-                    { SettingsRow(Icons.Rounded.Tune, "排序", settingsSortLabel(settings.videoSortOrder), color = Color(0xFFB8E95E), onClick = { onTick(); viewModel.setVideoSortOrder(nextSettingsSortOrder(settings.videoSortOrder)) }) },
-                    { SettingsRow(Icons.Rounded.Layers, "每组数量", settings.videoBatchSize.toString(), color = Color(0xFFB8E95E), onClick = { onTick(); viewModel.setVideoBatchSize(nextSettingsBatchSize(settings.videoBatchSize)) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.CalendarToday, "整理范围", organizerDateModeLabel(settings.videoDateMode), settingsDateModeOptions(), settings.videoDateMode, color = Color(0xFFB8E95E), onSelected = { onTick(); viewModel.setVideoDateMode(it) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Tune, "排序", settingsSortLabel(settings.videoSortOrder), settingsSortOptions(), settings.videoSortOrder, color = Color(0xFFB8E95E), onSelected = { onTick(); viewModel.setVideoSortOrder(it) }) },
+                    { SettingsStepperRow(Icons.Rounded.Layers, "每组数量", settings.videoBatchSize.toString() + " 个", color = Color(0xFFB8E95E), onDecrease = { onTick(); viewModel.setVideoBatchSize(settings.videoBatchSize - 10) }, onIncrease = { onTick(); viewModel.setVideoBatchSize(settings.videoBatchSize + 10) }) },
                     { SettingsSwitchRow(Icons.Rounded.Movie, "视频进度条", if (settings.videoShowProgressBar) "细条常驻显示" else "已隐藏", checked = settings.videoShowProgressBar, onCheckedChange = { onTick(); viewModel.setVideoShowProgressBar(it) }, color = Color(0xFFB8E95E)) },
                 ))
                 SectionTitle("整理方式")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.Delete, "删除模式", stringResource(settings.deleteMode.labelRes), color = Color(0xFFDD5A56), onClick = { onTick(); viewModel.cycleDeleteMode() }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Delete, "删除模式", stringResource(settings.deleteMode.labelRes), deleteModeOptions(), settings.deleteMode.name, color = Color(0xFFDD5A56), onSelected = { onTick(); viewModel.setDeleteMode(DeleteMode.valueOf(it)) }) },
                     { SettingsRow(Icons.AutoMirrored.Rounded.DriveFileMove, "移动到文件夹时", if (settings.autoMoveOnKeepFavorite) "已开启指定归档确认" else "点击开启文件移动能力", onClick = { openSheet(SettingsSheet.MOVE_PERMISSION) }) },
                     { SettingsSwitchRow(Icons.Rounded.BrokenImage, "相似照片检测", "自动检测连拍、截图和相似照片", checked = settings.similarDetection, onCheckedChange = { onTick(); viewModel.setSimilarDetection(it) }, badge = "测试") },
                 ))
@@ -437,11 +446,11 @@ private fun SettingsPageContent(
             SettingsPage.EXPERIENCE -> {
                 SectionTitle("操作体验")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.Tune, "滑动灵敏度", stringResource(settings.swipeSensitivity.labelRes), color = Color(0xFFD44C84), onClick = { onTick(); viewModel.cycleSwipeSensitivity() }) },
-                    { SettingsRow(Icons.Rounded.TouchApp, "手势方向", stringResource(settings.gestureDirection.labelRes), color = Color(0xFFD44C84), onClick = { onTick(); viewModel.cycleGestureDirection() }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Tune, "滑动灵敏度", stringResource(settings.swipeSensitivity.labelRes), swipeSensitivityOptions(), settings.swipeSensitivity.name, color = Color(0xFFD44C84), onSelected = { onTick(); viewModel.setSwipeSensitivity(SwipeSensitivity.valueOf(it)) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.TouchApp, "手势方向", stringResource(settings.gestureDirection.labelRes), gestureDirectionOptions(), settings.gestureDirection.name, color = Color(0xFFD44C84), onSelected = { onTick(); viewModel.setGestureDirection(GestureDirection.valueOf(it)) }) },
                     { SettingsSwitchRow(Icons.Rounded.MusicNote, "滑动音效", if (settings.swipeSound) "已开启" else "已关闭", checked = settings.swipeSound, onCheckedChange = { onTick(); viewModel.setSwipeSound(it) }, color = Color(0xFFE8A93B)) },
                     { SettingsSwitchRow(Icons.Rounded.MusicNote, "打开视频默认静音", "进入视频整理时默认静音，点侧边栏音量按钮可恢复声音", checked = settings.videoDefaultMuted, onCheckedChange = { onTick(); viewModel.setVideoDefaultMuted(it) }, color = Color(0xFFE8A93B)) },
-                    { SettingsRow(Icons.Rounded.AspectRatio, "视频显示比例", stringResource(settings.videoDisplayMode.labelRes) + " · " + stringResource(settings.videoDisplayMode.descriptionRes), color = Color(0xFF5E8DB4), onClick = { onTick(); viewModel.cycleVideoDisplayMode() }) },
+                    { SettingsSegmentedRow(Icons.Rounded.AspectRatio, "视频显示比例", stringResource(settings.videoDisplayMode.labelRes), videoDisplayModeOptions(), settings.videoDisplayMode.name, color = Color(0xFF5E8DB4), onSelected = { onTick(); viewModel.setVideoDisplayMode(VideoDisplayMode.valueOf(it)) }) },
                     { SettingsRow(Icons.Rounded.Vibration, "震动反馈", stringResource(settings.hapticLevel.labelRes), color = Color(0xFF55A6C8), onClick = { openSheet(SettingsSheet.HAPTIC) }) },
                 ))
             }
@@ -501,23 +510,18 @@ private fun cleaningDisplaySummary(settings: AppSettings): String {
 
 private fun settingsSortLabel(order: String): String = if (order == "newest") "最新在前" else "随机"
 
-private fun nextSettingsSortOrder(order: String): String = if (order == "random") "newest" else "random"
+private fun settingsDateModeOptions(): List<Pair<String, String>> = listOf(
+    "all" to "全部",
+    "year" to "今年",
+    "month" to "本月",
+    "seven_days" to "7天",
+    "today_history" to "那天",
+)
 
-private fun nextSettingsBatchSize(current: Int): Int = when (current) {
-    10 -> 20
-    20 -> 30
-    30 -> 40
-    40 -> 60
-    else -> 10
-}
-
-private fun nextSettingsDateMode(mode: String): String = when (mode) {
-    "all" -> "year"
-    "year" -> "month"
-    "month" -> "seven_days"
-    "seven_days" -> "today_history"
-    else -> "all"
-}
+private fun settingsSortOptions(): List<Pair<String, String>> = listOf(
+    "random" to "随机",
+    "newest" to "最新",
+)
 
 private fun settingsPhotoTypeLabel(type: String): String = when (type) {
     "normal" -> "普通照片"
@@ -530,15 +534,28 @@ private fun settingsPhotoTypeLabel(type: String): String = when (type) {
     else -> "全部照片"
 }
 
-private fun nextSettingsPhotoType(type: String): String = when (type) {
-    "all" -> "screenshot"
-    "screenshot" -> "selfie"
-    "selfie" -> "motion"
-    "motion" -> "gif"
-    "gif" -> "long"
-    "long" -> "raw"
-    else -> "all"
-}
+private fun settingsPhotoTypeOptions(): List<Pair<String, String>> = listOf(
+    "all" to "全部",
+    "normal" to "普通",
+    "screenshot" to "截图",
+    "selfie" to "自拍",
+    "motion" to "实况",
+    "gif" to "GIF",
+    "long" to "长图",
+    "raw" to "RAW",
+)
+
+@Composable
+private fun deleteModeOptions(): List<Pair<String, String>> = DeleteMode.entries.map { it.name to stringResource(it.labelRes) }
+
+@Composable
+private fun swipeSensitivityOptions(): List<Pair<String, String>> = SwipeSensitivity.entries.map { it.name to stringResource(it.labelRes) }
+
+@Composable
+private fun gestureDirectionOptions(): List<Pair<String, String>> = GestureDirection.entries.map { it.name to stringResource(it.labelRes) }
+
+@Composable
+private fun videoDisplayModeOptions(): List<Pair<String, String>> = VideoDisplayMode.entries.map { it.name to stringResource(it.labelRes) }
 
 @Composable
 private fun SettingsHeader(title: String, subtitle: String, onBack: () -> Unit) {
@@ -1826,6 +1843,96 @@ private fun SettingsSwitchRow(
             }
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun SettingsSegmentedRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    options: List<Pair<String, String>>,
+    selectedValue: String,
+    color: Color = MaterialTheme.colorScheme.primary,
+    onSelected: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 15.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconTile(icon, color)
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .clip(RoundedCornerShape(999.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            options.forEach { (value, label) ->
+                SegmentButton(
+                    text = label,
+                    selected = value == selectedValue,
+                    modifier = Modifier.width(86.dp),
+                    onClick = { onSelected(value) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsStepperRow(
+    icon: ImageVector,
+    title: String,
+    value: String,
+    color: Color = MaterialTheme.colorScheme.primary,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        IconTile(icon, color)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            StepperButton("-", onDecrease)
+            Text(value, modifier = Modifier.width(58.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            StepperButton("+", onIncrease)
+        }
+    }
+}
+
+@Composable
+private fun StepperButton(text: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
     }
 }
 
