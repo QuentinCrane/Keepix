@@ -1,7 +1,9 @@
 package com.futureape.kanleme.ui.screens
 
 import android.content.ContentUris
+import android.content.Context
 import android.net.Uri
+import android.media.AudioManager
 import android.os.SystemClock
 import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
@@ -138,6 +140,10 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showFolderPicker by remember { mutableStateOf(false) }
     val videoChromeVisible = settingsLoaded && settings.videoChromeVisible
+    val context = LocalContext.current
+    val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    var sessionMuted by remember { mutableStateOf<Boolean?>(null) }
+    val videoMuted = sessionMuted ?: settings.videoDefaultMuted
     val pagerState = rememberPagerState(pageCount = { videos.size.coerceAtLeast(1) })
     var lastAppliedShuffleSeed by remember { mutableStateOf(scope.randomSeed) }
     var lastSettledPage by remember { mutableIntStateOf(0) }
@@ -151,6 +157,17 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
 
     BackHandler(onBack = ::leaveCleaning)
 
+    LaunchedEffect(settingsLoaded) {
+        if (settingsLoaded && sessionMuted == null) sessionMuted = settings.videoDefaultMuted
+    }
+    LaunchedEffect(settingsLoaded, videoMuted) {
+        if (!settingsLoaded) return@LaunchedEffect
+        audioManager.adjustStreamVolume(
+            AudioManager.STREAM_MUSIC,
+            if (videoMuted) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE,
+            0,
+        )
+    }
     LaunchedEffect(scope.folderPaths, scope.dateMode, scope.sortOrder, settings.excludedFolderPaths) { viewModel.loadVideoDeck(scope) }
     LaunchedEffect(videos.isEmpty(), deckPreparing, dashboard.videoCount, dashboard.processedVideoCount, scope) {
         if (videos.isEmpty() && !deckPreparing && dashboard.processedVideoCount < dashboard.videoCount) viewModel.loadVideoDeck(scope)
@@ -247,9 +264,11 @@ fun VideoCleanScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                         sessionActionCount = videoSessionActionCount,
                         lastAction = lastVideoAction,
                         chromeVisible = videoChromeVisible,
+                        muted = videoMuted,
                         onFavorite = { performVideoAction(video, SwipeAction.Favorite) },
                         onDelete = { performVideoAction(video, SwipeAction.Delete) },
                         onChromeVisibilityChange = { visible -> viewModel.setVideoChromeVisible(visible) },
+                        onMuteChange = { muted -> sessionMuted = muted },
                         onUndo = {
                             haptics.undo()
                             val mediaStoreId = viewModel.undoVideoCleaningAction()
@@ -476,9 +495,11 @@ private fun VideoReelPage(
     sessionActionCount: Int,
     lastAction: SwipeAction?,
     chromeVisible: Boolean,
+    muted: Boolean,
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
     onChromeVisibilityChange: (Boolean) -> Unit,
+    onMuteChange: (Boolean) -> Unit,
     onUndo: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -502,7 +523,6 @@ private fun VideoReelPage(
             }.getOrNull()
         }
     }
-    var muted by remember(video.id, settings.videoDefaultMuted) { mutableStateOf(settings.videoDefaultMuted) }
     var shouldPlay by remember(video.id) { mutableStateOf(true) }
     var playbackFailed by remember(video.id) { mutableStateOf(false) }
     var lastTapMillis by remember(video.id) { mutableStateOf(0L) }
@@ -517,7 +537,7 @@ private fun VideoReelPage(
     }
     LaunchedEffect(player, muted, isCurrent, shouldPlay) {
         player?.playWhenReady = isCurrent && shouldPlay
-        player?.volume = if (muted) 0f else 1f
+        player?.volume = 1f
     }
     DisposableEffect(player, playbackUris, playbackUriIndex) {
         val listener = object : Player.Listener {
@@ -714,7 +734,7 @@ private fun VideoReelPage(
                 },
                 onMute = {
                     haptics.tick()
-                    muted = !muted
+                    onMuteChange(!muted)
                 },
                 onFavorite = onFavorite,
                 onDelete = onDelete,
@@ -725,7 +745,7 @@ private fun VideoReelPage(
         }
 
         androidx.compose.animation.AnimatedVisibility(
-            visible = true,
+            visible = chromeVisible && (settings.videoShowInfoPanel || settings.videoShowProgressBar),
             enter = fadeIn() + slideInVertically { it / 5 },
             exit = fadeOut() + slideOutVertically { it / 5 },
             modifier = Modifier.align(Alignment.BottomStart),
@@ -737,18 +757,20 @@ private fun VideoReelPage(
                         Text(video.folderName.ifBlank { "本地相册" }, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                ThinVideoScrubber(
-                    progress = shownProgress,
-                    onValueChange = { value ->
-                        draggingProgress = value
-                        player?.seekTo((duration.toFloat() * value).toLong().coerceIn(0L, duration))
-                    },
-                    onValueChangeFinished = {
-                        haptics.tick()
-                        draggingProgress = null
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (settings.videoShowProgressBar) {
+                    ThinVideoScrubber(
+                        progress = shownProgress,
+                        onValueChange = { value ->
+                            draggingProgress = value
+                            player?.seekTo((duration.toFloat() * value).toLong().coerceIn(0L, duration))
+                        },
+                        onValueChangeFinished = {
+                            haptics.tick()
+                            draggingProgress = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }

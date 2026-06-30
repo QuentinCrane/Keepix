@@ -136,7 +136,17 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 popEnterTransition = { fadeIn(tween(140)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(280)) },
                 popExitTransition = { fadeOut(tween(120)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(280)) },
             ) {
-                composable(Destinations.HOME) {
+                composable(
+                    Destinations.HOME,
+                    popEnterTransition = {
+                        if (initialState.destination.route == Destinations.PHOTO) {
+                            fadeIn(tween(180, easing = LinearOutSlowInEasing)) +
+                                scaleIn(tween(240, easing = FastOutSlowInEasing), initialScale = 0.985f)
+                        } else {
+                            fadeIn(tween(140)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(280))
+                        }
+                    },
+                ) {
                     CleanHomeScreen(
                         viewModel = viewModel,
                         contentPadding = PaddingValues(bottom = homeBottomPadding),
@@ -167,10 +177,19 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 }
                 composable(
                     Destinations.PHOTO,
-                    enterTransition = { fadeIn(tween(90)) },
-                    exitTransition = { fadeOut(tween(90)) },
-                    popEnterTransition = { fadeIn(tween(90)) },
-                    popExitTransition = { fadeOut(tween(90)) },
+                    enterTransition = {
+                        fadeIn(tween(120, easing = LinearOutSlowInEasing)) +
+                            scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = 0.985f)
+                    },
+                    exitTransition = {
+                        fadeOut(tween(120, easing = FastOutSlowInEasing)) +
+                            scaleOut(tween(180, easing = FastOutSlowInEasing), targetScale = 1.01f)
+                    },
+                    popEnterTransition = { fadeIn(tween(120)) },
+                    popExitTransition = {
+                        fadeOut(tween(170, easing = FastOutSlowInEasing)) +
+                            scaleOut(tween(240, easing = FastOutSlowInEasing), targetScale = 0.94f)
+                    },
                 ) {
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         PhotoCleanScreen(

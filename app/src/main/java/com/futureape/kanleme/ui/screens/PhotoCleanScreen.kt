@@ -125,6 +125,7 @@ fun PhotoCleanScreen(
     onBatchFinished: () -> Unit,
 ) {
     val deck by viewModel.photoDeck.collectAsStateWithLifecycle()
+    val timelinePhotos by viewModel.timelinePhotos.collectAsStateWithLifecycle()
     val deckPreparing by viewModel.photoDeckPreparing.collectAsStateWithLifecycle()
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val typeStats by viewModel.photoTypeStats.collectAsStateWithLifecycle()
@@ -260,6 +261,7 @@ fun PhotoCleanScreen(
     }
 
     val currentPhoto = deck.first()
+    val memoryPhotos = timelinePhotos.ifEmpty { deck }
     val remainingPhotos = (dashboard.photoCount - dashboard.processedPhotoCount).coerceAtLeast(deck.size)
     val dimAlpha by animateFloatAsState(targetValue = if (showGuide) 0.46f else 0f, label = "guide_dim")
 
@@ -345,7 +347,7 @@ fun PhotoCleanScreen(
             KeepixDayMemoryOverlay(
                 visible = showDayMemory,
                 currentPhoto = currentPhoto,
-                photos = deck,
+                photos = memoryPhotos,
                 onDismiss = { showDayMemory = false },
                 onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
                 onDelete = { photo -> perform(photo, SwipeAction.Delete, 0f, -620f) },
@@ -535,7 +537,7 @@ fun PhotoCleanScreen(
         KeepixDayMemoryOverlay(
             visible = showDayMemory,
             currentPhoto = currentPhoto,
-            photos = deck,
+            photos = memoryPhotos,
             onDismiss = { showDayMemory = false },
             onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
             onDelete = { photo -> perform(photo, SwipeAction.Delete, 0f, -620f) },

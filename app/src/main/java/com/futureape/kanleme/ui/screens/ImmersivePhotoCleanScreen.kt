@@ -14,6 +14,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -29,6 +30,8 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -115,7 +118,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlinx.coroutines.launch
@@ -330,6 +332,7 @@ internal fun ImmersivePhotoCleanContent(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun KeepixDayMemoryOverlay(
     visible: Boolean,
@@ -342,26 +345,25 @@ internal fun KeepixDayMemoryOverlay(
     onApply: (String) -> Unit,
 ) {
     val context = LocalContext.current
-    val currentMillis = remember(currentPhoto.id, currentPhoto.dateTaken, currentPhoto.dateModified, currentPhoto.dateAdded) {
-        memoryItemMillis(currentPhoto)
-    }
-    val items = remember(currentPhoto.id, currentMillis, photos) {
-        (listOf(currentPhoto) + photos.sortedBy { abs(memoryItemMillis(it) - currentMillis) })
-            .distinctBy { it.id }
-            .take(72)
-    }
-    val memoryScrollState = rememberScrollState()
     val memoryScope = rememberCoroutineScope()
-    val scrollProgress = if (memoryScrollState.maxValue > 0) {
-        memoryScrollState.value.toFloat() / memoryScrollState.maxValue.toFloat()
-    } else {
-        0f
-    }.coerceIn(0f, 1f)
-    val selectedIndex = (scrollProgress * items.lastIndex.coerceAtLeast(0)).roundToInt().coerceIn(0, items.lastIndex.coerceAtLeast(0))
-    val selectedPhoto = items.getOrNull(selectedIndex) ?: currentPhoto
-    val mode = remember(selectedPhoto.id, selectedPhoto.dateTaken, selectedPhoto.dateAdded) { dayModeForPhoto(selectedPhoto) }
-    val dayTitle = remember(mode) { mode.removePrefix("d:").replace("-", "/") }
+    val currentDayKey = remember(currentPhoto.id, currentPhoto.dateTaken, currentPhoto.dateModified, currentPhoto.dateAdded) {
+        memoryDayKey(currentPhoto)
+    }
+    val dayGroups = remember(currentPhoto.id, photos) { buildMemoryDays(currentPhoto, photos) }
+    val initialPage = remember(currentDayKey, dayGroups) {
+        dayGroups.indexOfFirst { it.key == currentDayKey }.coerceAtLeast(0)
+    }
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { dayGroups.size.coerceAtLeast(1) })
+    LaunchedEffect(currentDayKey, dayGroups.size) {
+        val target = dayGroups.indexOfFirst { it.key == currentDayKey }
+        if (target >= 0 && pagerState.currentPage != target) pagerState.scrollToPage(target)
+    }
+    val selectedPage = pagerState.settledPage.coerceIn(0, dayGroups.lastIndex.coerceAtLeast(0))
+    val selectedDay = dayGroups.getOrNull(selectedPage) ?: MemoryDay(currentDayKey, currentDayKey.replace("-", "/"), listOf(currentPhoto))
+    val pageProgress = if (dayGroups.size > 1) selectedPage.toFloat() / dayGroups.lastIndex.toFloat() else 0f
     var memoryScale by remember(currentPhoto.id) { mutableFloatStateOf(1f) }
+    val rowCount = if (memoryScale < 0.86f) 3 else 2
+    val returnProgress = ((memoryScale - 1.28f) / 0.30f).coerceIn(0f, 1f)
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(180)) + scaleIn(tween(240), initialScale = 0.86f),
@@ -371,12 +373,12 @@ internal fun KeepixDayMemoryOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer { alpha = (1f - returnProgress).coerceIn(0.08f, 1f) }
                 .background(Color.Black.copy(alpha = 0.90f))
                 .statusBarsPadding()
                 .padding(horizontal = 18.dp, vertical = 12.dp)
-                .pointerInput(currentPhoto.id, items.size) {
+                .pointerInput(currentPhoto.id, dayGroups.size) {
                     awaitEachGesture {
-                        var totalZoom = 1f
                         while (true) {
                             val event = awaitPointerEvent()
                             val pressed = event.changes.filter { it.pressed }
@@ -394,10 +396,9 @@ internal fun KeepixDayMemoryOverlay(
                                     (currentA.y - currentB.y) * (currentA.y - currentB.y)
                             ).coerceAtLeast(1f)
                             val zoom = currentDistance / previousDistance
-                            totalZoom *= zoom
-                            memoryScale = (memoryScale * zoom).coerceIn(0.72f, 1.32f)
+                            memoryScale = (memoryScale * zoom).coerceIn(0.66f, 1.62f)
                             pressed.forEach { it.consume() }
-                            if (totalZoom < 0.54f) {
+                            if (memoryScale >= 1.58f) {
                                 onDismiss()
                                 break
                             }
@@ -418,12 +419,12 @@ internal fun KeepixDayMemoryOverlay(
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("回到那天", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.72f), fontWeight = FontWeight.Bold)
-                    Text(dayTitle, style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Black)
+                    Text(selectedDay.title, style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Black)
                 }
                 KeepixRoundButton(
                     icon = Icons.Rounded.Check,
                     contentDescription = null,
-                    onClick = { onApply(mode) },
+                    onClick = { onApply("d:" + selectedDay.key) },
                 )
             }
             BoxWithConstraints(
@@ -434,18 +435,27 @@ internal fun KeepixDayMemoryOverlay(
             ) {
                 val density = LocalDensity.current
                 val gap = 10.dp
-                val rowHeight = ((maxHeight - gap) / 2) * (0.70f * memoryScale)
+                val rowHeight = if (rowCount == 3) {
+                    ((maxHeight - gap * 2) / 3) * 0.88f
+                } else {
+                    ((maxHeight - gap) / 2) * (0.72f * memoryScale.coerceIn(0.86f, 1.28f))
+                }
                 val rowHeightPx = with(density) { rowHeight.roundToPx().coerceAtLeast(96) }
                 val gapPx = with(density) { gap.roundToPx() }
-                KeepixMemoryPhotoTape(
-                    context = context,
-                    photos = items,
-                    rowHeightPx = rowHeightPx,
-                    gapPx = gapPx,
-                    modifier = Modifier.horizontalScroll(memoryScrollState),
-                    onOpen = onOpen,
-                    onDelete = onDelete,
-                )
+                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                    val day = dayGroups.getOrNull(page) ?: return@HorizontalPager
+                    val dayScrollState = rememberScrollState()
+                    KeepixMemoryPhotoTape(
+                        context = context,
+                        photos = day.photos,
+                        rowHeightPx = rowHeightPx,
+                        gapPx = gapPx,
+                        rowCount = rowCount,
+                        modifier = Modifier.horizontalScroll(dayScrollState),
+                        onOpen = onOpen,
+                        onDelete = onDelete,
+                    )
+                }
             }
             Column(
                 modifier = Modifier
@@ -469,7 +479,7 @@ internal fun KeepixDayMemoryOverlay(
                             icon = Icons.Rounded.Swipe,
                             contentDescription = null,
                             onClick = {
-                                memoryScope.launch { memoryScrollState.animateScrollTo(0) }
+                                memoryScope.launch { pagerState.animateScrollToPage(initialPage) }
                             },
                         )
                         Surface(
@@ -480,12 +490,12 @@ internal fun KeepixDayMemoryOverlay(
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
                         ) {
                             KeepixMemoryDensityBar(
-                                total = items.size,
-                                progress = scrollProgress,
+                                total = dayGroups.size,
+                                progress = pageProgress,
                                 onSelect = { fraction ->
                                     memoryScope.launch {
-                                        val maxScroll = memoryScrollState.maxValue
-                                        memoryScrollState.scrollTo((maxScroll * fraction).toInt().coerceIn(0, maxScroll))
+                                        val target = (dayGroups.lastIndex * fraction).roundToInt().coerceIn(0, dayGroups.lastIndex.coerceAtLeast(0))
+                                        pagerState.animateScrollToPage(target)
                                     }
                                 },
                             )
@@ -586,6 +596,7 @@ private fun KeepixMemoryPhotoTape(
     photos: List<PhotoEntity>,
     rowHeightPx: Int,
     gapPx: Int,
+    rowCount: Int,
     modifier: Modifier,
     onOpen: (PhotoEntity) -> Unit,
     onDelete: (PhotoEntity) -> Unit,
@@ -607,21 +618,22 @@ private fun KeepixMemoryPhotoTape(
         val widths = photos.map { photo ->
             (rowHeightPx * memoryPhotoAspectRatio(photo)).roundToInt().coerceAtLeast(rowHeightPx / 2)
         }
-        val rowX = intArrayOf(0, 0)
+        val safeRowCount = rowCount.coerceIn(1, 3)
+        val rowX = IntArray(safeRowCount)
         val xOffsets = IntArray(measurables.size)
         val placeables = measurables.mapIndexed { index, measurable ->
-            val row = index % 2
+            val row = index % safeRowCount
             val width = widths[index]
             xOffsets[index] = rowX[row]
             rowX[row] += width + gapPx
             measurable.measure(Constraints.fixed(width, rowHeightPx))
         }
-        val contentWidth = max(rowX[0], rowX[1]).let { if (it > 0) it - gapPx else 0 }
+        val contentWidth = (rowX.maxOrNull() ?: 0).let { if (it > 0) it - gapPx else 0 }
         val layoutWidth = contentWidth.coerceAtLeast(constraints.minWidth)
-        val layoutHeight = rowHeightPx * 2 + gapPx
+        val layoutHeight = rowHeightPx * safeRowCount + gapPx * (safeRowCount - 1)
         layout(layoutWidth, layoutHeight) {
             placeables.forEachIndexed { index, placeable ->
-                val y = if (index % 2 == 0) 0 else rowHeightPx + gapPx
+                val y = (index % safeRowCount) * (rowHeightPx + gapPx)
                 placeable.placeRelative(xOffsets[index], y)
             }
         }
@@ -632,6 +644,26 @@ private fun memoryPhotoAspectRatio(photo: PhotoEntity): Float {
     val width = photo.width.takeIf { it > 0 } ?: photo.exifWidth?.takeIf { it > 0 } ?: 1
     val height = photo.height.takeIf { it > 0 } ?: photo.exifHeight?.takeIf { it > 0 } ?: 1
     return (width.toFloat() / height.toFloat()).coerceIn(0.36f, 3.20f)
+}
+
+private data class MemoryDay(
+    val key: String,
+    val title: String,
+    val photos: List<PhotoEntity>,
+)
+
+private fun buildMemoryDays(currentPhoto: PhotoEntity, photos: List<PhotoEntity>): List<MemoryDay> {
+    val unique = (listOf(currentPhoto) + photos).distinctBy { it.id }
+    return unique
+        .groupBy { memoryDayKey(it) }
+        .toSortedMap()
+        .map { (key, dayPhotos) ->
+            MemoryDay(
+                key = key,
+                title = key.replace("-", "/"),
+                photos = dayPhotos.sortedByDescending { memoryItemMillis(it) },
+            )
+        }
 }
 
 @Composable
@@ -723,12 +755,8 @@ private fun KeepixMemoryDensityBar(
     }
 }
 
-private fun dayModeForPhoto(photo: PhotoEntity): String {
-    return "d:" + SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(memoryItemMillis(photo)))
-}
-
-private fun memoryItemShortDate(photo: PhotoEntity): String {
-    return SimpleDateFormat("M/d", Locale.CHINA).format(Date(memoryItemMillis(photo)))
+private fun memoryDayKey(photo: PhotoEntity): String {
+    return SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(memoryItemMillis(photo)))
 }
 
 private fun memoryItemMillis(photo: PhotoEntity): Long {
@@ -736,11 +764,6 @@ private fun memoryItemMillis(photo: PhotoEntity): Long {
         .firstOrNull { it > 0L }
         ?.let(::normalizeMediaMillis)
         ?: System.currentTimeMillis()
-}
-
-private fun wrapMemoryIndex(index: Int, size: Int): Int {
-    if (size <= 0) return 0
-    return ((index % size) + size) % size
 }
 
 private fun normalizeMediaMillis(value: Long): Long {
