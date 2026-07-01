@@ -53,7 +53,6 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Swipe
@@ -107,6 +106,7 @@ import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
+import com.futureape.kanleme.ui.util.sharePhoto
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import com.futureape.kanleme.ui.i18n.Text
 import java.text.SimpleDateFormat
@@ -150,6 +150,8 @@ fun PhotoCleanScreen(
     var batchFavoriteCount by rememberSaveable { mutableIntStateOf(0) }
     var batchDeleteCount by rememberSaveable { mutableIntStateOf(0) }
     var batchDeleteBytes by rememberSaveable { mutableStateOf(0L) }
+    var lastBatchAction by remember { mutableStateOf<SwipeAction?>(null) }
+    var lastBatchDeleteBytes by rememberSaveable { mutableStateOf(0L) }
     var batchSummary by remember { mutableStateOf<PhotoBatchSummary?>(null) }
     var dayMemoryPinch by remember { mutableStateOf(DayMemoryPinchState()) }
 
@@ -158,6 +160,8 @@ fun PhotoCleanScreen(
         batchFavoriteCount = 0
         batchDeleteCount = 0
         batchDeleteBytes = 0L
+        lastBatchAction = null
+        lastBatchDeleteBytes = 0L
     }
 
     fun closeDayMemory() {
@@ -197,9 +201,26 @@ fun PhotoCleanScreen(
             favorited = batchFavoriteCount,
             deleted = batchDeleteCount,
             deletedBytes = batchDeleteBytes,
+            lastAction = lastBatchAction,
+            lastDeletedBytes = lastBatchDeleteBytes,
         )
-        viewModel.finishPhotoCleaningSession()
         batchFinishing = false
+    }
+
+    fun undoLastBatchAction(summary: PhotoBatchSummary) {
+        viewModel.undoPhotoCleaningAction()
+        when (summary.lastAction) {
+            SwipeAction.Keep -> batchKeepCount = (batchKeepCount - 1).coerceAtLeast(0)
+            SwipeAction.Favorite -> batchFavoriteCount = (batchFavoriteCount - 1).coerceAtLeast(0)
+            SwipeAction.Delete -> {
+                batchDeleteCount = (batchDeleteCount - 1).coerceAtLeast(0)
+                batchDeleteBytes = (batchDeleteBytes - summary.lastDeletedBytes).coerceAtLeast(0L)
+            }
+            null -> Unit
+        }
+        lastBatchAction = null
+        lastBatchDeleteBytes = 0L
+        batchSummary = null
     }
 
     fun updateGuideTarget(target: PhotoGuideTarget, rect: Rect) {
@@ -226,6 +247,37 @@ fun PhotoCleanScreen(
                     .build()
             )
         }
+    }
+
+    if (deck.isEmpty() && (batchSummary != null || batchFinishing)) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            batchSummary?.let { summary ->
+                PhotoBatchSummaryOverlay(
+                    summary = summary,
+                    onContinue = {
+                        viewModel.finishPhotoCleaningSession()
+                        batchSummary = null
+                        clearBatchCounters()
+                    },
+                    onBackHome = {
+                        viewModel.finishPhotoCleaningSession()
+                        batchSummary = null
+                        viewModel.resetPhotoSessionDateMode()
+                        clearBatchCounters()
+                        onBack()
+                    },
+                    onOpenTrash = {
+                        viewModel.finishPhotoCleaningSession()
+                        batchSummary = null
+                        viewModel.resetPhotoSessionDateMode()
+                        clearBatchCounters()
+                        onBatchFinished()
+                    },
+                    onUndoLast = { undoLastBatchAction(summary) },
+                )
+            }
+        }
+        return
     }
 
     if (deck.isEmpty() && deckPreparing) {
@@ -322,6 +374,8 @@ fun PhotoCleanScreen(
                 batchDeleteBytes += photo.size
             }
         }
+        lastBatchAction = action
+        lastBatchDeleteBytes = if (action == SwipeAction.Delete) photo.size else 0L
         viewModel.onPhotoAction(photo, action, exitTargetX, exitTargetY)
         val nextActionCount = sessionActionCount + 1
         if (nextActionCount >= settings.photoBatchSize.coerceIn(1, 100)) {
@@ -368,7 +422,7 @@ fun PhotoCleanScreen(
                 onTopCardPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.PhotoCard, rect) },
                 onUndoAnimationConsumed = { sequence -> viewModel.clearPhotoUndoAnimation(sequence) },
                 onAction = { photo, action, _, _, targetX, targetY -> perform(photo, action, targetX, targetY) },
-                onFavorite = { perform(currentPhoto, SwipeAction.Favorite, 0f, 560f) },
+                onShare = { haptics.tick(); sharePhoto(context, currentPhoto) },
                 onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
                 onToggleFocus = { haptics.tick(); viewModel.setPhotoFocusMode(!settings.photoFocusMode) },
                 onDateClick = { haptics.tick(); showDatePicker = true },
@@ -417,21 +471,25 @@ fun PhotoCleanScreen(
                 PhotoBatchSummaryOverlay(
                     summary = summary,
                     onContinue = {
+                        viewModel.finishPhotoCleaningSession()
                         batchSummary = null
                         clearBatchCounters()
                     },
                     onBackHome = {
+                        viewModel.finishPhotoCleaningSession()
                         batchSummary = null
                         viewModel.resetPhotoSessionDateMode()
                         clearBatchCounters()
                         onBack()
                     },
                     onOpenTrash = {
+                        viewModel.finishPhotoCleaningSession()
                         batchSummary = null
                         viewModel.resetPhotoSessionDateMode()
                         clearBatchCounters()
                         onBatchFinished()
                     },
+                    onUndoLast = { undoLastBatchAction(summary) },
                 )
             }
         }
@@ -499,10 +557,12 @@ fun PhotoCleanScreen(
                             .align(Alignment.Center)
                             .widthIn(max = 720.dp)
                             .fillMaxWidth()
+                            .zIndex(1f)
                     } else {
                         Modifier
                             .align(Alignment.Center)
                             .fillMaxWidth()
+                            .zIndex(1f)
                     }),
                     onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
                     onTopCardPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.PhotoCard, rect) },
@@ -519,6 +579,7 @@ fun PhotoCleanScreen(
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .padding(bottom = 4.dp)
+                            .zIndex(8f)
                             .onGloballyPositioned { coordinates ->
                                 updateGuideTarget(PhotoGuideTarget.BottomInfo, coordinates.boundsInRoot())
                             },
@@ -572,6 +633,7 @@ fun PhotoCleanScreen(
                     .fillMaxWidth()
                     .statusBarsPadding()
                     .padding(top = 10.dp)
+                    .zIndex(9f)
                     .onGloballyPositioned { coordinates ->
                         updateGuideTarget(PhotoGuideTarget.TopBar, coordinates.boundsInRoot())
                     },
@@ -585,7 +647,8 @@ fun PhotoCleanScreen(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
-                .padding(top = 64.dp, end = 18.dp),
+                .padding(top = 64.dp, end = 18.dp)
+                .zIndex(10f),
         )
         if (chromeVisible && settings.photoShowGestureHint) {
             PhotoEdgeGlow(feedback = photoSwipeFeedback)
@@ -634,21 +697,25 @@ fun PhotoCleanScreen(
             PhotoBatchSummaryOverlay(
                 summary = summary,
                 onContinue = {
+                    viewModel.finishPhotoCleaningSession()
                     batchSummary = null
                     clearBatchCounters()
                 },
                 onBackHome = {
+                    viewModel.finishPhotoCleaningSession()
                     batchSummary = null
                     viewModel.resetPhotoSessionDateMode()
                     clearBatchCounters()
                     onBack()
                 },
                 onOpenTrash = {
+                    viewModel.finishPhotoCleaningSession()
                     batchSummary = null
                     viewModel.resetPhotoSessionDateMode()
                     clearBatchCounters()
                     onBatchFinished()
                 },
+                onUndoLast = { undoLastBatchAction(summary) },
             )
         }
     }
@@ -661,6 +728,8 @@ private data class PhotoBatchSummary(
     val favorited: Int,
     val deleted: Int,
     val deletedBytes: Long,
+    val lastAction: SwipeAction?,
+    val lastDeletedBytes: Long,
 )
 
 private data class DayMemoryPinchState(
@@ -675,21 +744,27 @@ private fun PhotoBatchSummaryOverlay(
     onContinue: () -> Unit,
     onBackHome: () -> Unit,
     onOpenTrash: () -> Unit,
+    onUndoLast: () -> Unit,
 ) {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .zIndex(60f)
-            .background(Color.Black.copy(alpha = 0.52f))
-            .padding(22.dp),
-        contentAlignment = Alignment.Center,
+    androidx.compose.animation.AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(tween(180)) + scaleIn(tween(220), initialScale = 0.94f),
+        exit = fadeOut(tween(150)) + scaleOut(tween(170), targetScale = 0.94f),
+        modifier = Modifier.fillMaxSize().zIndex(60f),
     ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.72f))
+                .padding(22.dp),
+            contentAlignment = Alignment.Center,
+        ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(30.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)),
+            color = Color(0xFF111317).copy(alpha = 0.96f),
+            contentColor = Color.White,
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
         ) {
             Column(
                 modifier = Modifier.padding(22.dp),
@@ -699,13 +774,16 @@ private fun PhotoBatchSummaryOverlay(
                 Text(
                     "本轮处理 " + summary.total + " 张 · 保留 " + summary.kept + " · 收藏 " + summary.favorited + " · 待删 " + summary.deleted,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.72f),
                 )
                 Text(
                     if (summary.deleted > 0) "预计释放 " + formatSize(summary.deletedBytes) else "本轮没有加入待删区的照片",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.62f),
                 )
+                Button(onClick = onUndoLast, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(999.dp)) {
+                    Text("撤回上一张")
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(onClick = onContinue, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) {
                         Text("继续")
@@ -720,6 +798,7 @@ private fun PhotoBatchSummaryOverlay(
                     }
                 }
             }
+        }
         }
     }
 }
@@ -743,7 +822,10 @@ private fun Modifier.detectScreenPinchToMemory(
             while (true) {
                 val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                 val pressed = event.changes.filter { it.pressed }
-                if (pressed.size < 2) break
+                if (pressed.size < 2) {
+                    if (pressed.isEmpty()) break
+                    continue
+                }
                 val a = pressed[0].position
                 val b = pressed[1].position
                 val dx = a.x - b.x

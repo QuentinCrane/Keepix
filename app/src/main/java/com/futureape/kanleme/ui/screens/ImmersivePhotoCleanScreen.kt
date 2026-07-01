@@ -55,9 +55,9 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Swipe
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -142,7 +142,7 @@ internal fun ImmersivePhotoCleanContent(
     onTopCardPositioned: (Rect) -> Unit,
     onUndoAnimationConsumed: (Long) -> Unit,
     onAction: (PhotoEntity, SwipeAction, Float, Float, Float, Float) -> Unit,
-    onFavorite: () -> Unit,
+    onShare: () -> Unit,
     onUndo: () -> Unit,
     onToggleFocus: () -> Unit,
     onDateClick: () -> Unit,
@@ -292,9 +292,9 @@ internal fun ImmersivePhotoCleanContent(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         KeepixRoundButton(
-                            icon = Icons.Rounded.FavoriteBorder,
+                            icon = Icons.Rounded.Share,
                             contentDescription = null,
-                            onClick = onFavorite,
+                            onClick = onShare,
                         )
                         KeepixBottomInfoBar(
                             photo = currentPhoto,

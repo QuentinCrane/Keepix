@@ -171,7 +171,7 @@ data class SimilarGroupPhotoEntity(
     @ColumnInfo(name = "is_best") val isBest: Boolean = false,
 )
 
-@Entity(tableName = "trash_items", indices = [Index("media_type"), Index("trashed_at")])
+@Entity(tableName = "trash_items", indices = [Index("media_type"), Index("trashed_at"), Index(value = ["media_id", "media_type"])])
 data class TrashItemEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "media_id") val mediaId: Long,

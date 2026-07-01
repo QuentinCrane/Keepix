@@ -8,11 +8,19 @@ import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import com.futureape.kanleme.ui.util.IMAGE_DISK_CACHE_MAX_BYTES
+import com.futureape.kanleme.ui.util.installCrashLogger
+import com.futureape.kanleme.ui.util.trimAppCache
 import dagger.hilt.android.HiltAndroidApp
 import java.io.File
 
 @HiltAndroidApp
 class KanlemeApplication : Application(), ImageLoaderFactory {
+    override fun onCreate() {
+        super.onCreate()
+        installCrashLogger(this)
+        trimAppCache(this)
+    }
+
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
         .crossfade(false)
         .diskCache {

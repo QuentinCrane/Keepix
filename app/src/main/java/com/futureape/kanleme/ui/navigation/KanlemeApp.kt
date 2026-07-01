@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -55,6 +56,7 @@ import com.futureape.kanleme.ui.screens.FavoritesScreen
 import com.futureape.kanleme.ui.screens.MeScreen
 import com.futureape.kanleme.ui.screens.MediaPermissionGate
 import com.futureape.kanleme.ui.screens.OnboardingScreen
+import com.futureape.kanleme.ui.screens.PhotoHistoryScreen
 import com.futureape.kanleme.ui.screens.PhotoCleanScreen
 import com.futureape.kanleme.ui.screens.PhotoStartScreen
 import com.futureape.kanleme.ui.screens.PhotoViewerScreen
@@ -279,6 +281,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         contentPadding = PaddingValues(bottom = homeBottomPadding),
                         onFavorites = { navController.navigate(Destinations.FAVORITES) },
                         onTrash = { navController.navigate(Destinations.TRASH) },
+                        onHistory = { navController.navigate(Destinations.PHOTO_HISTORY) },
                         onSettings = { navController.navigate(Destinations.SETTINGS) },
                         onSimilar = { navController.navigate(Destinations.SIMILAR) },
                         onAchievements = { navController.navigate(Destinations.ACHIEVEMENTS) },
@@ -291,6 +294,13 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 }
                 composable(Destinations.FAVORITES) { FavoritesScreen(viewModel, onBack = { navController.popBackStack() }) }
                 composable(Destinations.TRASH) { TrashScreen(viewModel, onBack = { navController.popBackStack() }) }
+                composable(Destinations.PHOTO_HISTORY) {
+                    PhotoHistoryScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() },
+                        onOpenPhoto = { photo -> navController.navigate(Destinations.photoViewer(photo.id)) },
+                    )
+                }
                 composable(Destinations.SETTINGS) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SettingsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
@@ -364,6 +374,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onSelected = onNavSelected,
                         modifier = Modifier
                             .align(Alignment.CenterStart)
+                            .zIndex(100f)
                             .padding(start = 10.dp, top = 92.dp, bottom = 92.dp),
                     )
                 } else {
@@ -374,6 +385,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onAdd = {},
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
+                            .zIndex(100f)
                             .navigationBarsPadding()
                             .padding(bottom = 18.dp),
                     )

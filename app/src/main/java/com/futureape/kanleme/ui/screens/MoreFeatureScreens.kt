@@ -183,6 +183,33 @@ fun TodayInHistoryScreen(
 }
 
 @Composable
+fun PhotoHistoryScreen(
+    viewModel: KanlemeViewModel,
+    onBack: () -> Unit,
+    onOpenPhoto: (PhotoEntity) -> Unit,
+) {
+    val photos by viewModel.cleanedPhotoHistory.collectAsStateWithLifecycle()
+    Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
+        ScreenHeader("整理历史", "最近整理过的照片，方便反悔后再找回", onBack)
+        if (photos.isEmpty()) {
+            EmptyState(
+                "还没有照片整理记录",
+                "开始整理后，保留、收藏和待删操作会自动出现在这里。",
+                "同步媒体库",
+                { viewModel.refreshLibrary() },
+                modifier = Modifier.padding(18.dp),
+            )
+        } else {
+            PhotoGrid(
+                photos = photos,
+                modifier = Modifier.fillMaxSize().padding(18.dp),
+                onPhotoClick = onOpenPhoto,
+            )
+        }
+    }
+}
+
+@Composable
 private fun TodaySummaryCard(yearCount: Int, photoCount: Int, videoCount: Int) {
     GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.78f) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {

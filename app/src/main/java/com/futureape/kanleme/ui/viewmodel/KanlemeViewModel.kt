@@ -102,6 +102,8 @@ class KanlemeViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val timelineVideos = repository.observeTimelineVideos()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val cleanedPhotoHistory = repository.observeCleanedPhotoHistory()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val todayInHistoryPhotos = repository.observeTodayInHistory()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

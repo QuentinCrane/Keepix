@@ -32,6 +32,18 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
     fun observeTimeline(limit: Int): Flow<List<PhotoEntity>>
 
+    @Query("""
+        SELECT p.* FROM photos p
+        WHERE p.deletion_status = 'none'
+        AND p.id IN (
+            SELECT media_id FROM operation_history
+            WHERE media_type = 'photo' AND is_undone = 0
+        )
+        ORDER BY p.processed_at DESC, p.updated_at DESC
+        LIMIT :limit
+    """)
+    fun observeCleanedHistory(limit: Int): Flow<List<PhotoEntity>>
+
     @Query("SELECT * FROM photos WHERE deletion_status = 'none' AND strftime('%m-%d', date_taken / 1000, 'unixepoch', 'localtime') = strftime('%m-%d', :now / 1000, 'unixepoch', 'localtime') AND strftime('%Y', date_taken / 1000, 'unixepoch', 'localtime') != strftime('%Y', :now / 1000, 'unixepoch', 'localtime') ORDER BY date_taken DESC LIMIT :limit")
     fun observeTodayInHistory(now: Long = System.currentTimeMillis(), limit: Int = 400): Flow<List<PhotoEntity>>
 

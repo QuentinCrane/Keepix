@@ -111,6 +111,7 @@ class AppRepositoryImpl @Inject constructor(
     override fun observeRecentPhotos(limit: Int): Flow<List<PhotoEntity>> = photoDao.observeRecent(limit)
     override fun observeTimelinePhotos(limit: Int): Flow<List<PhotoEntity>> = photoDao.observeTimeline(limit)
     override fun observeTimelineVideos(limit: Int): Flow<List<VideoEntity>> = videoDao.observeTimeline(limit)
+    override fun observeCleanedPhotoHistory(limit: Int): Flow<List<PhotoEntity>> = photoDao.observeCleanedHistory(limit)
     override fun observeTodayInHistory(limit: Int): Flow<List<PhotoEntity>> = photoDao.observeTodayInHistory(limit = limit)
     override fun observeTodayInHistoryVideos(limit: Int): Flow<List<VideoEntity>> = videoDao.observeTodayInHistory(limit = limit)
     override fun observeRecentlyAddedPhotos(days: Int, limit: Int): Flow<List<PhotoEntity>> {
@@ -324,7 +325,10 @@ class AppRepositoryImpl @Inject constructor(
                     }
                     trashDao.deleteByMedia(current.id, "photo")
                     trashDao.insert(current.toTrashItem())
-                    if (current.processingStatus == ProcessingStatus.UNPROCESSED) bumpStats(photoDelta = 1, deletedSize = current.size)
+                    bumpStats(
+                        photoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
+                        deletedSize = current.size,
+                    )
                 }
             }
         }
@@ -370,7 +374,10 @@ class AppRepositoryImpl @Inject constructor(
                     }
                     trashDao.deleteByMedia(current.id, "video")
                     trashDao.insert(current.toTrashItem())
-                    if (current.processingStatus == ProcessingStatus.UNPROCESSED) bumpStats(videoDelta = 1, deletedSize = current.size)
+                    bumpStats(
+                        videoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
+                        deletedSize = current.size,
+                    )
                 }
             }
         }

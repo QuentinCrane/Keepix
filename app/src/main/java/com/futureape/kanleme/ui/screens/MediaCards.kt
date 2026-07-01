@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Swipe
 import androidx.compose.material.icons.rounded.Visibility
@@ -542,8 +543,7 @@ fun SwipePhotoCard(
         inlineMotionSource = null
         inlineMotionUnavailable = false
         inlineMotionLoading = false
-        inlineMotionManualHint = false
-        if (canInlinePlayMotion) startInlineMotionPreview(manual = false)
+        inlineMotionManualHint = canInlinePlayMotion
     }
 
     LaunchedEffect(undoAnimation?.sequence, photo.id) {
@@ -824,6 +824,8 @@ fun SwipePhotoCard(
                     photo = photo,
                     modifier = Modifier.align(Alignment.TopStart).padding(14.dp),
                 )
+            } else if (canInlinePlayMotion && motionPreview == null) {
+                MotionPhotoTinyIcon(Modifier.align(Alignment.TopStart).padding(14.dp))
             }
             if (!immersiveStyle) {
                 Box(
@@ -909,12 +911,27 @@ private fun PhotoFitImageWithSoftFill(
             .crossfade(false)
             .build()
     }
-    AsyncImage(
-        model = model,
-        contentDescription = contentDescription,
-        modifier = modifier,
-        contentScale = ContentScale.Fit,
-    )
+    Box(modifier.background(Color.Black)) {
+        AsyncImage(
+            model = model,
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = 1.08f
+                    scaleY = 1.08f
+                    alpha = 0.34f
+                },
+            contentScale = ContentScale.Crop,
+        )
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.20f)))
+        AsyncImage(
+            model = model,
+            contentDescription = contentDescription,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit,
+        )
+    }
 }
 
 @Composable
@@ -1429,13 +1446,20 @@ private fun PhotoDynamicBadgeRow(
     compact: Boolean = false,
 ) {
     val labels = photoMediaBadges(photo)
-    if (labels.isEmpty()) return
+    val hasMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
+    if (labels.isEmpty() && !hasMotion) return
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        labels.take(2).forEach { label ->
+        if (hasMotion) MotionPhotoTinyIcon()
+        val visibleLabels = if (compact) {
+            labels.filterNot { it.contains("实况") || it.contains("Live", ignoreCase = true) || it.contains("Motion", ignoreCase = true) }.take(1)
+        } else {
+            labels.take(2)
+        }
+        visibleLabels.forEach { label ->
             Surface(
                 shape = RoundedCornerShape(999.dp),
                 color = Color.Black.copy(alpha = 0.58f),
@@ -1450,6 +1474,21 @@ private fun PhotoDynamicBadgeRow(
                     maxLines = 1,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun MotionPhotoTinyIcon(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.size(24.dp),
+        shape = CircleShape,
+        color = Color.Black.copy(alpha = 0.58f),
+        contentColor = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.PlayCircle, contentDescription = "实况照片", modifier = Modifier.size(15.dp), tint = Color.White)
         }
     }
 }

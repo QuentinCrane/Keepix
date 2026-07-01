@@ -13,6 +13,7 @@ object Destinations {
     const val ME = "me"
     const val FAVORITES = "favorites"
     const val TRASH = "trash"
+    const val PHOTO_HISTORY = "photo_history"
     const val SETTINGS = "settings"
     const val SETTINGS_PAGE_ARG = "settingsPage"
     const val SETTINGS_WITH_PAGE = "settings/{$SETTINGS_PAGE_ARG}"

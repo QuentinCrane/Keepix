@@ -78,6 +78,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -96,6 +97,7 @@ import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.components.NativeFolderExcludeButton
 import com.futureape.kanleme.ui.util.rememberHapticKit
+import com.futureape.kanleme.ui.util.shareCrashLogs
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -299,6 +301,7 @@ private fun SettingsPageContent(
     onSuccess: () -> Unit,
     viewModel: KanlemeViewModel,
 ) {
+    val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         when (page) {
             SettingsPage.HOME -> {
@@ -485,6 +488,7 @@ private fun SettingsPageContent(
                 SectionTitle("高级设置")
                 SettingsGroup(listOf<@Composable () -> Unit>(
                     { SettingsRow(Icons.Rounded.CleaningServices, "照片清理模式", stringResource(settings.photoCleanMode.labelRes), onClick = { openSheet(SettingsSheet.PHOTO_CLEAN_MODE) }) },
+                    { SettingsRow(Icons.Rounded.Info, "导出闪退日志", "自动记录最近 8 次闪退，方便后续 debug", onClick = { onTick(); if (!shareCrashLogs(context)) viewModel.showMessage("暂无闪退日志") }) },
                 ))
                 Text(stringResource(settings.photoCleanMode.descriptionRes), modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

@@ -99,6 +99,7 @@ interface AppRepository {
     fun observeRecentPhotos(limit: Int = 50): Flow<List<PhotoEntity>>
     fun observeTimelinePhotos(limit: Int = 5000): Flow<List<PhotoEntity>>
     fun observeTimelineVideos(limit: Int = 5000): Flow<List<VideoEntity>>
+    fun observeCleanedPhotoHistory(limit: Int = 300): Flow<List<PhotoEntity>>
     fun observeTodayInHistory(limit: Int = 400): Flow<List<PhotoEntity>>
     fun observeTodayInHistoryVideos(limit: Int = 400): Flow<List<VideoEntity>>
     fun observeRecentlyAddedPhotos(days: Int = 7, limit: Int = 120): Flow<List<PhotoEntity>>

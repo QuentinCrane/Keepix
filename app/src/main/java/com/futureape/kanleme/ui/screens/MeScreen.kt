@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
@@ -53,6 +54,7 @@ fun MeScreen(
     contentPadding: PaddingValues,
     onFavorites: () -> Unit,
     onTrash: () -> Unit,
+    onHistory: () -> Unit,
     onSettings: () -> Unit,
     onSimilar: () -> Unit,
     onAchievements: () -> Unit,
@@ -156,6 +158,13 @@ fun MeScreen(
                             accent = Color(0xFFE46A62),
                             onClick = onTrash,
                         )
+                        ProfileRow(
+                            icon = Icons.Rounded.History,
+                            title = "整理历史",
+                            subtitle = "最近整理过的照片",
+                            accent = Color(0xFF86A7FF),
+                            onClick = onHistory,
+                        )
                     }
                 }
             }
@@ -171,7 +180,8 @@ private fun UsageHeroCard(
     dashboard: DashboardStats,
     onRefresh: () -> Unit,
 ) {
-    val freed = dashboard.pendingDeleteBytes
+    val historicalFreed = dashboard.userStats?.totalStorageFreed ?: 0L
+    val freed = historicalFreed.takeIf { it > 0L } ?: dashboard.pendingDeleteBytes
     val progress = dashboard.progress.coerceIn(0f, 1f)
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -190,7 +200,7 @@ private fun UsageHeroCard(
                         color = Color.White,
                         fontWeight = FontWeight.Black,
                     )
-                    Text("预计可释放", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.58f), fontWeight = FontWeight.Bold)
+                    Text(if (historicalFreed > 0L) "累计记录释放" else "预计可释放", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.58f), fontWeight = FontWeight.Bold)
                 }
                 RoundIconSurface(icon = Icons.Rounded.Refresh, onClick = onRefresh)
             }
