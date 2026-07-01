@@ -178,7 +178,6 @@ fun VideoCleanScreen(
             0,
         )
     }
-    LaunchedEffect(scope.folderPaths, scope.dateMode, scope.sortOrder, settings.excludedFolderPaths) { viewModel.loadVideoDeck(scope) }
     LaunchedEffect(videos.isEmpty(), deckPreparing, dashboard.videoCount, dashboard.processedVideoCount, scope) {
         if (videos.isEmpty() && !deckPreparing && dashboard.processedVideoCount < dashboard.videoCount) viewModel.loadVideoDeck(scope)
     }
@@ -639,6 +638,7 @@ private fun VideoReelPage(
         Box(
             Modifier
                 .fillMaxSize()
+                .padding(bottom = bottomContentPadding)
                 .pointerInput(video.id, settings.videoSeekThresholdPx, player, chromeVisible) {
                     detectReelSurfaceGestures(
                         haptics = haptics,
@@ -769,17 +769,26 @@ private fun VideoReelPage(
             Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = bottomContentPadding), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (settings.videoShowInfoPanel) {
                     Column {
-                        Text(simpleAgeLabel(video.dateTaken), style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Black, maxLines = 1)
                         Text(
-                            videoInfoLine(video),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White.copy(alpha = 0.72f),
+                            if (chromeVisible) video.folderName.ifBlank { "本地相册" } else simpleAgeLabel(video.dateTaken),
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Black,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        androidx.compose.animation.AnimatedVisibility(visible = chromeVisible) {
+                            Text(
+                                videoInfoLine(video),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White.copy(alpha = 0.72f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
-                if (settings.videoShowProgressBar) {
+                if (settings.videoShowProgressBar && chromeVisible) {
                     ThinVideoScrubber(
                         progress = shownProgress,
                         onValueChange = { value ->

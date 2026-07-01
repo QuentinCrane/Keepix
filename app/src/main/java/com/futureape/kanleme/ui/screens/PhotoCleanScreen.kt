@@ -242,8 +242,8 @@ fun PhotoCleanScreen(
             context.imageLoader.enqueue(
                 ImageRequest.Builder(context)
                     .data(Uri.parse(photo.uri))
-                    .memoryCacheKey(photo.uri)
                     .diskCacheKey(photo.uri)
+                    .size(1280, 1280)
                     .build()
             )
         }

@@ -153,9 +153,10 @@ internal fun ImmersiveCleanHomeScreen(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(Uri.parse(heroUri))
-                    .memoryCacheKey(heroUri)
+                    .memoryCacheKey(heroUri + "#home_blur")
                     .diskCacheKey(heroUri)
-                    .placeholderMemoryCacheKey(heroUri)
+                    .placeholderMemoryCacheKey(heroUri + "#home_deck")
+                    .size(1080, 1080)
                     .crossfade(false)
                     .build(),
                 contentDescription = null,
@@ -698,9 +699,10 @@ private fun KeepixHomeDeck(
                     AsyncImage(
                         model = ImageRequest.Builder(context)
                             .data(Uri.parse(item.uri))
-                            .memoryCacheKey(item.uri)
+                            .memoryCacheKey(item.uri + "#home_deck")
                             .diskCacheKey(item.uri)
-                            .placeholderMemoryCacheKey(item.uri)
+                            .placeholderMemoryCacheKey(item.uri + "#home_deck")
+                            .size(900, 1200)
                             .crossfade(false)
                             .build(),
                         contentDescription = item.name,

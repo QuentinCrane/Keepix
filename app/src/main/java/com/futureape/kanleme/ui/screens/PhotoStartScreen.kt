@@ -79,6 +79,7 @@ fun PhotoStartScreen(
 ) {
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val photos by viewModel.photoDeck.collectAsStateWithLifecycle()
+    val recentPhotos by viewModel.recentPhotos.collectAsStateWithLifecycle()
     val scope by viewModel.photoScope.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val photoFolders by viewModel.photoFolders.collectAsStateWithLifecycle()
@@ -88,14 +89,15 @@ fun PhotoStartScreen(
     val alpha by animateFloatAsState(if (ready) 1f else 0f, tween(260), label = "photo_start_alpha")
     val lift by animateFloatAsState(if (ready) 0f else 30f, tween(320), label = "photo_start_lift")
 
-    LaunchedEffect(scope.folderPaths, scope.sortOrder, settings.excludedFolderPaths, scope.mediaType, scope.dateMode) {
-        viewModel.loadPhotoDeck(scope)
+    LaunchedEffect(Unit) {
         ready = true
     }
+    val previewPhotos = photos.ifEmpty { recentPhotos }
 
     if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
         KeepixPhotoStartContent(
-            photos = photos,
+            photos = previewPhotos,
+            queuedPhotoCount = photos.size,
             photoCount = dashboard.photoCount,
             processedPhotoCount = dashboard.processedPhotoCount,
             scopeMediaType = scope.mediaType,
@@ -251,6 +253,7 @@ fun PhotoStartScreen(
 @Composable
 private fun KeepixPhotoStartContent(
     photos: List<PhotoEntity>,
+    queuedPhotoCount: Int,
     photoCount: Int,
     processedPhotoCount: Int,
     scopeMediaType: String,
@@ -280,9 +283,10 @@ private fun KeepixPhotoStartContent(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(Uri.parse(hero.uri))
-                    .memoryCacheKey(hero.uri)
+                    .memoryCacheKey(hero.uri + "#photo_start_blur")
                     .diskCacheKey(hero.uri)
-                    .placeholderMemoryCacheKey(hero.uri)
+                    .placeholderMemoryCacheKey(hero.uri + "#photo_start_deck")
+                    .size(1080, 1080)
                     .crossfade(false)
                     .build(),
                 contentDescription = null,
@@ -330,7 +334,7 @@ private fun KeepixPhotoStartContent(
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
                         ) {
                             Text(
-                                photos.size.toString() + " 张待看",
+                                if (queuedPhotoCount > 0) queuedPhotoCount.toString() + " 张待看" else "点击开始",
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
@@ -460,9 +464,10 @@ private fun KeepixStartDeck(
                     AsyncImage(
                         model = ImageRequest.Builder(context)
                             .data(Uri.parse(photo.uri))
-                            .memoryCacheKey(photo.uri)
+                            .memoryCacheKey(photo.uri + "#photo_start_deck")
                             .diskCacheKey(photo.uri)
-                            .placeholderMemoryCacheKey(photo.uri)
+                            .placeholderMemoryCacheKey(photo.uri + "#photo_start_deck")
+                            .size(900, 1200)
                             .crossfade(false)
                             .build(),
                         contentDescription = photo.displayName,

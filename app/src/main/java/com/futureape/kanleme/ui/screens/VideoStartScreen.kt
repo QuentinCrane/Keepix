@@ -64,7 +64,6 @@ fun VideoStartScreen(
     onStart: () -> Unit,
 ) {
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
-    val videos by viewModel.videoDeck.collectAsStateWithLifecycle()
     val scope by viewModel.videoScope.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val videoFolders by viewModel.videoFolders.collectAsStateWithLifecycle()
@@ -74,8 +73,7 @@ fun VideoStartScreen(
     val alpha by animateFloatAsState(if (ready) 1f else 0f, tween(260), label = "video_start_alpha")
     val lift by animateFloatAsState(if (ready) 0f else 30f, tween(320), label = "video_start_lift")
 
-    LaunchedEffect(scope.folderPaths, scope.sortOrder, settings.excludedFolderPaths) {
-        viewModel.loadVideoDeck(scope)
+    LaunchedEffect(Unit) {
         ready = true
     }
 

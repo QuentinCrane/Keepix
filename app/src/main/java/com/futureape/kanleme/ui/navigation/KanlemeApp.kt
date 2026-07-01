@@ -104,13 +104,6 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
         }
     }
 
-    // Deck loading is triggered after MediaStore permission is confirmed and the library is synced.
-    // Keeping this pre-load makes returning users see cached Room data immediately while the new scan runs.
-    LaunchedEffect(Unit) {
-        viewModel.loadPhotoDeck()
-        viewModel.loadVideoDeck()
-    }
-
     LaunchedEffect(messageText) {
         val text = messageText ?: return@LaunchedEffect
         visibleMessage = text
@@ -359,10 +352,17 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                             } else if (target != current) {
                                 haptic.tick()
                             }
-                            navController.navigate(target) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                            if (index == 0 && current == Destinations.VIDEO) {
+                                viewModel.setHomeMediaTab("photo")
+                                if (!navController.popBackStack(Destinations.HOME, false)) {
+                                    navController.navigate(Destinations.HOME) { launchSingleTop = true }
+                                }
+                            } else {
+                                navController.navigate(target) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         }
                     }

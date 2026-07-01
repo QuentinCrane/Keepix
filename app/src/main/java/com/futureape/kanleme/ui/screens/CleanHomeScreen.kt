@@ -120,6 +120,7 @@ fun CleanHomeScreen(
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val recentlyAddedPhotos by viewModel.recentlyAddedPhotos.collectAsStateWithLifecycle()
+    val recentPhotos by viewModel.recentPhotos.collectAsStateWithLifecycle()
     val recentVideos by viewModel.recentVideos.collectAsStateWithLifecycle()
     val photoDeck by viewModel.photoDeck.collectAsStateWithLifecycle()
     val videoDeck by viewModel.videoDeck.collectAsStateWithLifecycle()
@@ -155,11 +156,6 @@ fun CleanHomeScreen(
             viewModel.setHomeMediaTab("photo")
         }
     }
-    LaunchedEffect(photoScope, videoScope, settings.excludedFolderPaths, photoDeckPreparing, videoDeckPreparing) {
-        if (photoDeck.isEmpty() && !photoDeckPreparing) viewModel.loadPhotoDeck(photoScope)
-        if (videoDeck.isEmpty() && !videoDeckPreparing) viewModel.loadVideoDeck(videoScope)
-    }
-
     // New Keepix visual path lives in ImmersiveCleanHomeScreen.kt.
     if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
         ImmersiveCleanHomeScreen(
@@ -168,8 +164,8 @@ fun CleanHomeScreen(
             settings = settings,
             photoScope = photoScope,
             videoScope = videoScope,
-            photos = photoDeck,
-            videos = videoDeck,
+            photos = photoDeck.ifEmpty { recentPhotos },
+            videos = videoDeck.ifEmpty { recentVideos },
             photoPreparing = photoDeckPreparing,
             videoPreparing = videoDeckPreparing,
             selectedIsPhoto = selectedIsPhoto,
@@ -182,10 +178,10 @@ fun CleanHomeScreen(
                 onVideo()
             },
             onPhoto = {
-                if (photoDeck.isNotEmpty()) onPhoto() else if (!photoDeckPreparing) viewModel.loadPhotoDeck(photoScope)
+                onPhoto()
             },
             onVideo = {
-                if (videoDeck.isNotEmpty()) onVideo() else if (!videoDeckPreparing) viewModel.loadVideoDeck(videoScope)
+                onVideo()
             },
             onTimeline = onTimeline,
             onTrash = onTrash,

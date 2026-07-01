@@ -78,10 +78,10 @@ class KanlemeViewModel @Inject constructor(
     private val settingsRepository: AppSettingsRepository,
 ) : ViewModel() {
     private companion object {
-        const val CONTINUOUS_PHOTO_DECK_SIZE = 1200
-        const val CONTINUOUS_VIDEO_DECK_SIZE = 600
-        const val PHOTO_PREFETCH_THRESHOLD = 320
-        const val VIDEO_PREFETCH_THRESHOLD = 160
+        const val CONTINUOUS_PHOTO_DECK_SIZE = 420
+        const val CONTINUOUS_VIDEO_DECK_SIZE = 240
+        const val PHOTO_PREFETCH_THRESHOLD = 120
+        const val VIDEO_PREFETCH_THRESHOLD = 80
     }
     private val _settingsLoaded = MutableStateFlow(false)
     val settingsLoaded = _settingsLoaded.asStateFlow()
@@ -196,8 +196,6 @@ class KanlemeViewModel @Inject constructor(
             val persisted = settingsRepository.settings.first()
             _photoScope.value = persisted.toPhotoCleaningScope()
             _videoScope.value = persisted.toVideoCleaningScope()
-            loadPhotoDeck(_photoScope.value)
-            loadVideoDeck(_videoScope.value)
         }
     }
 
@@ -215,8 +213,6 @@ class KanlemeViewModel @Inject constructor(
                 if (showMessage) {
                     _message.value = uiText(R.string.message_library_synced, p, v)
                 }
-                loadPhotoDeck()
-                loadVideoDeck()
             }
             .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_library_sync_failed) }
     }

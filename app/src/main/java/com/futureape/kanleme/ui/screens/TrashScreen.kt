@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.EmptyState
@@ -262,6 +263,7 @@ private fun TrashFilterPill(text: String, selected: Boolean = false, onClick: ()
 
 @Composable
 private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit) {
+    val context = LocalContext.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -271,7 +273,14 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit) {
             .clickable(onClick = onPreview),
     ) {
         AsyncImage(
-            model = Uri.parse(item.uri),
+            model = ImageRequest.Builder(context)
+                .data(Uri.parse(item.uri))
+                .memoryCacheKey(item.uri + "#trash_tile")
+                .diskCacheKey(item.uri)
+                .placeholderMemoryCacheKey(item.uri + "#trash_tile")
+                .size(640, 840)
+                .crossfade(false)
+                .build(),
             contentDescription = item.displayName,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,

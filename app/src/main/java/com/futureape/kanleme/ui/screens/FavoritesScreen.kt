@@ -395,9 +395,10 @@ private fun FavoritePhotoTile(
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(Uri.parse(photo.uri))
-                .memoryCacheKey(photo.uri)
+                .memoryCacheKey(photo.uri + "#favorite_photo_tile")
                 .diskCacheKey(photo.uri)
-                .placeholderMemoryCacheKey(photo.uri)
+                .placeholderMemoryCacheKey(photo.uri + "#favorite_photo_tile")
+                .size(900, 900)
                 .crossfade(false)
                 .build(),
             contentDescription = photo.displayName,
