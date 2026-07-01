@@ -90,6 +90,11 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
     val useSideRail = screenWidthDp >= 840 && screenWidthDp > screenHeightDp && current in setOf(Destinations.HOME, Destinations.ME)
     val homeBottomPadding = if (useSideRail) 30.dp else 108.dp
     val haptic = rememberHapticKit(settings)
+    val transitionBackdrop = if (current.usesDarkTransitionBackdrop(settings.appVisualStyle)) {
+        Color.Black
+    } else {
+        MaterialTheme.colorScheme.background
+    }
 
     LaunchedEffect(initialShortcutTarget, shortcutNonce) {
         when (initialShortcutTarget) {
@@ -112,7 +117,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
         viewModel.clearMessage()
     }
 
-    LiquidBackground(modifier = Modifier.fillMaxSize()) {
+    LiquidBackground(modifier = Modifier.fillMaxSize().background(transitionBackdrop)) {
         if (!settings.onboardingShown) {
             OnboardingScreen(onFinish = { viewModel.markOnboardingShown() })
         } else {
@@ -121,11 +126,12 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                     viewModel.onMediaAccessReady(accessKey, accessLabel)
                 },
             ) {
-            Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().background(transitionBackdrop)) {
             NavHost(
                 navController = navController,
                 startDestination = Destinations.HOME,
-                modifier = if (useSideRail) Modifier.fillMaxSize().padding(start = 92.dp) else Modifier.fillMaxSize(),
+                modifier = (if (useSideRail) Modifier.fillMaxSize().padding(start = 92.dp) else Modifier.fillMaxSize())
+                    .background(transitionBackdrop),
                 enterTransition = {
                     fadeIn(tween(140)) + slideIntoContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280))
                 },
@@ -459,6 +465,11 @@ private fun topLevelRouteIndex(route: String?): Int? = when (route) {
     Destinations.VIDEO -> 1
     Destinations.ME -> 2
     else -> null
+}
+
+private fun String?.usesDarkTransitionBackdrop(appVisualStyle: com.futureape.kanleme.data.settings.AppVisualStyle): Boolean {
+    return this in setOf(Destinations.PHOTO_START, Destinations.PHOTO, Destinations.VIDEO_START, Destinations.VIDEO, Destinations.VIEWER) ||
+        (this == Destinations.HOME && appVisualStyle == com.futureape.kanleme.data.settings.AppVisualStyle.IMMERSIVE_PHOTO)
 }
 
 

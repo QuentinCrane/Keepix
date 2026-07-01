@@ -82,6 +82,7 @@ class KanlemeViewModel @Inject constructor(
         const val CONTINUOUS_VIDEO_DECK_SIZE = 240
         const val PHOTO_PREFETCH_THRESHOLD = 120
         const val VIDEO_PREFETCH_THRESHOLD = 80
+        const val HOME_PREVIEW_DECK_SIZE = 3
     }
     private val _settingsLoaded = MutableStateFlow(false)
     val settingsLoaded = _settingsLoaded.asStateFlow()
@@ -149,14 +150,26 @@ class KanlemeViewModel @Inject constructor(
     private val _videoDeck = MutableStateFlow<List<VideoEntity>>(emptyList())
     val videoDeck = _videoDeck.asStateFlow()
 
+    private val _photoDeckPreview = MutableStateFlow<List<PhotoEntity>>(emptyList())
+    val photoDeckPreview = _photoDeckPreview.asStateFlow()
+
+    private val _videoDeckPreview = MutableStateFlow<List<VideoEntity>>(emptyList())
+    val videoDeckPreview = _videoDeckPreview.asStateFlow()
+
     private val _photoDeckPreparing = MutableStateFlow(false)
     val photoDeckPreparing = _photoDeckPreparing.asStateFlow()
+
+    private val _photoDeckPreviewPreparing = MutableStateFlow(false)
+    val photoDeckPreviewPreparing = _photoDeckPreviewPreparing.asStateFlow()
 
     private val _photoUndoAnimation = MutableStateFlow<PhotoUndoAnimation?>(null)
     val photoUndoAnimation = _photoUndoAnimation.asStateFlow()
 
     private val _videoDeckPreparing = MutableStateFlow(false)
     val videoDeckPreparing = _videoDeckPreparing.asStateFlow()
+
+    private val _videoDeckPreviewPreparing = MutableStateFlow(false)
+    val videoDeckPreviewPreparing = _videoDeckPreviewPreparing.asStateFlow()
 
     private val _photoSessionActionCount = MutableStateFlow(0)
     val photoSessionActionCount = _photoSessionActionCount.asStateFlow()
@@ -181,8 +194,12 @@ class KanlemeViewModel @Inject constructor(
     private var videoDeckRefilling = false
     private var photoDeckLoadJob: Job? = null
     private var videoDeckLoadJob: Job? = null
+    private var photoDeckPreviewLoadJob: Job? = null
+    private var videoDeckPreviewLoadJob: Job? = null
     private var photoDeckGeneration = 0L
     private var videoDeckGeneration = 0L
+    private var photoDeckPreviewGeneration = 0L
+    private var videoDeckPreviewGeneration = 0L
     private var lastGeneratedRandomSeed = 1L
     private var similarDetectionJob: Job? = null
     private val pendingPhotoActionMediaIds = mutableSetOf<Long>()
@@ -249,11 +266,15 @@ class KanlemeViewModel @Inject constructor(
     private fun invalidatePhotoDeckLoads() {
         photoDeckLoadJob?.cancel()
         photoDeckGeneration += 1L
+        photoDeckPreviewLoadJob?.cancel()
+        photoDeckPreviewGeneration += 1L
     }
 
     private fun invalidateVideoDeckLoads() {
         videoDeckLoadJob?.cancel()
         videoDeckGeneration += 1L
+        videoDeckPreviewLoadJob?.cancel()
+        videoDeckPreviewGeneration += 1L
     }
 
     private fun List<PhotoEntity>.withoutLocalPhotoExclusions(): List<PhotoEntity> =
@@ -407,9 +428,37 @@ class KanlemeViewModel @Inject constructor(
                     .loadPhotoDeck(requestedScope.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
-                if (generation == photoDeckGeneration) _photoDeck.value = loaded
+                if (generation == photoDeckGeneration) {
+                    _photoDeck.value = loaded
+                    _photoDeckPreview.value = loaded.take(HOME_PREVIEW_DECK_SIZE)
+                }
             } finally {
                 if (showPreparing && generation == photoDeckGeneration) _photoDeckPreparing.value = false
+            }
+        }
+    }
+
+    fun loadPhotoDeckPreview(scope: CleaningScope = _photoScope.value) {
+        if (_photoDeck.value.isNotEmpty()) {
+            _photoDeckPreview.value = _photoDeck.value.take(HOME_PREVIEW_DECK_SIZE)
+            return
+        }
+        val requestedScope = ensureRandomSeed(scope.copy(sortOrder = if (scope.sortOrder.isBlank()) "random" else scope.sortOrder))
+        _photoScope.value = requestedScope
+        _photoDeckPreviewPreparing.value = true
+        photoDeckPreviewLoadJob?.cancel()
+        val generation = ++photoDeckPreviewGeneration
+        photoDeckPreviewLoadJob = viewModelScope.launch {
+            try {
+                val preview = repository
+                    .loadPhotoDeck(requestedScope.copy(batchSize = HOME_PREVIEW_DECK_SIZE))
+                    .withoutLocalPhotoExclusions()
+                    .distinctBy { it.mediaStoreId }
+                if (generation == photoDeckPreviewGeneration && _photoDeck.value.isEmpty()) {
+                    _photoDeckPreview.value = preview
+                }
+            } finally {
+                if (generation == photoDeckPreviewGeneration) _photoDeckPreviewPreparing.value = false
             }
         }
     }
@@ -426,9 +475,37 @@ class KanlemeViewModel @Inject constructor(
                     .loadVideoDeck(requestedScope.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
                     .withoutLocalVideoExclusions()
                     .distinctBy { it.mediaStoreId }
-                if (generation == videoDeckGeneration) _videoDeck.value = loaded
+                if (generation == videoDeckGeneration) {
+                    _videoDeck.value = loaded
+                    _videoDeckPreview.value = loaded.take(HOME_PREVIEW_DECK_SIZE)
+                }
             } finally {
                 if (showPreparing && generation == videoDeckGeneration) _videoDeckPreparing.value = false
+            }
+        }
+    }
+
+    fun loadVideoDeckPreview(scope: CleaningScope = _videoScope.value) {
+        if (_videoDeck.value.isNotEmpty()) {
+            _videoDeckPreview.value = _videoDeck.value.take(HOME_PREVIEW_DECK_SIZE)
+            return
+        }
+        val requestedScope = ensureRandomSeed(scope.copy(sortOrder = if (scope.sortOrder.isBlank()) "random" else scope.sortOrder))
+        _videoScope.value = requestedScope
+        _videoDeckPreviewPreparing.value = true
+        videoDeckPreviewLoadJob?.cancel()
+        val generation = ++videoDeckPreviewGeneration
+        videoDeckPreviewLoadJob = viewModelScope.launch {
+            try {
+                val preview = repository
+                    .loadVideoDeck(requestedScope.copy(batchSize = HOME_PREVIEW_DECK_SIZE))
+                    .withoutLocalVideoExclusions()
+                    .distinctBy { it.mediaStoreId }
+                if (generation == videoDeckPreviewGeneration && _videoDeck.value.isEmpty()) {
+                    _videoDeckPreview.value = preview
+                }
+            } finally {
+                if (generation == videoDeckPreviewGeneration) _videoDeckPreviewPreparing.value = false
             }
         }
     }
@@ -458,7 +535,10 @@ class KanlemeViewModel @Inject constructor(
                     .loadPhotoDeck(session.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
-                if (generation == photoDeckGeneration) _photoDeck.value = loaded
+                if (generation == photoDeckGeneration) {
+                    _photoDeck.value = loaded
+                    _photoDeckPreview.value = loaded.take(HOME_PREVIEW_DECK_SIZE)
+                }
             } finally {
                 if (generation == photoDeckGeneration) _photoDeckPreparing.value = false
             }
@@ -489,7 +569,10 @@ class KanlemeViewModel @Inject constructor(
                     .loadVideoDeck(session.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
                     .withoutLocalVideoExclusions()
                     .distinctBy { it.mediaStoreId }
-                if (generation == videoDeckGeneration) _videoDeck.value = loaded
+                if (generation == videoDeckGeneration) {
+                    _videoDeck.value = loaded
+                    _videoDeckPreview.value = loaded.take(HOME_PREVIEW_DECK_SIZE)
+                }
             } finally {
                 if (generation == videoDeckGeneration) _videoDeckPreparing.value = false
             }
@@ -576,6 +659,24 @@ class KanlemeViewModel @Inject constructor(
         }
     }
 
+    private fun preparePhotoPreview(scope: CleaningScope) {
+        invalidatePhotoDeckLoads()
+        _photoDeck.value = emptyList()
+        _photoDeckPreview.value = emptyList()
+        _photoDeckPreparing.value = false
+        _photoScope.value = scope
+        loadPhotoDeckPreview(scope)
+    }
+
+    private fun prepareVideoPreview(scope: CleaningScope) {
+        invalidateVideoDeckLoads()
+        _videoDeck.value = emptyList()
+        _videoDeckPreview.value = emptyList()
+        _videoDeckPreparing.value = false
+        _videoScope.value = scope
+        loadVideoDeckPreview(scope)
+    }
+
     fun setHomeMediaTab(tab: String) = viewModelScope.launch {
         settingsRepository.setHomeMediaTab(tab)
     }
@@ -585,9 +686,19 @@ class KanlemeViewModel @Inject constructor(
         loadPhotoDeck(_photoScope.value.copy(mediaType = type))
     }
 
+    fun setPhotoTypePreview(type: String) = viewModelScope.launch {
+        settingsRepository.setPhotoMediaType(type)
+        preparePhotoPreview(_photoScope.value.copy(mediaType = type))
+    }
+
     fun setPhotoDateMode(mode: String) = viewModelScope.launch {
         settingsRepository.setPhotoDateMode(mode)
         loadPhotoDeck(_photoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
+    }
+
+    fun setPhotoDateModePreview(mode: String) = viewModelScope.launch {
+        settingsRepository.setPhotoDateMode(mode)
+        preparePhotoPreview(_photoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
     }
 
     fun setPhotoSessionDateMode(mode: String) {
@@ -603,6 +714,11 @@ class KanlemeViewModel @Inject constructor(
         loadVideoDeck(_videoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
     }
 
+    fun setVideoDateModePreview(mode: String) = viewModelScope.launch {
+        settingsRepository.setVideoDateMode(mode)
+        prepareVideoPreview(_videoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
+    }
+
     fun setVideoSessionDateMode(mode: String) {
         loadVideoDeck(_videoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
     }
@@ -616,6 +732,11 @@ class KanlemeViewModel @Inject constructor(
         loadPhotoDeck(_photoScope.value.copy(folderPaths = path?.let { setOf(it) } ?: emptySet()))
     }
 
+    fun setPhotoFolderPreview(path: String?) = viewModelScope.launch {
+        settingsRepository.setPhotoFolderPath(path)
+        preparePhotoPreview(_photoScope.value.copy(folderPaths = path?.let { setOf(it) } ?: emptySet()))
+    }
+
     fun togglePhotoRandom() = viewModelScope.launch {
         val next = if (_photoScope.value.sortOrder == "random") "newest" else "random"
         val seed = if (next == "random") nextRandomSeed() else _photoScope.value.randomSeed
@@ -623,11 +744,25 @@ class KanlemeViewModel @Inject constructor(
         loadPhotoDeck(_photoScope.value.copy(sortOrder = next, randomSeed = seed))
     }
 
+    fun togglePhotoRandomPreview() = viewModelScope.launch {
+        val next = if (_photoScope.value.sortOrder == "random") "newest" else "random"
+        val seed = if (next == "random") nextRandomSeed() else _photoScope.value.randomSeed
+        settingsRepository.setPhotoSortOrderWithSeed(next, seed)
+        preparePhotoPreview(_photoScope.value.copy(sortOrder = next, randomSeed = seed))
+    }
+
     fun setPhotoSortOrder(order: String) = viewModelScope.launch {
         val next = if (order == "newest") "newest" else "random"
         val seed = if (next == "random") nextRandomSeed() else _photoScope.value.randomSeed
         settingsRepository.setPhotoSortOrderWithSeed(next, seed)
         loadPhotoDeck(_photoScope.value.copy(sortOrder = next, randomSeed = seed))
+    }
+
+    fun setPhotoSortOrderPreview(order: String) = viewModelScope.launch {
+        val next = if (order == "newest") "newest" else "random"
+        val seed = if (next == "random") nextRandomSeed() else _photoScope.value.randomSeed
+        settingsRepository.setPhotoSortOrderWithSeed(next, seed)
+        preparePhotoPreview(_photoScope.value.copy(sortOrder = next, randomSeed = seed))
     }
 
     fun cyclePhotoBatchSize() = viewModelScope.launch {
@@ -647,6 +782,11 @@ class KanlemeViewModel @Inject constructor(
         loadVideoDeck(_videoScope.value.copy(folderPaths = path?.let { setOf(it) } ?: emptySet()))
     }
 
+    fun setVideoFolderPreview(path: String?) = viewModelScope.launch {
+        settingsRepository.setVideoFolderPath(path)
+        prepareVideoPreview(_videoScope.value.copy(folderPaths = path?.let { setOf(it) } ?: emptySet()))
+    }
+
     fun toggleVideoRandom() = viewModelScope.launch {
         val next = if (_videoScope.value.sortOrder == "random") "newest" else "random"
         val seed = if (next == "random") nextRandomSeed() else _videoScope.value.randomSeed
@@ -654,11 +794,25 @@ class KanlemeViewModel @Inject constructor(
         loadVideoDeck(_videoScope.value.copy(sortOrder = next, randomSeed = seed))
     }
 
+    fun toggleVideoRandomPreview() = viewModelScope.launch {
+        val next = if (_videoScope.value.sortOrder == "random") "newest" else "random"
+        val seed = if (next == "random") nextRandomSeed() else _videoScope.value.randomSeed
+        settingsRepository.setVideoSortOrderWithSeed(next, seed)
+        prepareVideoPreview(_videoScope.value.copy(sortOrder = next, randomSeed = seed))
+    }
+
     fun setVideoSortOrder(order: String) = viewModelScope.launch {
         val next = if (order == "newest") "newest" else "random"
         val seed = if (next == "random") nextRandomSeed() else _videoScope.value.randomSeed
         settingsRepository.setVideoSortOrderWithSeed(next, seed)
         loadVideoDeck(_videoScope.value.copy(sortOrder = next, randomSeed = seed))
+    }
+
+    fun setVideoSortOrderPreview(order: String) = viewModelScope.launch {
+        val next = if (order == "newest") "newest" else "random"
+        val seed = if (next == "random") nextRandomSeed() else _videoScope.value.randomSeed
+        settingsRepository.setVideoSortOrderWithSeed(next, seed)
+        prepareVideoPreview(_videoScope.value.copy(sortOrder = next, randomSeed = seed))
     }
 
     fun cycleVideoBatchSize() = viewModelScope.launch {

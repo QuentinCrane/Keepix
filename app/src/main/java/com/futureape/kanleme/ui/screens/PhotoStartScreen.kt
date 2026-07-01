@@ -79,7 +79,7 @@ fun PhotoStartScreen(
 ) {
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val photos by viewModel.photoDeck.collectAsStateWithLifecycle()
-    val recentPhotos by viewModel.recentPhotos.collectAsStateWithLifecycle()
+    val photoPreview by viewModel.photoDeckPreview.collectAsStateWithLifecycle()
     val scope by viewModel.photoScope.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val photoFolders by viewModel.photoFolders.collectAsStateWithLifecycle()
@@ -89,10 +89,11 @@ fun PhotoStartScreen(
     val alpha by animateFloatAsState(if (ready) 1f else 0f, tween(260), label = "photo_start_alpha")
     val lift by animateFloatAsState(if (ready) 0f else 30f, tween(320), label = "photo_start_lift")
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(scope.folderPaths, scope.sortOrder, scope.randomSeed, settings.excludedFolderPaths, scope.mediaType, scope.dateMode, photos.isEmpty()) {
+        if (photos.isEmpty()) viewModel.loadPhotoDeckPreview(scope)
         ready = true
     }
-    val previewPhotos = photos.ifEmpty { recentPhotos }
+    val previewPhotos = photos.ifEmpty { photoPreview }
 
     if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
         KeepixPhotoStartContent(
@@ -111,11 +112,11 @@ fun PhotoStartScreen(
             showAllPhotoExcludedFolders = showAllPhotoExcludedFolders,
             onBack = onBack,
             onStart = { haptics.success(); onStart() },
-            onToggleRandom = { haptics.tick(); viewModel.togglePhotoRandom() },
+            onToggleRandom = { haptics.tick(); viewModel.togglePhotoRandomPreview() },
             onCycleGesture = { haptics.tick(); viewModel.cycleGestureDirection() },
-            onType = { haptics.tick(); viewModel.setPhotoTypeFilter(it) },
-            onDate = { haptics.tick(); viewModel.setPhotoDateMode(it) },
-            onFolder = { path -> haptics.tick(); viewModel.setPhotoFolder(path) },
+            onType = { haptics.tick(); viewModel.setPhotoTypePreview(it) },
+            onDate = { haptics.tick(); viewModel.setPhotoDateModePreview(it) },
+            onFolder = { path -> haptics.tick(); viewModel.setPhotoFolderPreview(path) },
             onExclude = { path -> haptics.tick(); viewModel.toggleExcludedFolder(path) },
             onAddExcludedFolder = { path -> haptics.success(); viewModel.addExcludedFolder(path) },
             onToggleAllExcludedFolders = { haptics.tick(); showAllPhotoExcludedFolders = !showAllPhotoExcludedFolders },
@@ -179,7 +180,7 @@ fun PhotoStartScreen(
                                 title = "排序",
                                 subtitle = if (scope.sortOrder == "random") "随机" else "最新优先",
                                 modifier = Modifier.weight(1f),
-                                onClick = { haptics.tick(); viewModel.togglePhotoRandom() },
+                                onClick = { haptics.tick(); viewModel.togglePhotoRandomPreview() },
                             )
                             PhotoOptionPill(
                                 icon = Icons.Rounded.Swipe,
@@ -192,14 +193,14 @@ fun PhotoStartScreen(
                         PhotoFilterRail(
                             selectedType = scope.mediaType,
                             selectedDate = scope.dateMode,
-                            onType = { haptics.tick(); viewModel.setPhotoTypeFilter(it) },
-                            onDate = { haptics.tick(); viewModel.setPhotoDateMode(it) },
+                            onType = { haptics.tick(); viewModel.setPhotoTypePreview(it) },
+                            onDate = { haptics.tick(); viewModel.setPhotoDateModePreview(it) },
                         )
                         PhotoFolderSelectRail(
                             folders = photoFolders,
                             selectedPath = scope.folderPaths.firstOrNull(),
                             excluded = settings.excludedFolderPaths,
-                            onFolder = { path -> haptics.tick(); viewModel.setPhotoFolder(path) },
+                            onFolder = { path -> haptics.tick(); viewModel.setPhotoFolderPreview(path) },
                             onExclude = { path -> haptics.tick(); viewModel.toggleExcludedFolder(path) },
                         )
                     }

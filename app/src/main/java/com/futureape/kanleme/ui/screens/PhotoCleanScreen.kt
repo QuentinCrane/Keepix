@@ -748,57 +748,112 @@ private fun PhotoBatchSummaryOverlay(
 ) {
     androidx.compose.animation.AnimatedVisibility(
         visible = true,
-        enter = fadeIn(tween(180)) + scaleIn(tween(220), initialScale = 0.94f),
-        exit = fadeOut(tween(150)) + scaleOut(tween(170), targetScale = 0.94f),
+        enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { it / 5 } + scaleIn(tween(220), initialScale = 0.98f),
+        exit = fadeOut(tween(150)) + slideOutVertically(tween(170)) { it / 6 },
         modifier = Modifier.fillMaxSize().zIndex(60f),
     ) {
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.72f))
-                .padding(22.dp),
-            contentAlignment = Alignment.Center,
+                .background(Color.Black.copy(alpha = 0.58f))
+                .padding(horizontal = 18.dp, vertical = 22.dp),
+            contentAlignment = Alignment.BottomCenter,
         ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(30.dp),
-            color = Color(0xFF111317).copy(alpha = 0.96f),
-            contentColor = Color.White,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
-        ) {
-            Column(
-                modifier = Modifier.padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 520.dp),
+                shape = RoundedCornerShape(22.dp),
+                color = Color(0xFF090A0C).copy(alpha = 0.92f),
+                contentColor = Color.White,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
             ) {
-                Text("本轮整理完毕", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-                Text(
-                    "本轮处理 " + summary.total + " 张 · 保留 " + summary.kept + " · 收藏 " + summary.favorited + " · 待删 " + summary.deleted,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.72f),
-                )
-                Text(
-                    if (summary.deleted > 0) "预计释放 " + formatSize(summary.deletedBytes) else "本轮没有加入待删区的照片",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.62f),
-                )
-                Button(onClick = onUndoLast, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(999.dp)) {
-                    Text("撤回上一张")
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = onContinue, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) {
-                        Text("继续")
+                Column(
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(13.dp),
+                ) {
+                    val releaseText = if (summary.deleted > 0) "预计释放 " + formatSize(summary.deletedBytes) else "暂无待释放空间"
+                    val summaryText = "已整理 " + summary.total + " 张 · 待删 " + summary.deleted + " 张 · " + releaseText
+                    Text("本轮整理完成", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    Text(
+                        summaryText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.72f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.10f)))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (summary.lastAction != null) {
+                            PhotoBatchQuietTextButton(text = "撤回最后一张", onClick = onUndoLast)
+                        } else {
+                            Spacer(Modifier.width(1.dp))
+                        }
+                        if (summary.deleted > 0) {
+                            PhotoBatchQuietTextButton(text = "查看待删", onClick = onOpenTrash)
+                        }
                     }
-                    Button(onClick = onBackHome, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) {
-                        Text("回首页")
-                    }
-                }
-                if (summary.deleted > 0) {
-                    Button(onClick = onOpenTrash, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(999.dp)) {
-                        Text("去待删区")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        PhotoBatchSummaryAction(
+                            text = "继续整理",
+                            primary = true,
+                            modifier = Modifier.weight(1f),
+                            onClick = onContinue,
+                        )
+                        PhotoBatchSummaryAction(
+                            text = "回首页",
+                            primary = false,
+                            modifier = Modifier.weight(1f),
+                            onClick = onBackHome,
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PhotoBatchQuietTextButton(
+    text: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(999.dp),
+        color = Color.Transparent,
+        contentColor = Color.White.copy(alpha = 0.72f),
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun PhotoBatchSummaryAction(
+    text: String,
+    primary: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(46.dp),
+        shape = RoundedCornerShape(999.dp),
+        color = if (primary) Color.White.copy(alpha = 0.92f) else Color.White.copy(alpha = 0.08f),
+        contentColor = if (primary) Color.Black else Color.White,
+        border = if (primary) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         }
     }
 }

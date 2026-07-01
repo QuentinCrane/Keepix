@@ -120,12 +120,15 @@ fun CleanHomeScreen(
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val recentlyAddedPhotos by viewModel.recentlyAddedPhotos.collectAsStateWithLifecycle()
-    val recentPhotos by viewModel.recentPhotos.collectAsStateWithLifecycle()
     val recentVideos by viewModel.recentVideos.collectAsStateWithLifecycle()
     val photoDeck by viewModel.photoDeck.collectAsStateWithLifecycle()
     val videoDeck by viewModel.videoDeck.collectAsStateWithLifecycle()
+    val photoDeckPreview by viewModel.photoDeckPreview.collectAsStateWithLifecycle()
+    val videoDeckPreview by viewModel.videoDeckPreview.collectAsStateWithLifecycle()
     val photoDeckPreparing by viewModel.photoDeckPreparing.collectAsStateWithLifecycle()
     val videoDeckPreparing by viewModel.videoDeckPreparing.collectAsStateWithLifecycle()
+    val photoDeckPreviewPreparing by viewModel.photoDeckPreviewPreparing.collectAsStateWithLifecycle()
+    val videoDeckPreviewPreparing by viewModel.videoDeckPreviewPreparing.collectAsStateWithLifecycle()
     val photoScope by viewModel.photoScope.collectAsStateWithLifecycle()
     val videoScope by viewModel.videoScope.collectAsStateWithLifecycle()
     val haptics = rememberHapticKit(settings)
@@ -156,6 +159,14 @@ fun CleanHomeScreen(
             viewModel.setHomeMediaTab("photo")
         }
     }
+    LaunchedEffect(settings.appVisualStyle, selectedIsPhoto, photoScope, videoScope, settings.excludedFolderPaths, photoDeck.isEmpty(), videoDeck.isEmpty()) {
+        if (settings.appVisualStyle != AppVisualStyle.IMMERSIVE_PHOTO) return@LaunchedEffect
+        if (selectedIsPhoto && photoDeck.isEmpty()) {
+            viewModel.loadPhotoDeckPreview(photoScope)
+        } else if (!selectedIsPhoto && videoDeck.isEmpty()) {
+            viewModel.loadVideoDeckPreview(videoScope)
+        }
+    }
     // New Keepix visual path lives in ImmersiveCleanHomeScreen.kt.
     if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
         ImmersiveCleanHomeScreen(
@@ -164,10 +175,10 @@ fun CleanHomeScreen(
             settings = settings,
             photoScope = photoScope,
             videoScope = videoScope,
-            photos = photoDeck.ifEmpty { recentPhotos },
-            videos = videoDeck.ifEmpty { recentVideos },
-            photoPreparing = photoDeckPreparing,
-            videoPreparing = videoDeckPreparing,
+            photos = photoDeck.ifEmpty { photoDeckPreview },
+            videos = videoDeck.ifEmpty { videoDeckPreview },
+            photoPreparing = photoDeckPreparing || (photoDeck.isEmpty() && photoDeckPreviewPreparing),
+            videoPreparing = videoDeckPreparing || (videoDeck.isEmpty() && videoDeckPreviewPreparing),
             selectedIsPhoto = selectedIsPhoto,
             onPhotoTab = {
                 haptics.tick()
@@ -191,15 +202,15 @@ fun CleanHomeScreen(
             onPhotoType = { type ->
                 haptics.tick()
                 viewModel.setHomeMediaTab("photo")
-                viewModel.setPhotoTypeFilter(type)
+                viewModel.setPhotoTypePreview(type)
             },
             onPhotoDate = { mode ->
                 haptics.tick()
-                viewModel.setPhotoDateMode(mode)
+                viewModel.setPhotoDateModePreview(mode)
             },
             onPhotoSort = { order ->
                 haptics.tick()
-                viewModel.setPhotoSortOrder(order)
+                viewModel.setPhotoSortOrderPreview(order)
             },
             onPhotoBatch = { size ->
                 haptics.tick()
@@ -207,11 +218,11 @@ fun CleanHomeScreen(
             },
             onVideoDate = { mode ->
                 haptics.tick()
-                viewModel.setVideoDateMode(mode)
+                viewModel.setVideoDateModePreview(mode)
             },
             onVideoSort = { order ->
                 haptics.tick()
-                viewModel.setVideoSortOrder(order)
+                viewModel.setVideoSortOrderPreview(order)
             },
             onVideoBatch = { size ->
                 haptics.tick()

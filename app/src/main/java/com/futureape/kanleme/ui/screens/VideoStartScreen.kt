@@ -135,7 +135,7 @@ fun VideoStartScreen(
                     title = "排序",
                     subtitle = if (scope.sortOrder == "random") "随机" else "最新优先",
                     modifier = Modifier.weight(1f),
-                    onClick = { haptics.tick(); viewModel.toggleVideoRandom() },
+                    onClick = { haptics.tick(); viewModel.toggleVideoRandomPreview() },
                 )
                 VideoOptionPill(
                     icon = Icons.Rounded.AspectRatio,
@@ -151,7 +151,7 @@ fun VideoStartScreen(
                 folders = videoFolders,
                 selectedPath = scope.folderPaths.firstOrNull(),
                 excluded = settings.excludedFolderPaths,
-                onFolder = { path -> haptics.tick(); viewModel.setVideoFolder(path) },
+                onFolder = { path -> haptics.tick(); viewModel.setVideoFolderPreview(path) },
                 onExclude = { path -> haptics.tick(); viewModel.toggleExcludedFolder(path) },
             )
         }
