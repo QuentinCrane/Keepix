@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -126,6 +127,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlinx.coroutines.Job
@@ -419,7 +421,17 @@ internal fun KeepixDayMemoryOverlay(
             }
         }
     }
-    val selectedDayIndex = memoryDayKeys.indexOf(selectedDayKey).coerceAtLeast(0)
+    val memoryDayRanges = remember(memoryPhotos, memoryDayKeys, memoryFirstIndexByDayKey) {
+        memoryDayKeys.mapIndexedNotNull { index, key ->
+            val startIndex = memoryFirstIndexByDayKey[key] ?: return@mapIndexedNotNull null
+            val nextKey = memoryDayKeys.getOrNull(index + 1)
+            val endExclusive = nextKey?.let(memoryFirstIndexByDayKey::get) ?: memoryPhotos.size
+            MemoryDayRange(
+                startIndex = startIndex,
+                endExclusive = endExclusive.coerceAtLeast(startIndex + 1),
+            )
+        }
+    }
     var lastDensityScrollIndex by remember(currentPhoto.id, memoryPhotos.size, rowCount) { mutableStateOf(-1) }
     val densityScrollJob = remember(currentPhoto.id) { arrayOf<Job?>(null) }
     val rowModeProgress = remember { Animatable(1f) }
@@ -437,11 +449,7 @@ internal fun KeepixDayMemoryOverlay(
     val returnProgress = ((memoryScale - 1.10f) / 0.50f).coerceIn(0f, 1f)
     val entryAlpha = entryProgress.coerceIn(0f, 1f)
     val entryZoom = 0.88f + entryAlpha * 0.12f
-    val scrollProgress = if (memoryDayKeys.size > 1) {
-        selectedDayIndex.toFloat() / memoryDayKeys.lastIndex.toFloat()
-    } else {
-        0.5f
-    }
+    val scrollProgress = memoryProgressForIndex(selectedPhotoIndex, memoryDayRanges)
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(180)) + scaleIn(tween(240), initialScale = 0.86f),
@@ -631,7 +639,7 @@ internal fun KeepixDayMemoryOverlay(
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
                         ) {
                             KeepixMemoryDensityBar(
-                                total = memoryDayKeys.size,
+                                total = memoryPhotos.size.coerceIn(28, 180),
                                 progress = scrollProgress,
                                 onDragStateChange = { dragging ->
                                     if (dragging) {
@@ -640,12 +648,7 @@ internal fun KeepixDayMemoryOverlay(
                                 },
                                 onSelect = { fraction ->
                                     suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 720L
-                                    val targetDayIndex = ((memoryDayKeys.lastIndex.coerceAtLeast(0)) * fraction)
-                                        .roundToInt()
-                                        .coerceIn(0, memoryDayKeys.lastIndex.coerceAtLeast(0))
-                                    val targetDayKey = memoryDayKeys.getOrNull(targetDayIndex)
-                                    val targetIndex = targetDayKey?.let(memoryFirstIndexByDayKey::get)
-                                        ?: initialPhotoIndex
+                                    val targetIndex = memoryIndexForProgress(fraction, memoryDayRanges, initialPhotoIndex)
                                     val scrollIndex = (targetIndex - rowCount * 2).coerceAtLeast(0)
                                     if (scrollIndex != lastDensityScrollIndex) {
                                         lastDensityScrollIndex = scrollIndex
@@ -835,6 +838,11 @@ private data class DeletedMemoryPhoto(
     val index: Int,
 )
 
+private data class MemoryDayRange(
+    val startIndex: Int,
+    val endExclusive: Int,
+)
+
 private fun buildMemoryPhotoWindow(currentPhoto: PhotoEntity, photos: List<PhotoEntity>): List<PhotoEntity> {
     val sorted = (photos + currentPhoto)
         .distinctBy { it.id }
@@ -854,6 +862,36 @@ private fun buildMemoryPhotoWindow(currentPhoto: PhotoEntity, photos: List<Photo
     return sorted.filter { memoryDayKey(it) in selectedDayKeys }.ifEmpty { listOf(currentPhoto) }
 }
 
+private fun memoryProgressForIndex(index: Int, ranges: List<MemoryDayRange>): Float {
+    if (ranges.isEmpty()) return 0.5f
+    val rangeIndex = ranges.indexOfLast { index >= it.startIndex }
+        .coerceIn(0, ranges.lastIndex)
+    val range = ranges[rangeIndex]
+    val span = (range.endExclusive - range.startIndex).coerceAtLeast(1)
+    val intraDay = if (span <= 1) {
+        0.5f
+    } else {
+        ((index - range.startIndex).toFloat() / (span - 1).toFloat()).coerceIn(0f, 1f)
+    }
+    return ((rangeIndex.toFloat() + intraDay) / ranges.size.toFloat()).coerceIn(0f, 1f)
+}
+
+private fun memoryIndexForProgress(progress: Float, ranges: List<MemoryDayRange>, fallbackIndex: Int): Int {
+    if (ranges.isEmpty()) return fallbackIndex
+    val scaled = progress.coerceIn(0f, 1f) * ranges.size.toFloat()
+    val rangeIndex = floor(scaled).toInt().coerceIn(0, ranges.lastIndex)
+    val range = ranges[rangeIndex]
+    val span = (range.endExclusive - range.startIndex).coerceAtLeast(1)
+    if (span <= 1) return range.startIndex
+    val intraDay = if (progress >= 1f && rangeIndex == ranges.lastIndex) {
+        1f
+    } else {
+        (scaled - rangeIndex.toFloat()).coerceIn(0f, 0.999f)
+    }
+    return (range.startIndex + ((span - 1).toFloat() * intraDay).roundToInt())
+        .coerceIn(range.startIndex, range.endExclusive - 1)
+}
+
 private fun memoryPhotoAspectRatio(photo: PhotoEntity): Float {
     val width = photo.width.takeIf { it > 0 } ?: photo.exifWidth?.takeIf { it > 0 } ?: 1
     val height = photo.height.takeIf { it > 0 } ?: photo.exifHeight?.takeIf { it > 0 } ?: 1
@@ -870,57 +908,78 @@ private fun KeepixMemoryDensityBar(
     val currentOnSelect by rememberUpdatedState(onSelect)
     val currentOnDragStateChange by rememberUpdatedState(onDragStateChange)
     var dragProgress by remember { mutableFloatStateOf(Float.NaN) }
-    var lastDispatchedBucket by remember { mutableStateOf(-1) }
     val visualProgress = if (dragProgress.isNaN()) progress else dragProgress
     val itemCount = total.coerceAtLeast(1)
-    val selectedTick = (visualProgress.coerceIn(0f, 1f) * 27f).roundToInt().coerceIn(0, 27)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 20.dp)
             .pointerInput(itemCount) {
-                fun selectFromX(x: Float) {
-                    val width = size.width.toFloat().coerceAtLeast(1f)
-                    val next = (x / width).coerceIn(0f, 1f)
-                    val bucket = (next * (itemCount - 1).coerceAtLeast(0)).roundToInt()
-                    dragProgress = next
-                    if (bucket != lastDispatchedBucket) {
-                        lastDispatchedBucket = bucket
-                        currentOnSelect(next)
-                    }
-                }
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    lastDispatchedBucket = -1
-                    currentOnDragStateChange(true)
-                    selectFromX(down.position.x)
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull() ?: break
-                        if (change.changedToUpIgnoreConsumed()) break
-                        selectFromX(change.position.x)
-                        change.consume()
+                    var lastDispatchedBucket = -1
+                    fun selectFromX(x: Float) {
+                        val width = size.width.toFloat().coerceAtLeast(1f)
+                        val next = (x / width).coerceIn(0f, 1f)
+                        val bucket = (next * (itemCount - 1).coerceAtLeast(0)).roundToInt()
+                        dragProgress = next
+                        if (bucket != lastDispatchedBucket) {
+                            lastDispatchedBucket = bucket
+                            currentOnSelect(next)
+                        }
                     }
-                    currentOnDragStateChange(false)
-                    lastDispatchedBucket = -1
-                    dragProgress = Float.NaN
+                    try {
+                        currentOnDragStateChange(true)
+                        selectFromX(down.position.x)
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.pressed } ?: event.changes.firstOrNull() ?: break
+                            if (change.changedToUpIgnoreConsumed()) break
+                            selectFromX(change.position.x)
+                            change.consume()
+                        }
+                    } finally {
+                        currentOnDragStateChange(false)
+                        dragProgress = Float.NaN
+                    }
                 }
             },
     ) {
-        Row(
-            modifier = Modifier.align(Alignment.Center),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            repeat(28) { index ->
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 2.dp)
-                        .width(if (index == selectedTick) 4.dp else 2.dp)
-                        .height(if (index == selectedTick) 28.dp else 22.dp)
-                        .background(Color.White.copy(alpha = if (index == selectedTick) 0.78f else 0.22f), RoundedCornerShape(999.dp)),
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val tickCount = 28
+            val centerY = size.height / 2f
+            val left = 0f
+            val right = size.width.coerceAtLeast(1f)
+            val progressX = left + (right - left) * visualProgress.coerceIn(0f, 1f)
+            repeat(tickCount) { index ->
+                val normalized = if (tickCount <= 1) 0f else index.toFloat() / (tickCount - 1).toFloat()
+                val distance = abs(normalized - visualProgress.coerceIn(0f, 1f))
+                val emphasis = (1f - (distance * 18f).coerceIn(0f, 1f))
+                val tickWidth = 2.dp.toPx() + emphasis * 1.2.dp.toPx()
+                val tickHeight = 20.dp.toPx() + emphasis * 8.dp.toPx()
+                val tickX = left + (right - left) * normalized
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.22f + emphasis * 0.38f),
+                    topLeft = Offset(tickX - tickWidth / 2f, centerY - tickHeight / 2f),
+                    size = Size(tickWidth, tickHeight),
+                    cornerRadius = CornerRadius(tickWidth, tickWidth),
                 )
             }
+            val thumbWidth = 5.dp.toPx()
+            val thumbHeight = 30.dp.toPx()
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.88f),
+                topLeft = Offset(progressX - thumbWidth / 2f, centerY - thumbHeight / 2f),
+                size = Size(thumbWidth, thumbHeight),
+                cornerRadius = CornerRadius(thumbWidth, thumbWidth),
+            )
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.18f),
+                topLeft = Offset(progressX - 10.dp.toPx(), centerY - 18.dp.toPx()),
+                size = Size(20.dp.toPx(), 36.dp.toPx()),
+                cornerRadius = CornerRadius(999.dp.toPx(), 999.dp.toPx()),
+                style = Stroke(width = 1.dp.toPx()),
+            )
         }
     }
 }
