@@ -221,7 +221,7 @@ private fun FavoriteVideoGrid(videos: List<VideoEntity>, modifier: Modifier = Mo
         modifier = modifier
             .fillMaxWidth(),
         contentPadding = PaddingValues(bottom = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         gridItems(videos, key = { it.mediaStoreId }) { video ->
@@ -303,7 +303,7 @@ private fun FavoritePhotosHeader(
         Column(Modifier.weight(1f)) {
             Text("收藏照片 " + photoCount + " 张", style = MaterialTheme.typography.titleMedium)
             Text(
-                "原比例 · " + columnCount + " 列",
+                "照片墙 · " + columnCount + " 列",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -364,7 +364,7 @@ private fun FavoritePhotoMasonryGrid(
             .fillMaxWidth(),
         contentPadding = PaddingValues(bottom = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalItemSpacing = 10.dp,
+        verticalItemSpacing = 8.dp,
     ) {
         staggeredItems(photos, key = { it.mediaStoreId }) { photo ->
             FavoritePhotoTile(
@@ -381,14 +381,14 @@ private fun FavoritePhotoTile(
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(16.dp)
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(favoriteOriginalAspectRatio(photo))
             .favoriteTileEnter(photo.id)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -403,7 +403,7 @@ private fun FavoritePhotoTile(
                 .build(),
             contentDescription = photo.displayName,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit,
+            contentScale = ContentScale.Crop,
         )
     }
 }
@@ -411,7 +411,7 @@ private fun FavoritePhotoTile(
 private fun favoriteOriginalAspectRatio(photo: PhotoEntity): Float {
     val width = photo.exifWidth?.takeIf { it > 0 } ?: photo.width.takeIf { it > 0 } ?: 1
     val height = photo.exifHeight?.takeIf { it > 0 } ?: photo.height.takeIf { it > 0 } ?: 1
-    return width.toFloat() / height.toFloat()
+    return (width.toFloat() / height.toFloat()).coerceIn(0.50f, 2.15f)
 }
 
 @Composable

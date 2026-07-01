@@ -41,9 +41,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -97,6 +97,7 @@ import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlin.math.ceil
 import com.futureape.kanleme.ui.i18n.Text
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
     val trashItems by viewModel.trashItems.collectAsStateWithLifecycle()
@@ -165,12 +166,12 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                             modifier = Modifier.fillMaxSize().padding(18.dp),
                         )
                     } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Adaptive(104.dp),
+                        LazyVerticalStaggeredGrid(
+                            columns = StaggeredGridCells.Adaptive(118.dp),
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 104.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            verticalItemSpacing = 7.dp,
                         ) {
                             items(typedItems, key = { it.id }) { item ->
                                 TrashGridTile(
@@ -267,9 +268,9 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.76f)
+            .aspectRatio(trashWallAspectRatio(item))
             .trashTileEnter(item.id)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onPreview),
     ) {
         AsyncImage(
@@ -306,6 +307,17 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit) {
                 .size(16.dp),
         )
     }
+}
+
+private fun trashWallAspectRatio(item: TrashItemEntity): Float {
+    val raw = if (item.width > 0 && item.height > 0) {
+        item.width.toFloat() / item.height.toFloat()
+    } else if (item.mediaType == "video") {
+        16f / 9f
+    } else {
+        0.76f
+    }
+    return raw.coerceIn(0.50f, 2.15f)
 }
 
 @Composable

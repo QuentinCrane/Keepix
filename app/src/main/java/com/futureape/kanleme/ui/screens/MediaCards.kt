@@ -28,9 +28,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -1364,22 +1364,22 @@ fun PhotoGrid(photos: List<PhotoEntity>, modifier: Modifier = Modifier, onPhotoC
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var playingMotionPhotoId by remember { mutableStateOf<Long?>(null) }
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(112.dp),
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Adaptive(118.dp),
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalItemSpacing = 7.dp,
     ) {
         items(photos, key = { it.id }) { photo ->
-            val shape = RoundedCornerShape(22.dp)
+            val shape = RoundedCornerShape(18.dp)
             val canPlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
             var motionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
             var motionLoading by remember(photo.id) { mutableStateOf(false) }
             Surface(
-                modifier = Modifier.aspectRatio(photoDisplayAspectRatio(photo).coerceIn(0.72f, 1.38f)),
+                modifier = Modifier.aspectRatio(photoWallAspectRatio(photo)),
                 shape = shape,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.42f),
-                shadowElevation = 3.dp,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+                shadowElevation = 0.dp,
             ) {
                 Box(Modifier.fillMaxSize()) {
                     val preview = motionSource.takeIf { playingMotionPhotoId == photo.id }
@@ -1425,7 +1425,7 @@ fun PhotoGrid(photos: List<PhotoEntity>, modifier: Modifier = Modifier, onPhotoC
                                         )
                                     }
                                 ),
-                            contentScale = ContentScale.Fit,
+                            contentScale = ContentScale.Crop,
                         )
                     }
                     PhotoDynamicBadgeRow(
@@ -1476,6 +1476,10 @@ private fun PhotoDynamicBadgeRow(
             }
         }
     }
+}
+
+private fun photoWallAspectRatio(photo: PhotoEntity): Float {
+    return photoDisplayAspectRatio(photo).coerceIn(0.50f, 2.15f)
 }
 
 @Composable
