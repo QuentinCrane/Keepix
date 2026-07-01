@@ -82,6 +82,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -127,7 +128,6 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 
 // Keepix immersive photo cleaning visual path. Do not put legacy Liquid Glass UI in this file.
 @Composable
@@ -499,23 +499,25 @@ internal fun KeepixDayMemoryOverlay(
                 val density = LocalDensity.current
                 val gap = 10.dp
                 val rowHeight = if (rowCount == 3) {
-                    ((maxHeight - gap * 2) / 3) * 0.88f
+                    (maxHeight - gap * 2) / 3
                 } else {
-                    ((maxHeight - gap) / 2) * (0.72f * memoryScale.coerceIn(0.86f, 1.28f))
+                    (maxHeight - gap) / 2
                 }
-                LaunchedEffect(visible, currentPhoto.id) {
+                LaunchedEffect(visible, currentPhoto.id, initialPhotoIndex) {
                     if (!visible || memoryPhotos.isEmpty()) return@LaunchedEffect
-                    val initialColumnIndex = (initialPhotoIndex - (initialPhotoIndex % rowCount)).coerceAtLeast(0)
-                    memoryGridState.scrollToItem(initialColumnIndex)
-                    yield()
-                    val layoutInfo = memoryGridState.layoutInfo
-                    val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == initialPhotoIndex }
-                    if (itemInfo != null) {
-                        val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
-                        val itemCenter = itemInfo.offset.x + itemInfo.size.width / 2f
-                        val delta = itemCenter - viewportCenter
-                        if (abs(delta) > with(density) { 2.dp.toPx() }) {
-                            memoryGridState.scrollBy(delta)
+                    memoryGridState.scrollToItem(initialPhotoIndex)
+                    repeat(8) {
+                        withFrameNanos { }
+                        val layoutInfo = memoryGridState.layoutInfo
+                        val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == initialPhotoIndex }
+                        if (itemInfo != null) {
+                            val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
+                            val itemCenter = itemInfo.offset.x + itemInfo.size.width / 2f
+                            val delta = itemCenter - viewportCenter
+                            if (abs(delta) > with(density) { 2.dp.toPx() }) {
+                                memoryGridState.scrollBy(delta)
+                            }
+                            return@LaunchedEffect
                         }
                     }
                 }
@@ -530,7 +532,7 @@ internal fun KeepixDayMemoryOverlay(
                 ) {
                     itemsIndexed(memoryPhotos, key = { _, photo -> photo.id }) { _, photo ->
                         val photoHeight = rowHeight
-                        val staggerRotation = memoryPhotoStaggerRotation(photo.id)
+                        val photoWidth = photoHeight * memoryPhotoAspectRatio(photo)
                         KeepixMemoryGridPhoto(
                             context = context,
                             photo = photo,
@@ -538,9 +540,8 @@ internal fun KeepixDayMemoryOverlay(
                             placementAnimationKey = memoryPlacementSequence,
                             openSuppressedUntilMillis = suppressMemoryOpenUntil.longValue,
                             modifier = Modifier
-                                .width(photoHeight * memoryPhotoAspectRatio(photo) * memoryPhotoFlowWidthScale(photo.id))
-                                .fillMaxHeight()
-                                .graphicsLayer { rotationZ = staggerRotation },
+                                .width(photoWidth)
+                                .fillMaxHeight(),
                             onOpen = onOpen,
                             onDelete = { _ ->
                                 val index = memoryPhotos.indexOfFirst { it.id == photo.id }
@@ -801,53 +802,7 @@ private fun buildMemoryPhotoWindow(currentPhoto: PhotoEntity, photos: List<Photo
 private fun memoryPhotoAspectRatio(photo: PhotoEntity): Float {
     val width = photo.width.takeIf { it > 0 } ?: photo.exifWidth?.takeIf { it > 0 } ?: 1
     val height = photo.height.takeIf { it > 0 } ?: photo.exifHeight?.takeIf { it > 0 } ?: 1
-    return (width.toFloat() / height.toFloat()).coerceIn(0.36f, 3.20f)
-}
-
-private fun memoryPhotoFlowWidthScale(photoId: Long): Float {
-    return when (abs(((photoId xor (photoId ushr 33)) % 6L).toInt())) {
-        0 -> 0.92f
-        1 -> 1.04f
-        2 -> 0.98f
-        3 -> 1.10f
-        4 -> 0.88f
-        else -> 1.0f
-    }
-}
-
-private fun memoryPhotoStaggerY(photoId: Long, rowCount: Int): Float {
-    val bucket = abs(((photoId xor (photoId ushr 32)) % 7L).toInt())
-    return if (rowCount == 3) {
-        when (bucket) {
-            0 -> -5f
-            1 -> 4f
-            2 -> 0f
-            3 -> 6f
-            4 -> -3f
-            5 -> 2f
-            else -> -1f
-        }
-    } else {
-        when (bucket) {
-            0 -> -12f
-            1 -> 7f
-            2 -> -3f
-            3 -> 11f
-            4 -> 2f
-            5 -> -8f
-            else -> 5f
-        }
-    }
-}
-
-private fun memoryPhotoStaggerRotation(photoId: Long): Float {
-    return when (abs(((photoId ushr 2) % 5L).toInt())) {
-        0 -> -0.45f
-        1 -> 0.32f
-        2 -> 0f
-        3 -> -0.25f
-        else -> 0.42f
-    }
+    return (width.toFloat() / height.toFloat()).coerceIn(0.30f, 4.80f)
 }
 
 @Composable

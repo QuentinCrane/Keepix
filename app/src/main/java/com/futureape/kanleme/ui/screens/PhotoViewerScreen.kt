@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -232,12 +233,15 @@ private fun PhotoExifSheet(photo: PhotoEntity, onDismiss: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 22.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text("EXIF 信息", style = MaterialTheme.typography.headlineSmall)
             ExifLine("文件名", photo.displayName)
             ExifLine("相册", photo.folderName)
+            ExifLine("路径", viewerPhotoDisplayPath(photo))
+            ExifLine("内容 URI", photo.uri)
             ExifLine("类型", photoMediaKindLabel(photo))
             ExifLine("尺寸", photo.width.toString() + " x " + photo.height.toString())
             ExifLine("大小", formatSize(photo.size))
@@ -258,6 +262,20 @@ private fun ExifLine(label: String, value: String) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.28f))
         Text(value.ifBlank { "未知" }, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(0.72f))
     }
+}
+
+private fun viewerPhotoDisplayPath(photo: PhotoEntity): String {
+    val basePath = photo.relativePath
+        ?.replace('\\', '/')
+        ?.trim()
+        ?.trim('/')
+        ?.takeIf { it.isNotBlank() }
+        ?: photo.folderPath
+            .replace('\\', '/')
+            .trim()
+            .trim('/')
+            .takeIf { it.isNotBlank() }
+    return listOfNotNull(basePath, photo.displayName.takeIf { it.isNotBlank() }).joinToString("/")
 }
 
 private fun formatViewerDateTime(timeMillis: Long): String {
