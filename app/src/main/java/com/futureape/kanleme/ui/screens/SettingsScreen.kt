@@ -3,10 +3,17 @@ package com.futureape.kanleme.ui.screens
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -53,6 +60,7 @@ import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
@@ -87,10 +95,12 @@ import com.futureape.kanleme.BuildConfig
 import com.futureape.kanleme.data.settings.AppSettings
 import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.data.settings.DeleteMode
+import com.futureape.kanleme.data.settings.FolderDisplayMode
 import com.futureape.kanleme.data.settings.GestureDirection
 import com.futureape.kanleme.data.settings.HapticLevel
 import com.futureape.kanleme.data.settings.PhotoCleanMode
 import com.futureape.kanleme.data.settings.SwipeSensitivity
+import com.futureape.kanleme.data.settings.ThemeMode
 import com.futureape.kanleme.data.settings.VideoDisplayMode
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveCenter
@@ -220,7 +230,29 @@ fun SettingsScreen(
             AnimatedContent(
                 targetState = page,
                 transitionSpec = {
-                    fadeIn(tween(140)).togetherWith(fadeOut(tween(100)))
+                    val returningHome = targetState == SettingsPage.HOME
+                    val enteringChild = initialState == SettingsPage.HOME && targetState != SettingsPage.HOME
+                    val enter = fadeIn(tween(150, easing = FastOutSlowInEasing)) +
+                        slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { width ->
+                            when {
+                                enteringChild -> width / 4
+                                returningHome -> -width / 7
+                                targetState.ordinal > initialState.ordinal -> width / 7
+                                else -> -width / 7
+                            }
+                        } +
+                        scaleIn(tween(260, easing = FastOutSlowInEasing), initialScale = if (returningHome) 0.985f else 0.992f)
+                    val exit = fadeOut(tween(120, easing = FastOutSlowInEasing)) +
+                        slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { width ->
+                            when {
+                                returningHome -> width / 4
+                                enteringChild -> -width / 8
+                                targetState.ordinal > initialState.ordinal -> -width / 8
+                                else -> width / 8
+                            }
+                        } +
+                        scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = if (returningHome) 0.992f else 0.985f)
+                    enter.togetherWith(exit)
                 },
                 label = "settings_page_transition",
             ) { animatedPage ->
@@ -363,7 +395,7 @@ private fun SettingsPageContent(
                 SectionTitle("整理方式")
                 SettingsGroup(listOf<@Composable () -> Unit>(
                     { SettingsSegmentedRow(Icons.Rounded.Delete, "删除模式", stringResource(settings.deleteMode.labelRes), deleteModeOptions(), settings.deleteMode.name, color = Color(0xFFDD5A56), onSelected = { onTick(); viewModel.setDeleteMode(DeleteMode.valueOf(it)) }) },
-                    { SettingsRow(Icons.AutoMirrored.Rounded.DriveFileMove, "移动到文件夹时", if (settings.autoMoveOnKeepFavorite) "已开启指定归档确认" else "点击开启文件移动能力", onClick = { openSheet(SettingsSheet.MOVE_PERMISSION) }) },
+                    { SettingsSwitchRow(Icons.AutoMirrored.Rounded.DriveFileMove, "移动到文件夹时", if (settings.autoMoveOnKeepFavorite) "保留和收藏时允许指定归档移动" else "关闭后只记录整理状态，不移动原文件", checked = settings.autoMoveOnKeepFavorite, onCheckedChange = { onTick(); viewModel.setAutoMoveOnKeepFavorite(it) }, color = Color(0xFF55A6C8)) },
                     { SettingsSwitchRow(Icons.Rounded.BrokenImage, "相似照片检测", "自动检测连拍、截图和相似照片", checked = settings.similarDetection, onCheckedChange = { onTick(); viewModel.setSimilarDetection(it) }, badge = "测试") },
                 ))
             }
@@ -454,17 +486,17 @@ private fun SettingsPageContent(
                     { SettingsSwitchRow(Icons.Rounded.MusicNote, "滑动音效", if (settings.swipeSound) "已开启" else "已关闭", checked = settings.swipeSound, onCheckedChange = { onTick(); viewModel.setSwipeSound(it) }, color = Color(0xFFE8A93B)) },
                     { SettingsSwitchRow(Icons.Rounded.MusicNote, "打开视频默认静音", "进入视频整理时默认静音，点侧边栏音量按钮可恢复声音", checked = settings.videoDefaultMuted, onCheckedChange = { onTick(); viewModel.setVideoDefaultMuted(it) }, color = Color(0xFFE8A93B)) },
                     { SettingsSegmentedRow(Icons.Rounded.AspectRatio, "视频显示比例", stringResource(settings.videoDisplayMode.labelRes), videoDisplayModeOptions(), settings.videoDisplayMode.name, color = Color(0xFF5E8DB4), onSelected = { onTick(); viewModel.setVideoDisplayMode(VideoDisplayMode.valueOf(it)) }) },
-                    { SettingsRow(Icons.Rounded.Vibration, "震动反馈", stringResource(settings.hapticLevel.labelRes), color = Color(0xFF55A6C8), onClick = { openSheet(SettingsSheet.HAPTIC) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Vibration, "默认震动强度", stringResource(settings.hapticLevel.labelRes), hapticLevelOptions(), settings.hapticLevel.name, color = Color(0xFF55A6C8), onSelected = { onSuccess(); viewModel.setHapticLevel(HapticLevel.valueOf(it)) }) },
                 ))
             }
 
             SettingsPage.APPEARANCE -> {
                 SectionTitle("外观显示")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.Palette, "界面风格", visualStyleSummary(settings.appVisualStyle), onClick = { onTick(); viewModel.cycleAppVisualStyle() }) },
-                    { SettingsRow(Icons.Rounded.Palette, "主题模式", stringResource(settings.themeMode.labelRes), trailingContent = { ThemeModeDots(settings.themeMode.ordinal) }, onClick = { onTick(); viewModel.cycleThemeMode() }) },
-                    { SettingsRow(Icons.Rounded.ColorLens, "选择主题色", "点击切换应用主题色", trailingContent = { ColorDot(settings.accentColor) }, onClick = { onTick(); viewModel.cycleAccentColor() }) },
-                    { SettingsRow(Icons.Rounded.Folder, "文件夹显示", stringResource(settings.folderDisplay.labelRes), onClick = { onTick(); viewModel.cycleFolderDisplay() }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Palette, "界面风格", visualStyleSummary(settings.appVisualStyle), visualStyleOptions(), settings.appVisualStyle.name, onSelected = { onTick(); viewModel.setAppVisualStyle(AppVisualStyle.valueOf(it)) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Palette, "主题模式", stringResource(settings.themeMode.labelRes), themeModeOptions(), settings.themeMode.name, onSelected = { onTick(); viewModel.setThemeMode(ThemeMode.valueOf(it)) }) },
+                    { SettingsColorRow(Icons.Rounded.ColorLens, "主题色", "选择应用高亮色", accentColorOptions(), settings.accentColor, onSelected = { onTick(); viewModel.setAccentColor(it) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Folder, "文件夹显示", stringResource(settings.folderDisplay.labelRes), folderDisplayOptions(), settings.folderDisplay.name, onSelected = { onTick(); viewModel.setFolderDisplay(FolderDisplayMode.valueOf(it)) }) },
                     { SettingsSwitchRow(Icons.Rounded.Palette, "沉浸背景", "整理时以前一张照片的模糊效果作为背景", checked = settings.immersiveBackground, onCheckedChange = { onTick(); viewModel.setImmersiveBackground(it) }) },
                 ))
             }
@@ -487,7 +519,7 @@ private fun SettingsPageContent(
             SettingsPage.DIAGNOSIS -> {
                 SectionTitle("高级设置")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.CleaningServices, "照片清理模式", stringResource(settings.photoCleanMode.labelRes), onClick = { openSheet(SettingsSheet.PHOTO_CLEAN_MODE) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.CleaningServices, "照片清理模式", stringResource(settings.photoCleanMode.labelRes), photoCleanModeOptions(), settings.photoCleanMode.name, onSelected = { onSuccess(); viewModel.setPhotoCleanMode(PhotoCleanMode.valueOf(it)) }) },
                     { SettingsRow(Icons.Rounded.Info, "导出闪退日志", "自动记录最近 8 次闪退，方便后续 debug", onClick = { onTick(); if (!shareCrashLogs(context)) viewModel.showMessage("暂无闪退日志") }) },
                 ))
                 Text(stringResource(settings.photoCleanMode.descriptionRes), modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -549,6 +581,17 @@ private fun settingsPhotoTypeOptions(): List<Pair<String, String>> = listOf(
     "raw" to "RAW",
 )
 
+private fun visualStyleOptions(): List<Pair<String, String>> = listOf(
+    AppVisualStyle.IMMERSIVE_PHOTO.name to "沉浸",
+    AppVisualStyle.LIQUID_GLASS.name to "玻璃",
+)
+
+@Composable
+private fun themeModeOptions(): List<Pair<String, String>> = ThemeMode.entries.map { it.name to stringResource(it.labelRes) }
+
+@Composable
+private fun folderDisplayOptions(): List<Pair<String, String>> = FolderDisplayMode.entries.map { it.name to stringResource(it.labelRes) }
+
 @Composable
 private fun deleteModeOptions(): List<Pair<String, String>> = DeleteMode.entries.map { it.name to stringResource(it.labelRes) }
 
@@ -560,6 +603,20 @@ private fun gestureDirectionOptions(): List<Pair<String, String>> = GestureDirec
 
 @Composable
 private fun videoDisplayModeOptions(): List<Pair<String, String>> = VideoDisplayMode.entries.map { it.name to stringResource(it.labelRes) }
+
+@Composable
+private fun hapticLevelOptions(): List<Pair<String, String>> = HapticLevel.entries.map { it.name to stringResource(it.labelRes) }
+
+@Composable
+private fun photoCleanModeOptions(): List<Pair<String, String>> = PhotoCleanMode.entries.map { it.name to stringResource(it.labelRes) }
+
+private fun accentColorOptions(): List<Pair<Long, String>> = listOf(
+    0xFFC7ECFE to "冰蓝",
+    0xFFDDF5FF to "浅蓝",
+    0xFFF4FBFF to "雾白",
+    0xFFEAF8FF to "清透",
+    0xFFE8F0F7 to "冷灰",
+)
 
 @Composable
 private fun SettingsHeader(title: String, subtitle: String, onBack: () -> Unit) {
@@ -1329,15 +1386,34 @@ private fun TwoSegmentSelector(selectedTab: String, onSelectTab: (String) -> Uni
 
 @Composable
 private fun SegmentButton(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "settings_segment_background",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "settings_segment_content",
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0.985f,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "settings_segment_scale",
+    )
     Box(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(999.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .background(backgroundColor)
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = MaterialTheme.typography.titleSmall, color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = MaterialTheme.typography.titleSmall, color = contentColor)
     }
 }
 
@@ -1831,8 +1907,19 @@ private fun SettingsSwitchRow(
     color: Color = MaterialTheme.colorScheme.primary,
     showIcon: Boolean = true,
 ) {
+    val rowBackground by animateColorAsState(
+        targetValue = if (checked) color.copy(alpha = 0.075f) else Color.Transparent,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "settings_switch_row_background",
+    )
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = if (showIcon) 15.dp else 17.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(rowBackground)
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 12.dp, vertical = if (showIcon) 11.dp else 13.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -1846,7 +1933,7 @@ private fun SettingsSwitchRow(
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             }
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = { onCheckedChange(it) })
     }
 }
 
@@ -1893,6 +1980,88 @@ private fun SettingsSegmentedRow(
 }
 
 @Composable
+private fun SettingsColorRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    options: List<Pair<Long, String>>,
+    selectedColor: Long,
+    color: Color = MaterialTheme.colorScheme.primary,
+    onSelected: (Long) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 15.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconTile(icon, color)
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            options.forEach { (value, label) ->
+                ColorSwatchButton(
+                    colorValue = value,
+                    label = label,
+                    selected = value == selectedColor,
+                    onClick = { onSelected(value) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColorSwatchButton(
+    colorValue: Long,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.20f),
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "settings_color_swatch_border",
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0.96f,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "settings_color_swatch_scale",
+    )
+    Column(
+        modifier = Modifier
+            .width(68.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (selected) 0.70f else 0.42f))
+            .border(1.dp, borderColor, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 9.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .background(Color(colorValue), RoundedCornerShape(999.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.70f), RoundedCornerShape(999.dp)),
+        )
+        Text(label, style = MaterialTheme.typography.labelSmall, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
 private fun SettingsStepperRow(
     icon: ImageVector,
     title: String,
@@ -1919,15 +2088,17 @@ private fun SettingsStepperRow(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StepperButton("-", onDecrease)
-            Text(value, modifier = Modifier.width(58.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            StepperButton("+", onIncrease)
+            StepperButton(Icons.Rounded.Remove, "减少", onDecrease)
+            Box(Modifier.width(58.dp), contentAlignment = Alignment.Center) {
+                Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            StepperButton(Icons.Rounded.Add, "增加", onIncrease)
         }
     }
 }
 
 @Composable
-private fun StepperButton(text: String, onClick: () -> Unit) {
+private fun StepperButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(38.dp)
@@ -1936,7 +2107,7 @@ private fun StepperButton(text: String, onClick: () -> Unit) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(19.dp), tint = MaterialTheme.colorScheme.onSurface)
     }
 }
 

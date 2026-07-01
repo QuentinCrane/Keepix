@@ -1294,11 +1294,23 @@ class KanlemeViewModel @Inject constructor(
         settingsRepository.setThemeMode(values[(values.indexOf(settings.value.themeMode) + 1) % values.size])
     }
 
+    fun setThemeMode(value: ThemeMode) = viewModelScope.launch {
+        settingsRepository.setThemeMode(value)
+    }
+
     fun cycleAccentColor() = viewModelScope.launch { settingsRepository.setAccentColor(nextAccentColor(settings.value.accentColor)) }
+
+    fun setAccentColor(value: Long) = viewModelScope.launch {
+        settingsRepository.setAccentColor(value)
+    }
 
     fun cycleFolderDisplay() = viewModelScope.launch {
         val next = if (settings.value.folderDisplay == FolderDisplayMode.SINGLE_LINE) FolderDisplayMode.MULTI_LINE else FolderDisplayMode.SINGLE_LINE
         settingsRepository.setFolderDisplay(next)
+    }
+
+    fun setFolderDisplay(value: FolderDisplayMode) = viewModelScope.launch {
+        settingsRepository.setFolderDisplay(value)
     }
 
     fun setImmersiveBackground(value: Boolean) = viewModelScope.launch { settingsRepository.setImmersiveBackground(value) }

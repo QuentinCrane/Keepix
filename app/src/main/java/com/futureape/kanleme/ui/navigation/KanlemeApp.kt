@@ -300,7 +300,25 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onOpenPhoto = { photo -> navController.navigate(Destinations.photoViewer(photo.id)) },
                     )
                 }
-                composable(Destinations.SETTINGS) {
+                composable(
+                    Destinations.SETTINGS,
+                    enterTransition = {
+                        fadeIn(tween(150, easing = LinearOutSlowInEasing)) +
+                            scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = 0.985f)
+                    },
+                    exitTransition = {
+                        fadeOut(tween(120, easing = FastOutSlowInEasing)) +
+                            scaleOut(tween(180, easing = FastOutSlowInEasing), targetScale = 1.01f)
+                    },
+                    popEnterTransition = {
+                        fadeIn(tween(130, easing = LinearOutSlowInEasing)) +
+                            scaleIn(tween(180, easing = FastOutSlowInEasing), initialScale = 0.99f)
+                    },
+                    popExitTransition = {
+                        fadeOut(tween(150, easing = FastOutSlowInEasing)) +
+                            scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = 0.985f)
+                    },
+                ) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SettingsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
                     }
@@ -308,6 +326,22 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 composable(
                     route = Destinations.SETTINGS_WITH_PAGE,
                     arguments = listOf(navArgument(Destinations.SETTINGS_PAGE_ARG) { type = NavType.StringType }),
+                    enterTransition = {
+                        fadeIn(tween(150, easing = LinearOutSlowInEasing)) +
+                            scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = 0.985f)
+                    },
+                    exitTransition = {
+                        fadeOut(tween(120, easing = FastOutSlowInEasing)) +
+                            scaleOut(tween(180, easing = FastOutSlowInEasing), targetScale = 1.01f)
+                    },
+                    popEnterTransition = {
+                        fadeIn(tween(130, easing = LinearOutSlowInEasing)) +
+                            scaleIn(tween(180, easing = FastOutSlowInEasing), initialScale = 0.99f)
+                    },
+                    popExitTransition = {
+                        fadeOut(tween(150, easing = FastOutSlowInEasing)) +
+                            scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = 0.985f)
+                    },
                 ) { entry ->
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SettingsScreen(
