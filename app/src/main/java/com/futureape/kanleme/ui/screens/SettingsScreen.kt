@@ -3,14 +3,14 @@ package com.futureape.kanleme.ui.screens
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -199,10 +199,10 @@ fun SettingsScreen(
     MaterialTheme(colorScheme = settingsColorScheme) {
         AdaptiveCenter(
             modifier = Modifier.background(MaterialTheme.colorScheme.background),
-            maxWidth = 900.dp,
+            maxWidth = 760.dp,
         ) {
             Box(Modifier.fillMaxSize()) {
-                if (page != SettingsPage.HOME && predictiveBackProgress > 0.001f) {
+                if (page != SettingsPage.HOME && predictiveBackProgress > 0.001f && !predictiveBackCompleting) {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -214,8 +214,8 @@ fun SettingsScreen(
                                 scaleY = scale
                                 alpha = (0.58f + predictiveBackProgress * 0.42f).coerceIn(0f, 1f)
                             },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
-                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 34.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         item {
                             SettingsHeader(
@@ -251,7 +251,7 @@ fun SettingsScreen(
                         val returningHome = targetState == SettingsPage.HOME
                         val enteringChild = initialState == SettingsPage.HOME && targetState != SettingsPage.HOME
                         if (predictiveBackCompleting && returningHome) {
-                            fadeIn(tween(1)).togetherWith(fadeOut(tween(1)))
+                            EnterTransition.None.togetherWith(ExitTransition.None)
                         } else {
                             val enter = fadeIn(tween(150, easing = FastOutSlowInEasing)) +
                                 slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { width ->
@@ -261,8 +261,7 @@ fun SettingsScreen(
                                         targetState.ordinal > initialState.ordinal -> width / 7
                                         else -> -width / 7
                                     }
-                                } +
-                                scaleIn(tween(260, easing = FastOutSlowInEasing), initialScale = if (returningHome) 0.985f else 0.992f)
+                                }
                             val exit = fadeOut(tween(120, easing = FastOutSlowInEasing)) +
                                 slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { width ->
                                     when {
@@ -271,8 +270,7 @@ fun SettingsScreen(
                                         targetState.ordinal > initialState.ordinal -> -width / 8
                                         else -> width / 8
                                     }
-                                } +
-                                scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = if (returningHome) 0.992f else 0.985f)
+                                }
                             enter.togetherWith(exit)
                         }
                     },
@@ -289,8 +287,8 @@ fun SettingsScreen(
                                 scaleY = scale
                                 alpha = 1f - predictiveBackProgress * 0.18f
                             },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
-                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 34.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         item {
                             SettingsHeader(
@@ -1896,9 +1894,9 @@ private fun SectionTitle(text: String) {
     val iosStyle = isKeepixIosSettingsStyle()
     Text(
         text,
-        style = if (iosStyle) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = if (iosStyle) 18.dp else 24.dp, top = if (iosStyle) 4.dp else 2.dp),
+        modifier = Modifier.padding(start = if (iosStyle) 22.dp else 24.dp, top = if (iosStyle) 6.dp else 2.dp),
         fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Normal,
     )
 }
@@ -1971,8 +1969,8 @@ private fun SettingsRow(
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(
-                horizontal = if (iosStyle) 16.dp else 22.dp,
-                vertical = if (iosStyle) 12.dp else if (showIcon) 15.dp else 19.dp,
+                horizontal = if (iosStyle) 18.dp else 22.dp,
+                vertical = if (iosStyle) if (showIcon) 14.dp else 16.dp else if (showIcon) 15.dp else 19.dp,
             ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (iosStyle) 14.dp else 12.dp),
@@ -1982,7 +1980,7 @@ private fun SettingsRow(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     title,
-                    style = if (iosStyle) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -1991,7 +1989,7 @@ private fun SettingsRow(
             if (subtitle.isNotBlank()) {
                 Text(
                     subtitle,
-                    style = if (iosStyle) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                 )
@@ -2025,7 +2023,7 @@ private fun SettingsSwitchRow(
             .clip(RoundedCornerShape(if (iosStyle) 0.dp else 20.dp))
             .background(rowBackground)
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = if (iosStyle) 16.dp else 12.dp, vertical = if (iosStyle) 12.dp else if (showIcon) 11.dp else 13.dp),
+            .padding(horizontal = if (iosStyle) 18.dp else 12.dp, vertical = if (iosStyle) if (showIcon) 14.dp else 16.dp else if (showIcon) 11.dp else 13.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (iosStyle) 14.dp else 12.dp),
     ) {
@@ -2034,7 +2032,7 @@ private fun SettingsSwitchRow(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     title,
-                    style = if (iosStyle) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -2043,7 +2041,7 @@ private fun SettingsSwitchRow(
             if (subtitle.isNotBlank()) {
                 Text(
                     subtitle,
-                    style = if (iosStyle) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                 )
@@ -2067,7 +2065,7 @@ private fun SettingsSegmentedRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (iosStyle) 16.dp else 22.dp, vertical = if (iosStyle) 12.dp else 15.dp),
+            .padding(horizontal = if (iosStyle) 18.dp else 22.dp, vertical = if (iosStyle) 14.dp else 15.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (iosStyle) 14.dp else 12.dp)) {
@@ -2075,13 +2073,13 @@ private fun SettingsSegmentedRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     title,
-                    style = if (iosStyle) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     subtitle,
-                    style = if (iosStyle) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                 )
@@ -2122,7 +2120,7 @@ private fun SettingsColorRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (iosStyle) 16.dp else 22.dp, vertical = if (iosStyle) 12.dp else 15.dp),
+            .padding(horizontal = if (iosStyle) 18.dp else 22.dp, vertical = if (iosStyle) 14.dp else 15.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (iosStyle) 14.dp else 12.dp)) {
@@ -2130,13 +2128,13 @@ private fun SettingsColorRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     title,
-                    style = if (iosStyle) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     subtitle,
-                    style = if (iosStyle) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                 )
@@ -2223,7 +2221,7 @@ private fun SettingsStepperRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (iosStyle) 16.dp else 22.dp, vertical = if (iosStyle) 12.dp else 15.dp),
+            .padding(horizontal = if (iosStyle) 18.dp else 22.dp, vertical = if (iosStyle) 14.dp else 15.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (iosStyle) 14.dp else 12.dp),
     ) {
@@ -2231,13 +2229,13 @@ private fun SettingsStepperRow(
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                style = if (iosStyle) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 value,
-                style = if (iosStyle) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
