@@ -305,6 +305,13 @@ class KanlemeViewModel @Inject constructor(
     private fun List<VideoEntity>.withoutLocalVideoExclusions(): List<VideoEntity> =
         filterNot { it.mediaStoreId in handledVideoActionMediaIds }
 
+    private fun mergeVisiblePhotoDeckWithLoaded(loaded: List<PhotoEntity>): List<PhotoEntity> {
+        val currentVisible = _photoDeck.value.withoutLocalPhotoExclusions()
+        return (currentVisible + loaded)
+            .distinctBy { it.mediaStoreId }
+            .take(CONTINUOUS_PHOTO_DECK_SIZE)
+    }
+
     private fun rememberPhotoSessionAction(
         photo: PhotoEntity,
         action: SwipeAction,
@@ -574,14 +581,26 @@ class KanlemeViewModel @Inject constructor(
         pendingPhotoActionMediaIds.clear()
         clearPhotoActionHistory()
         _photoDeck.value = _photoDeck.value.withoutLocalPhotoExclusions()
-        if (_photoDeck.value.isNotEmpty()) {
+        val previewForSession = _photoDeckPreview.value
+            .withoutLocalPhotoExclusions()
+            .distinctBy { it.mediaStoreId }
+            .take(HOME_PREVIEW_DECK_SIZE)
+        val promotedPreview = _photoDeck.value.isEmpty() &&
+            previewForSession.isNotEmpty() &&
+            photoDeckPreviewScope == session
+        if (promotedPreview) {
+            _photoDeck.value = previewForSession
+            _photoDeckPreparing.value = false
+        }
+        if (_photoDeck.value.isNotEmpty() && !promotedPreview) {
             if (session.sortOrder == "random") {
                 viewModelScope.launch { settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed) }
             }
             _photoDeckPreparing.value = false
             return
         }
-        _photoDeckPreparing.value = true
+        val showPreparing = _photoDeck.value.isEmpty()
+        if (showPreparing) _photoDeckPreparing.value = true
         val generation = nextPhotoDeckGeneration()
         photoDeckLoadJob = viewModelScope.launch {
             if (session.sortOrder == "random") settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed)
@@ -591,8 +610,11 @@ class KanlemeViewModel @Inject constructor(
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == photoDeckGeneration) {
-                    _photoDeck.value = loaded
-                    _photoDeckPreview.value = loaded.take(HOME_PREVIEW_DECK_SIZE)
+                    val nextDeck = if (promotedPreview) mergeVisiblePhotoDeckWithLoaded(loaded) else loaded
+                    _photoDeck.value = nextDeck
+                    _photoDeckPreview.value = nextDeck.take(HOME_PREVIEW_DECK_SIZE)
+                    photoDeckPreviewScope = session
+                    photoDeckPreviewScopeLoaded = true
                 }
             } finally {
                 if (generation == photoDeckGeneration) _photoDeckPreparing.value = false

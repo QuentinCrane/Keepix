@@ -362,19 +362,33 @@ internal fun KeepixDayMemoryOverlay(
     val context = LocalContext.current
     val memoryScope = rememberCoroutineScope()
     val memoryGridState = rememberLazyStaggeredGridState()
-    var memoryPhotos by remember(currentPhoto.id, photos) { mutableStateOf(buildMemoryPhotoWindow(currentPhoto, photos)) }
+    var memoryPhotos by remember(currentPhoto.id) { mutableStateOf(buildMemoryPhotoWindow(currentPhoto, photos)) }
     var lastDeletedMemory by remember(currentPhoto.id) { mutableStateOf<DeletedMemoryPhoto?>(null) }
     var restoringPhotoId by remember(currentPhoto.id) { mutableStateOf<Long?>(null) }
     var memoryPlacementSequence by remember(currentPhoto.id) { mutableStateOf(0L) }
+    var memoryLocallyEdited by remember(currentPhoto.id) { mutableStateOf(false) }
+    var initialMemoryCentered by remember(currentPhoto.id) { mutableStateOf(false) }
+    var requestedMemoryScrollIndex by remember(currentPhoto.id) { mutableStateOf<Int?>(null) }
     val suppressMemoryOpenUntil = remember(currentPhoto.id) { mutableLongStateOf(0L) }
     val memoryGridIsScrolling by remember {
         derivedStateOf { memoryGridState.isScrollInProgress }
     }
     LaunchedEffect(visible, currentPhoto.id, photos) {
         if (visible) {
-            memoryPhotos = buildMemoryPhotoWindow(currentPhoto, photos)
-            lastDeletedMemory = null
-            restoringPhotoId = null
+            suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 980L
+            if (!memoryLocallyEdited) {
+                val nextPhotos = buildMemoryPhotoWindow(currentPhoto, photos)
+                if (nextPhotos.map { it.id } != memoryPhotos.map { it.id }) {
+                    memoryPhotos = nextPhotos
+                    initialMemoryCentered = false
+                }
+                lastDeletedMemory = null
+                restoringPhotoId = null
+            }
+        } else {
+            memoryLocallyEdited = false
+            initialMemoryCentered = false
+            requestedMemoryScrollIndex = null
         }
     }
     LaunchedEffect(restoringPhotoId) {
@@ -478,10 +492,13 @@ internal fun KeepixDayMemoryOverlay(
                             val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                             val pressed = event.changes.filter { it.pressed }
                             if (pressed.size < 2) {
-                                if (pressed.isEmpty()) break
+                                if (pressed.isEmpty()) {
+                                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 960L
+                                    break
+                                }
                                 continue
                             }
-                            suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 650L
+                            suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 960L
                             val currentA = pressed[0].position
                             val currentB = pressed[1].position
                             val currentDistance = sqrt(
@@ -493,14 +510,17 @@ internal fun KeepixDayMemoryOverlay(
                                 continue
                             }
                             val zoom = currentDistance / initialDistance.coerceAtLeast(1f)
-                            suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 650L
+                            suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 960L
                             memoryScale = zoom.coerceIn(0.66f, 1.42f)
                             pressed.forEach { it.consume() }
                             if (zoom >= 1.18f) {
                                 onDismiss()
                                 break
                             }
-                            if (pressed.any { it.changedToUpIgnoreConsumed() }) break
+                            if (pressed.any { it.changedToUpIgnoreConsumed() }) {
+                                suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 960L
+                                break
+                            }
                         }
                     }
                 },
@@ -548,8 +568,9 @@ internal fun KeepixDayMemoryOverlay(
                     animationSpec = tween(220, easing = FastOutSlowInEasing),
                     label = "day_memory_vertical_gap",
                 )
-                LaunchedEffect(visible, currentPhoto.id, initialPhotoIndex) {
-                    if (!visible || memoryPhotos.isEmpty()) return@LaunchedEffect
+                LaunchedEffect(visible, currentPhoto.id, initialPhotoIndex, memoryPhotos.size, memoryLocallyEdited) {
+                    if (!visible || memoryPhotos.isEmpty() || initialMemoryCentered || memoryLocallyEdited) return@LaunchedEffect
+                    initialMemoryCentered = true
                     memoryGridState.scrollToItem(initialPhotoIndex)
                     withFrameNanos { }
                     if (memoryGridState.isScrollInProgress) return@LaunchedEffect
@@ -563,6 +584,18 @@ internal fun KeepixDayMemoryOverlay(
                             memoryGridState.scrollBy(delta)
                         }
                     }
+                }
+                LaunchedEffect(requestedMemoryScrollIndex, rowCount, memoryPhotos.size) {
+                    val requestedIndex = requestedMemoryScrollIndex ?: return@LaunchedEffect
+                    if (memoryPhotos.isEmpty()) {
+                        requestedMemoryScrollIndex = null
+                        return@LaunchedEffect
+                    }
+                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 720L
+                    val targetIndex = requestedIndex.coerceIn(0, memoryPhotos.lastIndex)
+                    val scrollIndex = (targetIndex - rowCount * 2).coerceAtLeast(0)
+                    memoryGridState.animateScrollToItem(scrollIndex)
+                    requestedMemoryScrollIndex = null
                 }
                 LazyHorizontalStaggeredGrid(
                     rows = StaggeredGridCells.Fixed(rowCount),
@@ -598,8 +631,10 @@ internal fun KeepixDayMemoryOverlay(
                                 val index = memoryPhotos.indexOfFirst { it.id == photo.id }
                                 if (index >= 0) {
                                     lastDeletedMemory = DeletedMemoryPhoto(photo = photo, index = index)
+                                    memoryLocallyEdited = true
                                     memoryPlacementSequence += 1L
                                     memoryPhotos = memoryPhotos.filterNot { it.id == photo.id }
+                                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 760L
                                 }
                                 onDelete(photo)
                             },
@@ -629,9 +664,10 @@ internal fun KeepixDayMemoryOverlay(
                             icon = Icons.Rounded.Swipe,
                             contentDescription = null,
                             onClick = {
-                                memoryScope.launch {
-                                    memoryGridState.animateScrollToItem((initialPhotoIndex - rowCount * 2).coerceAtLeast(0))
-                                }
+                                requestedMemoryScrollIndex = lastDeletedMemory
+                                    ?.index
+                                    ?.coerceIn(0, memoryPhotos.lastIndex.coerceAtLeast(0))
+                                    ?: initialPhotoIndex
                             },
                         )
                         Surface(
@@ -670,9 +706,12 @@ internal fun KeepixDayMemoryOverlay(
                                 val deleted = lastDeletedMemory
                                 if (deleted != null && memoryPhotos.none { it.id == deleted.photo.id }) {
                                     val insertAt = deleted.index.coerceIn(0, memoryPhotos.size)
+                                    memoryLocallyEdited = true
                                     memoryPlacementSequence += 1L
                                     memoryPhotos = memoryPhotos.toMutableList().apply { add(insertAt, deleted.photo) }
                                     restoringPhotoId = deleted.photo.id
+                                    requestedMemoryScrollIndex = insertAt
+                                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 820L
                                     lastDeletedMemory = null
                                 }
                                 onUndo()
@@ -774,7 +813,7 @@ private fun KeepixMemoryGridPhoto(
                     var cancelledTap = gestureStartedSuppressed
                     var consumedByParent = false
                     val slop = viewConfiguration.touchSlop
-                    val openSlop = (slop * 0.22f).coerceAtMost(4f)
+                    val openSlop = (slop * 0.72f).coerceAtLeast(10f)
                     val deleteThreshold = maxOf(260f, size.height * 0.36f)
                     while (true) {
                         val event = awaitPointerEvent()

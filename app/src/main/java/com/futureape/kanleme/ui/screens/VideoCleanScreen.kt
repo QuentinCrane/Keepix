@@ -126,6 +126,21 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.futureape.kanleme.ui.i18n.Text
 
+private fun AudioManager.isMusicStreamMuted(): Boolean =
+    runCatching { isStreamMute(AudioManager.STREAM_MUSIC) }.getOrDefault(false)
+
+private fun AudioManager.setMusicStreamMuted(muted: Boolean) {
+    val alreadyMuted = isMusicStreamMuted()
+    if (alreadyMuted == muted) return
+    runCatching {
+        adjustStreamVolume(
+            AudioManager.STREAM_MUSIC,
+            if (muted) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE,
+            0,
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun VideoCleanScreen(
@@ -152,6 +167,7 @@ fun VideoCleanScreen(
     val videoChromeVisible = settingsLoaded && settings.videoChromeVisible
     val context = LocalContext.current
     val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    val initialSystemMusicMuted = remember(audioManager) { audioManager.isMusicStreamMuted() }
     var sessionMuted by remember { mutableStateOf<Boolean?>(null) }
     val videoMuted = sessionMuted ?: settings.videoDefaultMuted
     val pagerState = rememberPagerState(pageCount = { videos.size.coerceAtLeast(1) })
@@ -167,16 +183,19 @@ fun VideoCleanScreen(
 
     BackHandler(onBack = ::leaveCleaning)
 
-    LaunchedEffect(settingsLoaded) {
-        if (settingsLoaded && sessionMuted == null) sessionMuted = settings.videoDefaultMuted
+    DisposableEffect(audioManager, initialSystemMusicMuted) {
+        onDispose {
+            audioManager.setMusicStreamMuted(initialSystemMusicMuted)
+        }
     }
-    LaunchedEffect(settingsLoaded, videoMuted) {
+    LaunchedEffect(settingsLoaded) {
+        if (settingsLoaded && sessionMuted == null) {
+            sessionMuted = if (settings.videoDefaultMuted) true else audioManager.isMusicStreamMuted()
+        }
+    }
+    LaunchedEffect(settingsLoaded, sessionMuted) {
         if (!settingsLoaded) return@LaunchedEffect
-        audioManager.adjustStreamVolume(
-            AudioManager.STREAM_MUSIC,
-            if (videoMuted) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE,
-            0,
-        )
+        audioManager.setMusicStreamMuted(sessionMuted ?: return@LaunchedEffect)
     }
     LaunchedEffect(videos.isEmpty(), deckPreparing, dashboard.videoCount, dashboard.processedVideoCount, scope) {
         if (videos.isEmpty() && !deckPreparing && dashboard.processedVideoCount < dashboard.videoCount) viewModel.loadVideoDeck(scope)

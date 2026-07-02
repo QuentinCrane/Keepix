@@ -170,6 +170,7 @@ fun SettingsScreen(
         try {
             backEvents.collect { event -> predictiveBackProgress = event.progress }
             predictiveBackCompleting = true
+            predictiveBackProgress = 0f
             pageName = SettingsPage.HOME.name
         } catch (_: CancellationException) {
             // Gesture cancelled; keep the current secondary page.
@@ -189,6 +190,8 @@ fun SettingsScreen(
         }
     }
 
+    val activePredictiveBackProgress = if (predictiveBackCompleting) 0f else predictiveBackProgress
+
     val baseSettingsColorScheme = MaterialTheme.colorScheme
     val settingsColorScheme = if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
         keepixIosSettingsColorScheme(baseSettingsColorScheme)
@@ -202,49 +205,6 @@ fun SettingsScreen(
             maxWidth = 760.dp,
         ) {
             Box(Modifier.fillMaxSize()) {
-                if (page != SettingsPage.HOME && predictiveBackProgress > 0.001f && !predictiveBackCompleting) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .statusBarsPadding()
-                            .graphicsLayer {
-                                translationX = -56f * (1f - predictiveBackProgress)
-                                val scale = 0.985f + predictiveBackProgress * 0.015f
-                                scaleX = scale
-                                scaleY = scale
-                                alpha = (0.58f + predictiveBackProgress * 0.42f).coerceIn(0f, 1f)
-                            },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 34.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        item {
-                            SettingsHeader(
-                                title = SettingsPage.HOME.title,
-                                subtitle = "一级菜单",
-                                onBack = {},
-                            )
-                        }
-                        item {
-                            SettingsPageContent(
-                                page = SettingsPage.HOME,
-                                settings = settings,
-                                allFolders = allFolders,
-                                customizeTab = customizeTab,
-                                onSelectCustomizeTab = {},
-                                manualExcludePath = manualExcludePath,
-                                onManualExcludePathChange = {},
-                                showAllFolderRules = showAllFolderRules,
-                                onToggleShowAllFolderRules = {},
-                                onManualExcludeConsumed = {},
-                                goTo = {},
-                                openSheet = {},
-                                onTick = {},
-                                onSuccess = {},
-                                viewModel = viewModel,
-                            )
-                        }
-                    }
-                }
                 AnimatedContent(
                     targetState = page,
                     transitionSpec = {
@@ -281,11 +241,11 @@ fun SettingsScreen(
                             .fillMaxSize()
                             .statusBarsPadding()
                             .graphicsLayer {
-                                translationX = predictiveBackProgress * size.width * 0.82f
-                                val scale = 1f - predictiveBackProgress * 0.035f
+                                translationX = activePredictiveBackProgress * size.width * 0.82f
+                                val scale = 1f - activePredictiveBackProgress * 0.035f
                                 scaleX = scale
                                 scaleY = scale
-                                alpha = 1f - predictiveBackProgress * 0.18f
+                                alpha = 1f - activePredictiveBackProgress * 0.18f
                             },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 34.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),

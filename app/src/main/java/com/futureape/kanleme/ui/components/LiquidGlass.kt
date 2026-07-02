@@ -42,17 +42,16 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun LiquidBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun LiquidBackground(
+    modifier: Modifier = Modifier,
+    backgroundColor: Color? = null,
+    content: @Composable () -> Unit,
+) {
     val scheme = MaterialTheme.colorScheme
     val oledDark = scheme.background.luminance() < 0.03f
+    val resolvedBackground = backgroundColor ?: if (oledDark) Color.Black else scheme.background
     CompositionLocalProvider(LocalContentColor provides scheme.onBackground) {
-        if (oledDark) {
-            Box(modifier = modifier.background(Color.Black)) {
-                content()
-            }
-            return@CompositionLocalProvider
-        }
-        Box(modifier = modifier.background(scheme.background)) {
+        Box(modifier = modifier.background(resolvedBackground)) {
             content()
         }
     }

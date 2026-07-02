@@ -60,6 +60,7 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -191,7 +192,8 @@ fun PhotoCleanScreen(
         onBack()
     }
 
-    BackHandler(onBack = ::leaveCleaning)
+    BackHandler(enabled = showDayMemory || dayMemoryPinch.progress > 0.001f, onBack = ::closeDayMemory)
+    BackHandler(enabled = !showDayMemory && dayMemoryPinch.progress <= 0.001f, onBack = ::leaveCleaning)
 
     LaunchedEffect(batchFinishing) {
         if (!batchFinishing) return@LaunchedEffect
@@ -296,6 +298,29 @@ fun PhotoCleanScreen(
                     onClick = ::leaveCleaning,
                     modifier = Modifier.align(Alignment.TopStart),
                 )
+                Column(
+                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    CircularProgressIndicator(color = Color.White.copy(alpha = 0.86f), strokeWidth = 3.dp)
+                    Text(
+                        "正在准备整理队列",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.82f),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "预览队列会优先进入，完整队列随后补齐",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.50f),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            } else {
+                Box(Modifier.align(Alignment.Center), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
         }
         return
