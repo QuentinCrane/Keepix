@@ -91,6 +91,7 @@ import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.photoDisplayAspectRatio
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
 import com.futureape.kanleme.ui.util.openVideoInSystemGallery
@@ -409,9 +410,7 @@ private fun FavoritePhotoTile(
 }
 
 private fun favoriteOriginalAspectRatio(photo: PhotoEntity): Float {
-    val width = photo.exifWidth?.takeIf { it > 0 } ?: photo.width.takeIf { it > 0 } ?: 1
-    val height = photo.exifHeight?.takeIf { it > 0 } ?: photo.height.takeIf { it > 0 } ?: 1
-    return (width.toFloat() / height.toFloat()).coerceIn(0.50f, 2.15f)
+    return photoDisplayAspectRatio(photo, minRatio = 0.50f, maxRatio = 2.15f)
 }
 
 @Composable

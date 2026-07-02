@@ -161,12 +161,14 @@ fun SettingsScreen(
     var manualExcludePath by remember { mutableStateOf("") }
     var showAllFolderRules by remember { mutableStateOf(false) }
     var predictiveBackProgress by remember { mutableFloatStateOf(0f) }
+    var predictiveBackCompleting by remember { mutableStateOf(false) }
     var activeSheetName by rememberSaveable { mutableStateOf<String?>(null) }
     val activeSheet = activeSheetName?.let { runCatching { SettingsSheet.valueOf(it) }.getOrNull() }
 
     PredictiveBackHandler(enabled = page != SettingsPage.HOME && activeSheet == null) { backEvents ->
         try {
             backEvents.collect { event -> predictiveBackProgress = event.progress }
+            predictiveBackCompleting = true
             pageName = SettingsPage.HOME.name
         } catch (_: CancellationException) {
             // Gesture cancelled; keep the current secondary page.
@@ -176,7 +178,14 @@ fun SettingsScreen(
     }
 
     fun goTo(target: SettingsPage) {
+        predictiveBackCompleting = false
         pageName = target.name
+    }
+
+    LaunchedEffect(page, predictiveBackCompleting) {
+        if (page == SettingsPage.HOME && predictiveBackCompleting) {
+            predictiveBackCompleting = false
+        }
     }
 
     AdaptiveCenter(
@@ -232,27 +241,31 @@ fun SettingsScreen(
                 transitionSpec = {
                     val returningHome = targetState == SettingsPage.HOME
                     val enteringChild = initialState == SettingsPage.HOME && targetState != SettingsPage.HOME
-                    val enter = fadeIn(tween(150, easing = FastOutSlowInEasing)) +
-                        slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { width ->
-                            when {
-                                enteringChild -> width / 4
-                                returningHome -> -width / 7
-                                targetState.ordinal > initialState.ordinal -> width / 7
-                                else -> -width / 7
-                            }
-                        } +
-                        scaleIn(tween(260, easing = FastOutSlowInEasing), initialScale = if (returningHome) 0.985f else 0.992f)
-                    val exit = fadeOut(tween(120, easing = FastOutSlowInEasing)) +
-                        slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { width ->
-                            when {
-                                returningHome -> width / 4
-                                enteringChild -> -width / 8
-                                targetState.ordinal > initialState.ordinal -> -width / 8
-                                else -> width / 8
-                            }
-                        } +
-                        scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = if (returningHome) 0.992f else 0.985f)
-                    enter.togetherWith(exit)
+                    if (predictiveBackCompleting && returningHome) {
+                        fadeIn(tween(1)).togetherWith(fadeOut(tween(1)))
+                    } else {
+                        val enter = fadeIn(tween(150, easing = FastOutSlowInEasing)) +
+                            slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { width ->
+                                when {
+                                    enteringChild -> width / 4
+                                    returningHome -> -width / 7
+                                    targetState.ordinal > initialState.ordinal -> width / 7
+                                    else -> -width / 7
+                                }
+                            } +
+                            scaleIn(tween(260, easing = FastOutSlowInEasing), initialScale = if (returningHome) 0.985f else 0.992f)
+                        val exit = fadeOut(tween(120, easing = FastOutSlowInEasing)) +
+                            slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { width ->
+                                when {
+                                    returningHome -> width / 4
+                                    enteringChild -> -width / 8
+                                    targetState.ordinal > initialState.ordinal -> -width / 8
+                                    else -> width / 8
+                                }
+                            } +
+                            scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = if (returningHome) 0.992f else 0.985f)
+                        enter.togetherWith(exit)
+                    }
                 },
                 label = "settings_page_transition",
             ) { animatedPage ->

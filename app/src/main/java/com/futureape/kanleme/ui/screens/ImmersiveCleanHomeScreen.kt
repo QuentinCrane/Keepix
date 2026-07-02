@@ -99,6 +99,7 @@ import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.photoDisplayAspectRatio
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.util.shareDailyReportImage
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
@@ -143,7 +144,7 @@ internal fun ImmersiveCleanHomeScreen(
         if (!menuExpanded) menuPanel = KeepixMenuPanel.ROOT
     }
     val previews = if (selectedIsPhoto) {
-        photos.take(3).map { KeepixPreviewItem(it.uri, it.displayName, false, keepixPhotoAspectRatio(it.width, it.height)) }
+        photos.take(3).map { KeepixPreviewItem(it.uri, it.displayName, false, photoDisplayAspectRatio(it, minRatio = 0.42f, maxRatio = 2.20f)) }
     } else {
         videos.take(3).map { KeepixPreviewItem(it.uri, it.displayName, true, keepixPhotoAspectRatio(it.width, it.height)) }
     }

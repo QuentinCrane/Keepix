@@ -105,11 +105,14 @@ import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.photoMediaBadges
+import com.futureape.kanleme.ui.util.photoDisplayAspectRatio as correctedPhotoAspectRatio
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.viewmodel.PhotoUndoAnimation
 import kotlinx.coroutines.launch
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -481,7 +484,7 @@ fun SwipePhotoCard(
     val context = LocalContext.current
     val immersiveStyle = settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO
     val cardShape = RoundedCornerShape(if (immersiveStyle) 26.dp else 32.dp)
-    val photoRatio = remember(photo.id, photo.width, photo.height, photo.exifWidth, photo.exifHeight) { photoDisplayAspectRatio(photo) }
+    val photoRatio = remember(photo.id, photo.width, photo.height, photo.exifWidth, photo.exifHeight, photo.exifOrientation) { photoDisplayAspectRatio(photo) }
     val canInlinePlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
     var inlineMotionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
     var inlineMotionLoading by remember(photo.id) { mutableStateOf(false) }
@@ -858,7 +861,7 @@ private fun ExitingPhotoOverlay(
 ) {
     val offsetX = remember(exiting.sequence) { Animatable(exiting.startX) }
     val offsetY = remember(exiting.sequence) { Animatable(exiting.startY) }
-    val ratio = remember(exiting.photo.id, exiting.photo.width, exiting.photo.height, exiting.photo.exifWidth, exiting.photo.exifHeight) {
+    val ratio = remember(exiting.photo.id, exiting.photo.width, exiting.photo.height, exiting.photo.exifWidth, exiting.photo.exifHeight, exiting.photo.exifOrientation) {
         photoDisplayAspectRatio(exiting.photo)
     }
 
@@ -914,22 +917,9 @@ private fun PhotoFitImageWithSoftFill(
     Box(modifier.background(Color.Black)) {
         AsyncImage(
             model = model,
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = 1.08f
-                    scaleY = 1.08f
-                    alpha = 0.34f
-                },
-            contentScale = ContentScale.Crop,
-        )
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.20f)))
-        AsyncImage(
-            model = model,
             contentDescription = contentDescription,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit,
+            contentScale = ContentScale.Crop,
         )
     }
 }
@@ -984,7 +974,15 @@ fun InlineMotionPhotoPlayer(
         ExoPlayer.Builder(context).build().apply {
             repeatMode = if (playOnce) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ONE
             playWhenReady = true
-            volume = 0f
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                true,
+            )
+            setHandleAudioBecomingNoisy(true)
+            volume = 1f
             setMediaItem(MediaItem.fromUri(uri))
             prepare()
         }
@@ -1529,9 +1527,6 @@ fun VideoCard(video: VideoEntity, onAction: (SwipeAction) -> Unit) {
 }
 
 private fun photoDisplayAspectRatio(photo: PhotoEntity): Float {
-    val width = photo.width.takeIf { it > 0 } ?: photo.exifWidth?.takeIf { it > 0 } ?: 1
-    val height = photo.height.takeIf { it > 0 } ?: photo.exifHeight?.takeIf { it > 0 } ?: 1
-    val raw = width.toFloat() / height.toFloat()
     val minRatio = when {
         photo.isLongImage -> 0.42f
         photo.isScreenshot -> 0.46f
@@ -1539,7 +1534,7 @@ private fun photoDisplayAspectRatio(photo: PhotoEntity): Float {
     }
     // Keep the real photo orientation visible for common phone screenshots and panoramas,
     // while still bounding extreme long images so the card remains usable.
-    return raw.coerceIn(minRatio, 2.20f)
+    return correctedPhotoAspectRatio(photo, minRatio = minRatio, maxRatio = 2.20f)
 }
 
 

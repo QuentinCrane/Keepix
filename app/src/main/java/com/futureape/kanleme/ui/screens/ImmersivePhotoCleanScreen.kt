@@ -120,6 +120,7 @@ import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.photoDisplayAspectRatio
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import com.futureape.kanleme.ui.i18n.Text
@@ -361,12 +362,12 @@ internal fun KeepixDayMemoryOverlay(
     val context = LocalContext.current
     val memoryScope = rememberCoroutineScope()
     val memoryGridState = rememberLazyStaggeredGridState()
-    var memoryPhotos by remember(currentPhoto.id) { mutableStateOf(buildMemoryPhotoWindow(currentPhoto, photos)) }
+    var memoryPhotos by remember(currentPhoto.id, photos) { mutableStateOf(buildMemoryPhotoWindow(currentPhoto, photos)) }
     var lastDeletedMemory by remember(currentPhoto.id) { mutableStateOf<DeletedMemoryPhoto?>(null) }
     var restoringPhotoId by remember(currentPhoto.id) { mutableStateOf<Long?>(null) }
     var memoryPlacementSequence by remember(currentPhoto.id) { mutableStateOf(0L) }
     val suppressMemoryOpenUntil = remember(currentPhoto.id) { mutableLongStateOf(0L) }
-    LaunchedEffect(visible, currentPhoto.id) {
+    LaunchedEffect(visible, currentPhoto.id, photos) {
         if (visible) {
             memoryPhotos = buildMemoryPhotoWindow(currentPhoto, photos)
             lastDeletedMemory = null
@@ -893,9 +894,7 @@ private fun memoryIndexForProgress(progress: Float, ranges: List<MemoryDayRange>
 }
 
 private fun memoryPhotoAspectRatio(photo: PhotoEntity): Float {
-    val width = photo.width.takeIf { it > 0 } ?: photo.exifWidth?.takeIf { it > 0 } ?: 1
-    val height = photo.height.takeIf { it > 0 } ?: photo.exifHeight?.takeIf { it > 0 } ?: 1
-    return (width.toFloat() / height.toFloat()).coerceIn(0.30f, 4.80f)
+    return photoDisplayAspectRatio(photo, minRatio = 0.30f, maxRatio = 4.80f)
 }
 
 @Composable

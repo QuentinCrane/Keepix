@@ -34,6 +34,7 @@ class MediaStoreScanner @Inject constructor(
             MediaStore.Images.Media.MIME_TYPE,
             MediaStore.Images.Media.WIDTH,
             MediaStore.Images.Media.HEIGHT,
+            MediaStore.Images.Media.ORIENTATION,
         )
         val result = mutableListOf<PhotoEntity>()
         queryMedia(
@@ -61,6 +62,7 @@ class MediaStoreScanner @Inject constructor(
                     ?: 0L
                 val width = cursor.int(MediaStore.Images.Media.WIDTH)
                 val height = cursor.int(MediaStore.Images.Media.HEIGHT)
+                val orientation = cursor.int(MediaStore.Images.Media.ORIENTATION).takeIf { it != 0 }
                 // Keep scanning strictly lightweight: never open or sniff the media file here.
                 // The previous APK-reference build tried to parse Motion Photo XMP/MP4 during
                 // MediaStore scanning, which can block large libraries and make the app look as
@@ -84,6 +86,7 @@ class MediaStoreScanner @Inject constructor(
                     mimeType = mimeType,
                     width = width,
                     height = height,
+                    exifOrientation = orientation,
                     isScreenshot = isScreenshot(relativePath, displayName),
                     isSelfie = isSelfie(relativePath, displayName),
                     isMotionPhoto = isMotionHint,

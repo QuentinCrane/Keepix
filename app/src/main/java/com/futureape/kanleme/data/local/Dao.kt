@@ -110,6 +110,45 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE id IN (:ids)")
     suspend fun byIds(ids: List<Long>): List<PhotoEntity>
 
+    @Query("""
+        SELECT day_key FROM (
+            SELECT strftime('%Y-%m-%d', date_taken / 1000, 'unixepoch', 'localtime') AS day_key,
+                   MAX(date_taken) AS latest
+            FROM photos
+            WHERE deletion_status = 'none'
+            AND date_taken > 0
+            AND date_taken < :anchorStartMillis
+            GROUP BY day_key
+            ORDER BY latest DESC
+            LIMIT :limit
+        )
+    """)
+    suspend fun memoryDayKeysBefore(anchorStartMillis: Long, limit: Int): List<String>
+
+    @Query("""
+        SELECT day_key FROM (
+            SELECT strftime('%Y-%m-%d', date_taken / 1000, 'unixepoch', 'localtime') AS day_key,
+                   MIN(date_taken) AS earliest
+            FROM photos
+            WHERE deletion_status = 'none'
+            AND date_taken > 0
+            AND date_taken >= :anchorEndMillis
+            GROUP BY day_key
+            ORDER BY earliest ASC
+            LIMIT :limit
+        )
+    """)
+    suspend fun memoryDayKeysAfter(anchorEndMillis: Long, limit: Int): List<String>
+
+    @Query("""
+        SELECT * FROM photos
+        WHERE deletion_status = 'none'
+        AND strftime('%Y-%m-%d', date_taken / 1000, 'unixepoch', 'localtime') IN (:dayKeys)
+        ORDER BY date_taken ASC, id ASC
+        LIMIT :limit
+    """)
+    suspend fun photosForMemoryDayKeys(dayKeys: List<String>, limit: Int): List<PhotoEntity>
+
     @Query("SELECT * FROM photos WHERE media_store_id IN (:mediaStoreIds)")
     suspend fun byMediaStoreIds(mediaStoreIds: List<Long>): List<PhotoEntity>
 

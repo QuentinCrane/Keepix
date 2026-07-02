@@ -68,6 +68,7 @@ import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.components.NativeFolderExcludeButton
+import com.futureape.kanleme.ui.util.photoDisplayAspectRatio
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 
@@ -449,7 +450,7 @@ private fun KeepixStartDeck(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .fillMaxWidth(if (isTop) 0.76f else 0.70f)
-                        .aspectRatio(0.72f)
+                        .aspectRatio(photoDisplayAspectRatio(photo, minRatio = 0.42f, maxRatio = 2.20f))
                         .graphicsLayer {
                             rotationZ = rotations.getOrElse(originalIndex) { 0f }
                             translationX = offsets.getOrElse(originalIndex) { 0.dp }.toPx()
@@ -459,8 +460,7 @@ private fun KeepixStartDeck(
                             scaleY = if (isTop) 1f else 0.95f
                         }
                         .clip(shape)
-                        .background(Color.Black)
-                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)), shape),
+                        .background(Color.Black),
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(context)

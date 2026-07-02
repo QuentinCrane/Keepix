@@ -25,6 +25,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
@@ -284,6 +285,43 @@ class AppRepositoryImpl @Inject constructor(
             .filter { dateModeMatches(it.dateTaken, scope.dateMode) }
             .filterNot { isExcludedFolder(it.folderPath, settings.excludedFolderPaths) }
             .take(targetLimit)
+    }
+
+    override suspend fun loadPhotoMemoryWindow(
+        currentPhoto: PhotoEntity,
+        dayCount: Int,
+        limit: Int,
+    ): List<PhotoEntity> = withContext(Dispatchers.IO) {
+        val safeDayCount = dayCount.coerceIn(1, 14)
+        val anchorMillis = photoMemoryMillis(currentPhoto)
+        val (anchorStart, anchorEnd) = dayRangeForMillis(anchorMillis)
+        val anchorDayKey = memoryDayKey(anchorMillis)
+        val sideBudget = safeDayCount - 1
+        val preferredBefore = sideBudget / 2
+        val preferredAfter = sideBudget - preferredBefore
+        val beforeKeys = photoDao
+            .memoryDayKeysBefore(anchorStart, sideBudget)
+            .filter { it.isNotBlank() && it != anchorDayKey }
+            .distinct()
+            .sorted()
+        val afterKeys = photoDao
+            .memoryDayKeysAfter(anchorEnd, sideBudget)
+            .filter { it.isNotBlank() && it != anchorDayKey }
+            .distinct()
+            .sorted()
+        var beforeTake = preferredBefore.coerceAtMost(beforeKeys.size)
+        var afterTake = preferredAfter.coerceAtMost(afterKeys.size)
+        if (beforeTake < preferredBefore) {
+            afterTake = (afterTake + (preferredBefore - beforeTake)).coerceAtMost(afterKeys.size)
+        }
+        if (afterTake < preferredAfter) {
+            beforeTake = (beforeTake + (preferredAfter - afterTake)).coerceAtMost(beforeKeys.size)
+        }
+        val selectedDayKeys = (beforeKeys.takeLast(beforeTake) + anchorDayKey + afterKeys.take(afterTake)).distinct()
+        if (selectedDayKeys.isEmpty()) return@withContext listOf(currentPhoto)
+        val photos = photoDao.photosForMemoryDayKeys(selectedDayKeys, limit.coerceAtLeast(32))
+            .distinctBy { it.mediaStoreId }
+        photos.ifEmpty { listOf(currentPhoto) }
     }
 
     override suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction): Long = withContext(Dispatchers.IO) {
@@ -694,6 +732,33 @@ class AppRepositoryImpl @Inject constructor(
 
     private fun todayLocalDate(now: Long = System.currentTimeMillis()): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(java.util.Date(now))
+
+    private fun photoMemoryMillis(photo: PhotoEntity): Long {
+        return listOf(photo.dateTaken, photo.dateModified, photo.dateAdded)
+            .firstOrNull { it > 0L }
+            ?.let(::normalizeMediaTimeMillis)
+            ?: System.currentTimeMillis()
+    }
+
+    private fun normalizeMediaTimeMillis(value: Long): Long {
+        return if (value in 1L..10_000_000_000L) value * 1000L else value
+    }
+
+    private fun memoryDayKey(timeMillis: Long): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date(timeMillis))
+
+    private fun dayRangeForMillis(timeMillis: Long): Pair<Long, Long> {
+        val start = Calendar.getInstance().apply {
+            timeInMillis = timeMillis
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val end = start.clone() as Calendar
+        end.add(Calendar.DAY_OF_MONTH, 1)
+        return start.timeInMillis to end.timeInMillis
+    }
 
     private fun rangeFor(mode: String): Pair<Long, Long>? {
         val cal = Calendar.getInstance()

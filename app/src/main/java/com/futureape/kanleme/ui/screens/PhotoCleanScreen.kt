@@ -126,7 +126,7 @@ fun PhotoCleanScreen(
     onBatchFinished: () -> Unit,
 ) {
     val deck by viewModel.photoDeck.collectAsStateWithLifecycle()
-    val timelinePhotos by viewModel.timelinePhotos.collectAsStateWithLifecycle()
+    val dayMemoryPhotos by viewModel.photoDayMemoryWindow.collectAsStateWithLifecycle()
     val deckPreparing by viewModel.photoDeckPreparing.collectAsStateWithLifecycle()
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val typeStats by viewModel.photoTypeStats.collectAsStateWithLifecycle()
@@ -167,6 +167,7 @@ fun PhotoCleanScreen(
     fun closeDayMemory() {
         showDayMemory = false
         dayMemoryPinch = DayMemoryPinchState()
+        viewModel.clearPhotoDayMemoryWindow()
     }
 
     fun previewDayMemory(progress: Float, scale: Float) {
@@ -352,12 +353,20 @@ fun PhotoCleanScreen(
     }
 
     val currentPhoto = deck.first()
-    val memoryPhotos = timelinePhotos.ifEmpty { deck }
+    val memoryPhotos = dayMemoryPhotos.ifEmpty { listOf(currentPhoto) }
     val remainingPhotos = (dashboard.photoCount - dashboard.processedPhotoCount).coerceAtLeast(deck.size)
     val remainingInBatch = (settings.photoBatchSize.coerceIn(1, 100) - sessionActionCount).coerceAtLeast(1)
     val visibleDeck = deck.take(remainingInBatch.coerceAtMost(3))
     val dayMemoryVisible = showDayMemory || dayMemoryPinch.progress > 0.001f
     val dimAlpha by animateFloatAsState(targetValue = if (showGuide) 0.46f else 0f, label = "guide_dim")
+
+    LaunchedEffect(dayMemoryVisible, currentPhoto.id) {
+        if (dayMemoryVisible) {
+            viewModel.loadPhotoDayMemoryWindow(currentPhoto)
+        } else {
+            viewModel.clearPhotoDayMemoryWindow()
+        }
+    }
 
     fun perform(photo: PhotoEntity, action: SwipeAction, exitTargetX: Float, exitTargetY: Float) {
         if (batchFinishing) return

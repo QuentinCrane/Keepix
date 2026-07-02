@@ -153,6 +153,9 @@ class KanlemeViewModel @Inject constructor(
     private val _photoDeckPreview = MutableStateFlow<List<PhotoEntity>>(emptyList())
     val photoDeckPreview = _photoDeckPreview.asStateFlow()
 
+    private val _photoDayMemoryWindow = MutableStateFlow<List<PhotoEntity>>(emptyList())
+    val photoDayMemoryWindow = _photoDayMemoryWindow.asStateFlow()
+
     private val _videoDeckPreview = MutableStateFlow<List<VideoEntity>>(emptyList())
     val videoDeckPreview = _videoDeckPreview.asStateFlow()
 
@@ -196,10 +199,12 @@ class KanlemeViewModel @Inject constructor(
     private var videoDeckLoadJob: Job? = null
     private var photoDeckPreviewLoadJob: Job? = null
     private var videoDeckPreviewLoadJob: Job? = null
+    private var photoDayMemoryWindowJob: Job? = null
     private var photoDeckGeneration = 0L
     private var videoDeckGeneration = 0L
     private var photoDeckPreviewGeneration = 0L
     private var videoDeckPreviewGeneration = 0L
+    private var photoDayMemoryWindowGeneration = 0L
     private var lastGeneratedRandomSeed = 1L
     private var similarDetectionJob: Job? = null
     private val pendingPhotoActionMediaIds = mutableSetOf<Long>()
@@ -405,6 +410,7 @@ class KanlemeViewModel @Inject constructor(
     fun finishPhotoCleaningSession() {
         pendingPhotoActionMediaIds.clear()
         clearPhotoActionHistory()
+        clearPhotoDayMemoryWindow()
         _photoSessionActionCount.value = 0
         _lastPhotoAction.value = null
         _photoDeck.value = _photoDeck.value.withoutLocalPhotoExclusions()
@@ -461,6 +467,26 @@ class KanlemeViewModel @Inject constructor(
                 if (generation == photoDeckPreviewGeneration) _photoDeckPreviewPreparing.value = false
             }
         }
+    }
+
+    fun loadPhotoDayMemoryWindow(currentPhoto: PhotoEntity) {
+        photoDayMemoryWindowJob?.cancel()
+        _photoDayMemoryWindow.value = listOf(currentPhoto)
+        val generation = ++photoDayMemoryWindowGeneration
+        photoDayMemoryWindowJob = viewModelScope.launch {
+            val photos = repository
+                .loadPhotoMemoryWindow(currentPhoto = currentPhoto)
+                .distinctBy { it.mediaStoreId }
+            if (generation == photoDayMemoryWindowGeneration) {
+                _photoDayMemoryWindow.value = photos.ifEmpty { listOf(currentPhoto) }
+            }
+        }
+    }
+
+    fun clearPhotoDayMemoryWindow() {
+        photoDayMemoryWindowJob?.cancel()
+        photoDayMemoryWindowGeneration += 1L
+        _photoDayMemoryWindow.value = emptyList()
     }
 
     fun loadVideoDeck(scope: CleaningScope = _videoScope.value) {

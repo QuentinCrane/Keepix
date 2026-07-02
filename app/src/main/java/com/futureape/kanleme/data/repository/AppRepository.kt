@@ -114,6 +114,7 @@ interface AppRepository {
     suspend fun refreshMediaLibrary(): Pair<Int, Int>
     suspend fun loadPhotoDeck(scope: CleaningScope): List<PhotoEntity>
     suspend fun loadVideoDeck(scope: CleaningScope): List<VideoEntity>
+    suspend fun loadPhotoMemoryWindow(currentPhoto: PhotoEntity, dayCount: Int = 7, limit: Int = 420): List<PhotoEntity>
     suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction): Long
     suspend fun handleVideoAction(video: VideoEntity, action: SwipeAction): Long
     suspend fun movePhotoToFolder(photo: PhotoEntity, targetRelativePath: String): MovePhotoResult
