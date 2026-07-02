@@ -121,6 +121,8 @@ fun CleanHomeScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val recentlyAddedPhotos by viewModel.recentlyAddedPhotos.collectAsStateWithLifecycle()
     val recentVideos by viewModel.recentVideos.collectAsStateWithLifecycle()
+    val todayInHistoryPhotos by viewModel.todayInHistoryPhotos.collectAsStateWithLifecycle()
+    val todayInHistoryVideos by viewModel.todayInHistoryVideos.collectAsStateWithLifecycle()
     val photoDeck by viewModel.photoDeck.collectAsStateWithLifecycle()
     val videoDeck by viewModel.videoDeck.collectAsStateWithLifecycle()
     val photoDeckPreview by viewModel.photoDeckPreview.collectAsStateWithLifecycle()
@@ -138,6 +140,15 @@ fun CleanHomeScreen(
     var exportingDailyReport by remember { mutableStateOf(false) }
     var dailyReportExportError by remember { mutableStateOf<String?>(null) }
     val selectedIsPhoto = settings.homeMediaTab == "photo" || settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO
+    val hasTodayMemories = todayInHistoryPhotos.isNotEmpty() || todayInHistoryVideos.isNotEmpty()
+    val openTodayIfAvailable = {
+        if (hasTodayMemories) {
+            haptics.tick()
+            onToday()
+        } else {
+            viewModel.showMessage("今天暂无往年照片或视频")
+        }
+    }
     val pagerState = rememberPagerState(
         initialPage = if (selectedIsPhoto) 0 else 1,
         pageCount = { 2 },
@@ -197,7 +208,7 @@ fun CleanHomeScreen(
             onTimeline = onTimeline,
             onTrash = onTrash,
             onFavorites = onFavorites,
-            onToday = onToday,
+            onToday = openTodayIfAvailable,
             onSettings = onSettings,
             onPhotoType = { type ->
                 haptics.tick()
@@ -206,7 +217,11 @@ fun CleanHomeScreen(
             },
             onPhotoDate = { mode ->
                 haptics.tick()
-                viewModel.setPhotoDateModePreview(mode)
+                if (mode == "today_history" && !hasTodayMemories) {
+                    viewModel.showMessage("今天暂无往年照片或视频")
+                } else {
+                    viewModel.setPhotoDateModePreview(mode)
+                }
             },
             onPhotoSort = { order ->
                 haptics.tick()
@@ -218,7 +233,11 @@ fun CleanHomeScreen(
             },
             onVideoDate = { mode ->
                 haptics.tick()
-                viewModel.setVideoDateModePreview(mode)
+                if (mode == "today_history" && !hasTodayMemories) {
+                    viewModel.showMessage("今天暂无往年照片或视频")
+                } else {
+                    viewModel.setVideoDateModePreview(mode)
+                }
             },
             onVideoSort = { order ->
                 haptics.tick()
@@ -251,7 +270,7 @@ fun CleanHomeScreen(
                     ) {
                         item {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                HomeTopAction("当年今日", Icons.Rounded.CalendarToday, Modifier.weight(1f), onToday)
+                                HomeTopAction("当年今日", Icons.Rounded.CalendarToday, Modifier.weight(1f), openTodayIfAvailable)
                                 HomeTopAction(
                                     "今日整理",
                                     Icons.Rounded.Share,

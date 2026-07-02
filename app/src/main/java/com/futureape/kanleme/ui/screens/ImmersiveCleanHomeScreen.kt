@@ -673,12 +673,6 @@ private fun KeepixHomeDeck(
                 val entryStart = deckEntryStartPx + originalIndex * with(density) { 42.dp.toPx() }
                 val entryOffset = deckEntryOffsets.getOrNull(originalIndex)?.value ?: 0f
                 val entryProgress = (1f - entryOffset / entryStart.coerceAtLeast(1f)).coerceIn(0f, 1f)
-                val baseAlpha = when (originalIndex) {
-                    0 -> 1f
-                    1 -> 0.76f
-                    2 -> 0.66f
-                    else -> 0.58f
-                }
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -688,7 +682,7 @@ private fun KeepixHomeDeck(
                             rotationZ = rotations.getOrElse(originalIndex) { 0f }
                             translationX = offsetsX.getOrElse(originalIndex) { 0.dp }.toPx()
                             translationY = offsetsY.getOrElse(originalIndex) { 0.dp }.toPx() + entryOffset
-                            alpha = baseAlpha * entryProgress
+                            alpha = entryProgress
                             val baseScale = if (isTop) 1f else 0.96f
                             val entryScale = 0.92f + entryProgress * 0.08f
                             scaleX = baseScale * entryScale

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -127,7 +128,7 @@ fun TodayInHistoryScreen(
     val grouped = remember(memories) { memories.groupBy { it.year }.toSortedMap(compareByDescending { it }) }
     var expandedYears by remember(grouped.keys) { mutableStateOf(grouped.keys.take(1).toSet()) }
 
-    Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
+    Column(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 36.dp)) {
         ScreenHeader("当年今日", "按年份回看往年今天的照片和视频，展开后可查看状态", onBack)
         if (memories.isEmpty()) {
             EmptyState(
@@ -140,7 +141,7 @@ fun TodayInHistoryScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(18.dp),
+                contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {

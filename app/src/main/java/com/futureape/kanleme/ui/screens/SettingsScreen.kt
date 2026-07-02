@@ -73,6 +73,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -86,6 +87,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -1976,6 +1978,25 @@ private fun SettingsSwitchRow(
         animationSpec = tween(180, easing = FastOutSlowInEasing),
         label = "settings_switch_row_background",
     )
+    val darkSurface = MaterialTheme.colorScheme.background.luminance() < 0.18f
+    val uncheckedThumb = if (darkSurface) Color(0xFFE6EAF2) else MaterialTheme.colorScheme.outline
+    val uncheckedTrack = if (darkSurface) Color(0xFF242934) else MaterialTheme.colorScheme.surfaceVariant
+    val uncheckedBorder = if (darkSurface) Color.White.copy(alpha = 0.34f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.58f)
+    val switchColors = SwitchDefaults.colors(
+        checkedThumbColor = Color.White,
+        checkedTrackColor = color.copy(alpha = 0.92f),
+        checkedBorderColor = color.copy(alpha = 0.86f),
+        checkedIconColor = color.copy(alpha = 0.92f),
+        uncheckedThumbColor = uncheckedThumb,
+        uncheckedTrackColor = uncheckedTrack,
+        uncheckedBorderColor = uncheckedBorder,
+        uncheckedIconColor = uncheckedTrack,
+        disabledCheckedThumbColor = Color.White.copy(alpha = 0.62f),
+        disabledCheckedTrackColor = color.copy(alpha = 0.34f),
+        disabledUncheckedThumbColor = uncheckedThumb.copy(alpha = 0.46f),
+        disabledUncheckedTrackColor = uncheckedTrack.copy(alpha = 0.42f),
+        disabledUncheckedBorderColor = uncheckedBorder.copy(alpha = 0.46f),
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2007,7 +2028,7 @@ private fun SettingsSwitchRow(
                 )
             }
         }
-        Switch(checked = checked, onCheckedChange = { onCheckedChange(it) })
+        Switch(checked = checked, onCheckedChange = { onCheckedChange(it) }, colors = switchColors)
     }
 }
 
