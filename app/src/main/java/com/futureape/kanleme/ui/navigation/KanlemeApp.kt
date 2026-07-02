@@ -7,8 +7,6 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -41,6 +39,7 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -117,7 +116,10 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
         viewModel.clearMessage()
     }
 
-    LiquidBackground(modifier = Modifier.fillMaxSize().background(transitionBackdrop)) {
+    LiquidBackground(
+        modifier = Modifier.fillMaxSize().background(transitionBackdrop),
+        backgroundColor = transitionBackdrop,
+    ) {
         if (!settings.onboardingShown) {
             OnboardingScreen(onFinish = { viewModel.markOnboardingShown() })
         } else {
@@ -132,30 +134,12 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 startDestination = Destinations.HOME,
                 modifier = (if (useSideRail) Modifier.fillMaxSize().padding(start = 92.dp) else Modifier.fillMaxSize())
                     .background(transitionBackdrop),
-                enterTransition = {
-                    fadeIn(tween(140)) + slideIntoContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280))
-                },
-                exitTransition = {
-                    fadeOut(tween(120)) + slideOutOfContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280))
-                },
-                popEnterTransition = {
-                    fadeIn(tween(140)) + slideIntoContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280))
-                },
-                popExitTransition = {
-                    fadeOut(tween(120)) + slideOutOfContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280))
-                },
+                enterTransition = { hierarchyEnterTransition() },
+                exitTransition = { hierarchyExitTransition() },
+                popEnterTransition = { hierarchyEnterTransition() },
+                popExitTransition = { hierarchyExitTransition() },
             ) {
-                composable(
-                    Destinations.HOME,
-                    popEnterTransition = {
-                        if (initialState.destination.route == Destinations.PHOTO) {
-                            fadeIn(tween(180, easing = LinearOutSlowInEasing)) +
-                                scaleIn(tween(240, easing = FastOutSlowInEasing), initialScale = 0.985f)
-                        } else {
-                            fadeIn(tween(140)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(280))
-                        }
-                    },
-                ) {
+                composable(Destinations.HOME) {
                     CleanHomeScreen(
                         viewModel = viewModel,
                         contentPadding = PaddingValues(bottom = homeBottomPadding),
@@ -184,22 +168,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         },
                     )
                 }
-                composable(
-                    Destinations.PHOTO,
-                    enterTransition = {
-                        fadeIn(tween(120, easing = LinearOutSlowInEasing)) +
-                            scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = 0.985f)
-                    },
-                    exitTransition = {
-                        fadeOut(tween(120, easing = FastOutSlowInEasing)) +
-                            scaleOut(tween(180, easing = FastOutSlowInEasing), targetScale = 1.01f)
-                    },
-                    popEnterTransition = { fadeIn(tween(120)) },
-                    popExitTransition = {
-                        fadeOut(tween(170, easing = FastOutSlowInEasing)) +
-                            scaleOut(tween(240, easing = FastOutSlowInEasing), targetScale = 0.94f)
-                    },
-                ) {
+                composable(Destinations.PHOTO) {
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         PhotoCleanScreen(
                             viewModel = viewModel,
@@ -224,25 +193,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         },
                     )
                 }
-                composable(
-                    Destinations.VIDEO,
-                    enterTransition = {
-                        fadeIn(tween(140, easing = LinearOutSlowInEasing)) +
-                            slideIntoContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280, easing = FastOutSlowInEasing))
-                    },
-                    exitTransition = {
-                        fadeOut(tween(120, easing = FastOutSlowInEasing)) +
-                            slideOutOfContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280, easing = FastOutSlowInEasing))
-                    },
-                    popEnterTransition = {
-                        fadeIn(tween(140, easing = LinearOutSlowInEasing)) +
-                            slideIntoContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280, easing = FastOutSlowInEasing))
-                    },
-                    popExitTransition = {
-                        fadeOut(tween(120, easing = FastOutSlowInEasing)) +
-                            slideOutOfContainer(topLevelSlideDirection(initialState.destination.route, targetState.destination.route), tween(280, easing = FastOutSlowInEasing))
-                    },
-                ) {
+                composable(Destinations.VIDEO) {
                     VideoCleanScreen(
                         viewModel,
                         bottomContentPadding = if (useSideRail) 28.dp else 112.dp,
@@ -262,10 +213,6 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 composable(
                     route = Destinations.VIEWER,
                     arguments = listOf(navArgument(Destinations.VIEWER_ARG_PHOTO_ID) { type = NavType.LongType }),
-                    enterTransition = { fadeIn(tween(160, easing = LinearOutSlowInEasing)) },
-                    exitTransition = { fadeOut(tween(120, easing = FastOutSlowInEasing)) },
-                    popEnterTransition = { fadeIn(tween(120, easing = LinearOutSlowInEasing)) },
-                    popExitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) },
                 ) { entry ->
                     PhotoViewerScreen(
                         viewModel = viewModel,
@@ -300,50 +247,16 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onOpenPhoto = { photo -> navController.navigate(Destinations.photoViewer(photo.id)) },
                     )
                 }
-                composable(
-                    Destinations.SETTINGS,
-                    enterTransition = {
-                        fadeIn(tween(150, easing = LinearOutSlowInEasing)) +
-                            scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = 0.985f)
-                    },
-                    exitTransition = {
-                        fadeOut(tween(120, easing = FastOutSlowInEasing)) +
-                            scaleOut(tween(180, easing = FastOutSlowInEasing), targetScale = 1.01f)
-                    },
-                    popEnterTransition = {
-                        fadeIn(tween(130, easing = LinearOutSlowInEasing)) +
-                            scaleIn(tween(180, easing = FastOutSlowInEasing), initialScale = 0.99f)
-                    },
-                    popExitTransition = {
-                        fadeOut(tween(150, easing = FastOutSlowInEasing)) +
-                            scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = 0.985f)
-                    },
-                ) {
-                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                composable(Destinations.SETTINGS) {
+                    Box(Modifier.fillMaxSize().background(transitionBackdrop)) {
                         SettingsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
                     }
                 }
                 composable(
                     route = Destinations.SETTINGS_WITH_PAGE,
                     arguments = listOf(navArgument(Destinations.SETTINGS_PAGE_ARG) { type = NavType.StringType }),
-                    enterTransition = {
-                        fadeIn(tween(150, easing = LinearOutSlowInEasing)) +
-                            scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = 0.985f)
-                    },
-                    exitTransition = {
-                        fadeOut(tween(120, easing = FastOutSlowInEasing)) +
-                            scaleOut(tween(180, easing = FastOutSlowInEasing), targetScale = 1.01f)
-                    },
-                    popEnterTransition = {
-                        fadeIn(tween(130, easing = LinearOutSlowInEasing)) +
-                            scaleIn(tween(180, easing = FastOutSlowInEasing), initialScale = 0.99f)
-                    },
-                    popExitTransition = {
-                        fadeOut(tween(150, easing = FastOutSlowInEasing)) +
-                            scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = 0.985f)
-                    },
                 ) { entry ->
-                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    Box(Modifier.fillMaxSize().background(transitionBackdrop)) {
                         SettingsScreen(
                             viewModel = viewModel,
                             onBack = { navController.popBackStack() },
@@ -481,17 +394,79 @@ private fun NonBlockingStatusChip(
     }
 }
 
-private fun topLevelSlideDirection(
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.hierarchyEnterTransition() =
+    fadeIn(tween(150, easing = LinearOutSlowInEasing)) +
+        slideIntoContainer(
+            towards = hierarchySlideDirection(initialState.destination.route, targetState.destination.route),
+            animationSpec = tween(280, easing = FastOutSlowInEasing),
+        )
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.hierarchyExitTransition() =
+    fadeOut(tween(115, easing = FastOutSlowInEasing)) +
+        slideOutOfContainer(
+            towards = hierarchySlideDirection(initialState.destination.route, targetState.destination.route),
+            animationSpec = tween(260, easing = FastOutSlowInEasing),
+        )
+
+private fun hierarchySlideDirection(
     fromRoute: String?,
     toRoute: String?,
 ): AnimatedContentTransitionScope.SlideDirection {
-    val from = topLevelRouteIndex(fromRoute)
-    val to = topLevelRouteIndex(toRoute)
-    return if (from != null && to != null && to < from) {
+    val fromTopLevel = topLevelRouteIndex(fromRoute)
+    val toTopLevel = topLevelRouteIndex(toRoute)
+    if (fromTopLevel != null && toTopLevel != null) {
+        return if (toTopLevel < fromTopLevel) {
+            AnimatedContentTransitionScope.SlideDirection.Right
+        } else {
+            AnimatedContentTransitionScope.SlideDirection.Left
+        }
+    }
+
+    val fromDepth = routeDepth(fromRoute)
+    val toDepth = routeDepth(toRoute)
+    if (toDepth != fromDepth) {
+        return if (toDepth < fromDepth) {
+            AnimatedContentTransitionScope.SlideDirection.Right
+        } else {
+            AnimatedContentTransitionScope.SlideDirection.Left
+        }
+    }
+
+    return if (routeMotionRank(toRoute) < routeMotionRank(fromRoute)) {
         AnimatedContentTransitionScope.SlideDirection.Right
     } else {
         AnimatedContentTransitionScope.SlideDirection.Left
     }
+}
+
+private fun routeDepth(route: String?): Int = when (route) {
+    Destinations.HOME,
+    Destinations.VIDEO,
+    Destinations.ME -> 0
+    Destinations.VIEWER,
+    Destinations.SETTINGS_WITH_PAGE -> 2
+    else -> 1
+}
+
+private fun routeMotionRank(route: String?): Int = when (route) {
+    Destinations.HOME -> 0
+    Destinations.VIDEO -> 1
+    Destinations.ME -> 2
+    Destinations.PHOTO_START -> 10
+    Destinations.PHOTO -> 11
+    Destinations.VIDEO_START -> 12
+    Destinations.TIMELINE -> 20
+    Destinations.TODAY -> 21
+    Destinations.VIEWER -> 30
+    Destinations.SIMILAR -> 40
+    Destinations.FAVORITES -> 41
+    Destinations.TRASH -> 42
+    Destinations.PHOTO_HISTORY -> 43
+    Destinations.SETTINGS -> 50
+    Destinations.SETTINGS_WITH_PAGE -> 51
+    Destinations.ACHIEVEMENTS -> 60
+    Destinations.ANNUAL -> 61
+    else -> Int.MAX_VALUE
 }
 
 private fun topLevelRouteIndex(route: String?): Int? = when (route) {
@@ -502,6 +477,7 @@ private fun topLevelRouteIndex(route: String?): Int? = when (route) {
 }
 
 private fun String?.usesDarkTransitionBackdrop(appVisualStyle: com.futureape.kanleme.data.settings.AppVisualStyle): Boolean {
+    if (appVisualStyle == com.futureape.kanleme.data.settings.AppVisualStyle.IMMERSIVE_PHOTO) return true
     return this in setOf(Destinations.PHOTO_START, Destinations.PHOTO, Destinations.VIDEO_START, Destinations.VIDEO, Destinations.VIEWER) ||
         (this == Destinations.HOME && appVisualStyle == com.futureape.kanleme.data.settings.AppVisualStyle.IMMERSIVE_PHOTO)
 }

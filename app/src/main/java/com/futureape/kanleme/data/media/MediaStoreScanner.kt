@@ -169,6 +169,8 @@ class MediaStoreScanner @Inject constructor(
         val queryArgs = Bundle().apply {
             putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS, arrayOf(sortColumn, fallbackSortColumn))
             putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, ContentResolver.QUERY_SORT_DIRECTION_DESCENDING)
+            putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_EXCLUDE)
+            putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_EXCLUDE)
             if (limit != null && limit > 0) putInt(ContentResolver.QUERY_ARG_LIMIT, limit)
         }
         return try {
