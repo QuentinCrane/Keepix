@@ -67,6 +67,7 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Button
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -188,143 +189,152 @@ fun SettingsScreen(
         }
     }
 
-    AdaptiveCenter(
-        modifier = Modifier.background(MaterialTheme.colorScheme.background),
-        maxWidth = 900.dp,
-    ) {
-        Box(Modifier.fillMaxSize()) {
-            if (page != SettingsPage.HOME && predictiveBackProgress > 0.001f) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .graphicsLayer {
-                            translationX = -56f * (1f - predictiveBackProgress)
-                            val scale = 0.985f + predictiveBackProgress * 0.015f
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = (0.58f + predictiveBackProgress * 0.42f).coerceIn(0f, 1f)
-                        },
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
-                ) {
-                    item {
-                        SettingsHeader(
-                            title = SettingsPage.HOME.title,
-                            subtitle = "一级菜单",
-                            onBack = {},
-                        )
-                    }
-                    item {
-                        SettingsPageContent(
-                            page = SettingsPage.HOME,
-                            settings = settings,
-                            allFolders = allFolders,
-                            customizeTab = customizeTab,
-                            onSelectCustomizeTab = {},
-                            manualExcludePath = manualExcludePath,
-                            onManualExcludePathChange = {},
-                            showAllFolderRules = showAllFolderRules,
-                            onToggleShowAllFolderRules = {},
-                            onManualExcludeConsumed = {},
-                            goTo = {},
-                            openSheet = {},
-                            onTick = {},
-                            onSuccess = {},
-                            viewModel = viewModel,
-                        )
+    val baseSettingsColorScheme = MaterialTheme.colorScheme
+    val settingsColorScheme = if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
+        keepixIosSettingsColorScheme(baseSettingsColorScheme)
+    } else {
+        baseSettingsColorScheme
+    }
+
+    MaterialTheme(colorScheme = settingsColorScheme) {
+        AdaptiveCenter(
+            modifier = Modifier.background(MaterialTheme.colorScheme.background),
+            maxWidth = 900.dp,
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                if (page != SettingsPage.HOME && predictiveBackProgress > 0.001f) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .graphicsLayer {
+                                translationX = -56f * (1f - predictiveBackProgress)
+                                val scale = 0.985f + predictiveBackProgress * 0.015f
+                                scaleX = scale
+                                scaleY = scale
+                                alpha = (0.58f + predictiveBackProgress * 0.42f).coerceIn(0f, 1f)
+                            },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
+                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                    ) {
+                        item {
+                            SettingsHeader(
+                                title = SettingsPage.HOME.title,
+                                subtitle = "一级菜单",
+                                onBack = {},
+                            )
+                        }
+                        item {
+                            SettingsPageContent(
+                                page = SettingsPage.HOME,
+                                settings = settings,
+                                allFolders = allFolders,
+                                customizeTab = customizeTab,
+                                onSelectCustomizeTab = {},
+                                manualExcludePath = manualExcludePath,
+                                onManualExcludePathChange = {},
+                                showAllFolderRules = showAllFolderRules,
+                                onToggleShowAllFolderRules = {},
+                                onManualExcludeConsumed = {},
+                                goTo = {},
+                                openSheet = {},
+                                onTick = {},
+                                onSuccess = {},
+                                viewModel = viewModel,
+                            )
+                        }
                     }
                 }
-            }
-            AnimatedContent(
-                targetState = page,
-                transitionSpec = {
-                    val returningHome = targetState == SettingsPage.HOME
-                    val enteringChild = initialState == SettingsPage.HOME && targetState != SettingsPage.HOME
-                    if (predictiveBackCompleting && returningHome) {
-                        fadeIn(tween(1)).togetherWith(fadeOut(tween(1)))
-                    } else {
-                        val enter = fadeIn(tween(150, easing = FastOutSlowInEasing)) +
-                            slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { width ->
-                                when {
-                                    enteringChild -> width / 4
-                                    returningHome -> -width / 7
-                                    targetState.ordinal > initialState.ordinal -> width / 7
-                                    else -> -width / 7
-                                }
-                            } +
-                            scaleIn(tween(260, easing = FastOutSlowInEasing), initialScale = if (returningHome) 0.985f else 0.992f)
-                        val exit = fadeOut(tween(120, easing = FastOutSlowInEasing)) +
-                            slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { width ->
-                                when {
-                                    returningHome -> width / 4
-                                    enteringChild -> -width / 8
-                                    targetState.ordinal > initialState.ordinal -> -width / 8
-                                    else -> width / 8
-                                }
-                            } +
-                            scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = if (returningHome) 0.992f else 0.985f)
-                        enter.togetherWith(exit)
-                    }
-                },
-                label = "settings_page_transition",
-            ) { animatedPage ->
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .graphicsLayer {
-                            translationX = predictiveBackProgress * size.width * 0.82f
-                            val scale = 1f - predictiveBackProgress * 0.035f
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = 1f - predictiveBackProgress * 0.18f
-                        },
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
-                ) {
-                    item {
-                        SettingsHeader(
-                            title = animatedPage.title,
-                            subtitle = if (animatedPage == SettingsPage.HOME) "一级菜单" else "二级设置 · 修改后立即生效",
-                            onBack = {
-                                haptics.tick()
-                                if (animatedPage == SettingsPage.HOME) onBack() else pageName = SettingsPage.HOME.name
+                AnimatedContent(
+                    targetState = page,
+                    transitionSpec = {
+                        val returningHome = targetState == SettingsPage.HOME
+                        val enteringChild = initialState == SettingsPage.HOME && targetState != SettingsPage.HOME
+                        if (predictiveBackCompleting && returningHome) {
+                            fadeIn(tween(1)).togetherWith(fadeOut(tween(1)))
+                        } else {
+                            val enter = fadeIn(tween(150, easing = FastOutSlowInEasing)) +
+                                slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { width ->
+                                    when {
+                                        enteringChild -> width / 4
+                                        returningHome -> -width / 7
+                                        targetState.ordinal > initialState.ordinal -> width / 7
+                                        else -> -width / 7
+                                    }
+                                } +
+                                scaleIn(tween(260, easing = FastOutSlowInEasing), initialScale = if (returningHome) 0.985f else 0.992f)
+                            val exit = fadeOut(tween(120, easing = FastOutSlowInEasing)) +
+                                slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { width ->
+                                    when {
+                                        returningHome -> width / 4
+                                        enteringChild -> -width / 8
+                                        targetState.ordinal > initialState.ordinal -> -width / 8
+                                        else -> width / 8
+                                    }
+                                } +
+                                scaleOut(tween(220, easing = FastOutSlowInEasing), targetScale = if (returningHome) 0.992f else 0.985f)
+                            enter.togetherWith(exit)
+                        }
+                    },
+                    label = "settings_page_transition",
+                ) { animatedPage ->
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .graphicsLayer {
+                                translationX = predictiveBackProgress * size.width * 0.82f
+                                val scale = 1f - predictiveBackProgress * 0.035f
+                                scaleX = scale
+                                scaleY = scale
+                                alpha = 1f - predictiveBackProgress * 0.18f
                             },
-                        )
-                    }
-                    item {
-                        SettingsPageContent(
-                            page = animatedPage,
-                            settings = settings,
-                            allFolders = allFolders,
-                            customizeTab = customizeTab,
-                            onSelectCustomizeTab = { customizeTab = it; haptics.tick() },
-                            manualExcludePath = manualExcludePath,
-                            onManualExcludePathChange = { manualExcludePath = it },
-                            showAllFolderRules = showAllFolderRules,
-                            onToggleShowAllFolderRules = { showAllFolderRules = !showAllFolderRules },
-                            onManualExcludeConsumed = { manualExcludePath = "" },
-                            goTo = { target -> haptics.tick(); goTo(target) },
-                            openSheet = { sheet -> haptics.tick(); activeSheetName = sheet.name },
-                            onTick = { haptics.tick() },
-                            onSuccess = { haptics.success() },
-                            viewModel = viewModel,
-                        )
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 28.dp),
+                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                    ) {
+                        item {
+                            SettingsHeader(
+                                title = animatedPage.title,
+                                subtitle = if (animatedPage == SettingsPage.HOME) "一级菜单" else "二级设置 · 修改后立即生效",
+                                onBack = {
+                                    haptics.tick()
+                                    if (animatedPage == SettingsPage.HOME) onBack() else pageName = SettingsPage.HOME.name
+                                },
+                            )
+                        }
+                        item {
+                            SettingsPageContent(
+                                page = animatedPage,
+                                settings = settings,
+                                allFolders = allFolders,
+                                customizeTab = customizeTab,
+                                onSelectCustomizeTab = { customizeTab = it; haptics.tick() },
+                                manualExcludePath = manualExcludePath,
+                                onManualExcludePathChange = { manualExcludePath = it },
+                                showAllFolderRules = showAllFolderRules,
+                                onToggleShowAllFolderRules = { showAllFolderRules = !showAllFolderRules },
+                                onManualExcludeConsumed = { manualExcludePath = "" },
+                                goTo = { target -> haptics.tick(); goTo(target) },
+                                openSheet = { sheet -> haptics.tick(); activeSheetName = sheet.name },
+                                onTick = { haptics.tick() },
+                                onSuccess = { haptics.success() },
+                                viewModel = viewModel,
+                            )
+                        }
                     }
                 }
             }
         }
-    }
-    if (activeSheet != null) {
-        SettingsBottomSheet(
-            sheet = activeSheet,
-            settings = settings,
-            onDismiss = { activeSheetName = null },
-            onTick = { haptics.tick() },
-            onSuccess = { haptics.success() },
-            viewModel = viewModel,
-        )
+        if (activeSheet != null) {
+            SettingsBottomSheet(
+                sheet = activeSheet,
+                settings = settings,
+                onDismiss = { activeSheetName = null },
+                onTick = { haptics.tick() },
+                onSuccess = { haptics.success() },
+                viewModel = viewModel,
+            )
+        }
     }
 }
 
@@ -630,6 +640,38 @@ private fun accentColorOptions(): List<Pair<Long, String>> = listOf(
     0xFFEAF8FF to "清透",
     0xFFE8F0F7 to "冷灰",
 )
+
+private val KeepixIosSettingsBackground = Color(0xFF000000)
+private val KeepixIosSettingsSurface = Color(0xFF0B0B0D)
+private val KeepixIosSettingsGroupedSurface = Color(0xFF1C1C1E)
+private val KeepixIosSettingsSeparator = Color(0xFF38383A)
+
+private fun keepixIosSettingsColorScheme(base: ColorScheme): ColorScheme = base.copy(
+    background = KeepixIosSettingsBackground,
+    onBackground = Color.White,
+    surface = KeepixIosSettingsSurface,
+    onSurface = Color.White,
+    surfaceVariant = KeepixIosSettingsGroupedSurface,
+    onSurfaceVariant = Color(0xFFA1A1A6),
+    outline = KeepixIosSettingsSeparator,
+    outlineVariant = Color(0xFF2C2C2E),
+    primary = Color(0xFF0A84FF),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF123B65),
+    onPrimaryContainer = Color.White,
+    secondary = Color(0xFF64D2FF),
+    onSecondary = Color.Black,
+    tertiary = Color(0xFFBF5AF2),
+    onTertiary = Color.White,
+    error = Color(0xFFFF453A),
+    onError = Color.White,
+    surfaceTint = Color.Transparent,
+)
+
+@Composable
+private fun isKeepixIosSettingsStyle(): Boolean =
+    MaterialTheme.colorScheme.background == KeepixIosSettingsBackground &&
+        MaterialTheme.colorScheme.surfaceVariant == KeepixIosSettingsGroupedSurface
 
 @Composable
 private fun SettingsHeader(title: String, subtitle: String, onBack: () -> Unit) {
@@ -1851,20 +1893,53 @@ private fun ManualExcludeFolderEditor(
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 24.dp, top = 2.dp))
+    val iosStyle = isKeepixIosSettingsStyle()
+    Text(
+        text,
+        style = if (iosStyle) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = if (iosStyle) 18.dp else 24.dp, top = if (iosStyle) 4.dp else 2.dp),
+        fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Normal,
+    )
 }
 
 @Composable
 private fun SettingsGroup(rows: List<@Composable () -> Unit>) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), tonalAlpha = 0.88f) {
-        Column(modifier = Modifier.padding(vertical = 2.dp)) {
+    val iosStyle = isKeepixIosSettingsStyle()
+    val shape = RoundedCornerShape(if (iosStyle) 18.dp else 26.dp)
+    val content: @Composable () -> Unit = {
+        Column(modifier = Modifier.padding(vertical = if (iosStyle) 0.dp else 2.dp)) {
             rows.forEachIndexed { index, row ->
                 row()
                 if (index != rows.lastIndex) {
-                    Box(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp).height(1.dp).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)))
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = if (iosStyle) 58.dp else 22.dp, end = if (iosStyle) 0.dp else 22.dp)
+                            .height(1.dp)
+                            .background(
+                                if (iosStyle) {
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.46f)
+                                } else {
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                                }
+                            )
+                    )
                 }
             }
         }
+    }
+    if (iosStyle) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = shape,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = androidx.compose.foundation.BorderStroke(0.7.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)),
+            content = content,
+        )
+    } else {
+        GlassSurface(modifier = Modifier.fillMaxWidth(), shape = shape, tonalAlpha = 0.88f, content = content)
     }
 }
 
@@ -1890,19 +1965,36 @@ private fun SettingsRow(
     showIcon: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val iosStyle = isKeepixIosSettingsStyle()
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 22.dp, vertical = if (showIcon) 15.dp else 19.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(
+                horizontal = if (iosStyle) 16.dp else 22.dp,
+                vertical = if (iosStyle) 12.dp else if (showIcon) 15.dp else 19.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (iosStyle) 14.dp else 12.dp),
     ) {
         if (showIcon) IconTile(icon, color)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    title,
+                    style = if (iosStyle) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                    fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
                 if (badge != null) BadgeText(badge)
             }
             if (subtitle.isNotBlank()) {
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Text(
+                    subtitle,
+                    style = if (iosStyle) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
             }
         }
         trailingContent?.invoke() ?: Icon(Icons.AutoMirrored.Rounded.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f))
@@ -1920,30 +2012,41 @@ private fun SettingsSwitchRow(
     color: Color = MaterialTheme.colorScheme.primary,
     showIcon: Boolean = true,
 ) {
+    val iosStyle = isKeepixIosSettingsStyle()
     val rowBackground by animateColorAsState(
-        targetValue = if (checked) color.copy(alpha = 0.075f) else Color.Transparent,
+        targetValue = if (!iosStyle && checked) color.copy(alpha = 0.075f) else Color.Transparent,
         animationSpec = tween(180, easing = FastOutSlowInEasing),
         label = "settings_switch_row_background",
     )
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .padding(horizontal = if (iosStyle) 0.dp else 10.dp, vertical = if (iosStyle) 0.dp else 4.dp)
+            .clip(RoundedCornerShape(if (iosStyle) 0.dp else 20.dp))
             .background(rowBackground)
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 12.dp, vertical = if (showIcon) 11.dp else 13.dp),
+            .padding(horizontal = if (iosStyle) 16.dp else 12.dp, vertical = if (iosStyle) 12.dp else if (showIcon) 11.dp else 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (iosStyle) 14.dp else 12.dp),
     ) {
         if (showIcon) IconTile(icon, color)
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    title,
+                    style = if (iosStyle) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                    fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
                 if (badge != null) BadgeText(badge)
             }
             if (subtitle.isNotBlank()) {
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Text(
+                    subtitle,
+                    style = if (iosStyle) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
             }
         }
         Switch(checked = checked, onCheckedChange = { onCheckedChange(it) })
@@ -1960,15 +2063,28 @@ private fun SettingsSegmentedRow(
     color: Color = MaterialTheme.colorScheme.primary,
     onSelected: (String) -> Unit,
 ) {
+    val iosStyle = isKeepixIosSettingsStyle()
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 15.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = if (iosStyle) 16.dp else 22.dp, vertical = if (iosStyle) 12.dp else 15.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (iosStyle) 14.dp else 12.dp)) {
             IconTile(icon, color)
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Text(
+                    title,
+                    style = if (iosStyle) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                    fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    subtitle,
+                    style = if (iosStyle) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
             }
         }
         Row(
@@ -1976,7 +2092,7 @@ private fun SettingsSegmentedRow(
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
                 .clip(RoundedCornerShape(999.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f))
+                .background(if (iosStyle) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.84f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f))
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -2002,15 +2118,28 @@ private fun SettingsColorRow(
     color: Color = MaterialTheme.colorScheme.primary,
     onSelected: (Long) -> Unit,
 ) {
+    val iosStyle = isKeepixIosSettingsStyle()
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 15.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = if (iosStyle) 16.dp else 22.dp, vertical = if (iosStyle) 12.dp else 15.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (iosStyle) 14.dp else 12.dp)) {
             IconTile(icon, color)
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Text(
+                    title,
+                    style = if (iosStyle) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                    fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    subtitle,
+                    style = if (iosStyle) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
             }
         }
         Row(
@@ -2039,6 +2168,7 @@ private fun ColorSwatchButton(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val iosStyle = isKeepixIosSettingsStyle()
     val borderColor by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.20f),
         animationSpec = tween(180, easing = FastOutSlowInEasing),
@@ -2057,7 +2187,13 @@ private fun ColorSwatchButton(
                 scaleY = scale
             }
             .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (selected) 0.70f else 0.42f))
+            .background(
+                if (iosStyle) {
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (selected) 0.90f else 0.54f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (selected) 0.70f else 0.42f)
+                }
+            )
             .border(1.dp, borderColor, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 9.dp),
@@ -2083,20 +2219,32 @@ private fun SettingsStepperRow(
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
 ) {
+    val iosStyle = isKeepixIosSettingsStyle()
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 15.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = if (iosStyle) 16.dp else 22.dp, vertical = if (iosStyle) 12.dp else 15.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (iosStyle) 14.dp else 12.dp),
     ) {
         IconTile(icon, color)
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                title,
+                style = if (iosStyle) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                fontWeight = if (iosStyle) FontWeight.SemiBold else FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                value,
+                style = if (iosStyle) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(999.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f))
+                .background(if (iosStyle) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.84f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f))
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -2126,11 +2274,22 @@ private fun StepperButton(icon: ImageVector, contentDescription: String, onClick
 
 @Composable
 private fun IconTile(icon: ImageVector, color: Color) {
+    val iosStyle = isKeepixIosSettingsStyle()
     Box(
-        modifier = Modifier.size(40.dp).background(color.copy(alpha = 0.10f), RoundedCornerShape(13.dp)),
+        modifier = Modifier
+            .size(if (iosStyle) 32.dp else 40.dp)
+            .background(
+                if (iosStyle) color.copy(alpha = 0.92f) else color.copy(alpha = 0.10f),
+                RoundedCornerShape(if (iosStyle) 8.dp else 13.dp),
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = color.copy(alpha = 0.88f), modifier = Modifier.size(21.dp))
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (iosStyle) Color.White else color.copy(alpha = 0.88f),
+            modifier = Modifier.size(if (iosStyle) 18.dp else 21.dp),
+        )
     }
 }
 

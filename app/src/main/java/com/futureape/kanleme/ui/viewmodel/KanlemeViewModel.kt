@@ -199,6 +199,10 @@ class KanlemeViewModel @Inject constructor(
     private var videoDeckLoadJob: Job? = null
     private var photoDeckPreviewLoadJob: Job? = null
     private var videoDeckPreviewLoadJob: Job? = null
+    private var photoDeckPreviewScope: CleaningScope? = null
+    private var videoDeckPreviewScope: CleaningScope? = null
+    private var photoDeckPreviewScopeLoaded = false
+    private var videoDeckPreviewScopeLoaded = false
     private var photoDayMemoryWindowJob: Job? = null
     private var photoDeckGeneration = 0L
     private var videoDeckGeneration = 0L
@@ -216,8 +220,15 @@ class KanlemeViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val persisted = settingsRepository.settings.first()
-            _photoScope.value = persisted.toPhotoCleaningScope()
-            _videoScope.value = persisted.toVideoCleaningScope()
+            val photoScope = persisted.toPhotoCleaningScope()
+            val videoScope = persisted.toVideoCleaningScope()
+            _photoScope.value = photoScope
+            _videoScope.value = videoScope
+            if (persisted.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO || persisted.homeMediaTab != "video") {
+                loadPhotoDeckPreview(photoScope)
+            } else {
+                loadVideoDeckPreview(videoScope)
+            }
         }
     }
 
@@ -273,6 +284,9 @@ class KanlemeViewModel @Inject constructor(
         photoDeckGeneration += 1L
         photoDeckPreviewLoadJob?.cancel()
         photoDeckPreviewGeneration += 1L
+        photoDeckPreviewScope = null
+        photoDeckPreviewScopeLoaded = false
+        _photoDeckPreviewPreparing.value = false
     }
 
     private fun invalidateVideoDeckLoads() {
@@ -280,6 +294,9 @@ class KanlemeViewModel @Inject constructor(
         videoDeckGeneration += 1L
         videoDeckPreviewLoadJob?.cancel()
         videoDeckPreviewGeneration += 1L
+        videoDeckPreviewScope = null
+        videoDeckPreviewScopeLoaded = false
+        _videoDeckPreviewPreparing.value = false
     }
 
     private fun List<PhotoEntity>.withoutLocalPhotoExclusions(): List<PhotoEntity> =
@@ -450,7 +467,12 @@ class KanlemeViewModel @Inject constructor(
             return
         }
         val requestedScope = ensureRandomSeed(scope.copy(sortOrder = if (scope.sortOrder.isBlank()) "random" else scope.sortOrder))
+        if (photoDeckPreviewScope == requestedScope && (_photoDeckPreviewPreparing.value || photoDeckPreviewScopeLoaded)) {
+            return
+        }
         _photoScope.value = requestedScope
+        photoDeckPreviewScope = requestedScope
+        photoDeckPreviewScopeLoaded = false
         _photoDeckPreviewPreparing.value = true
         photoDeckPreviewLoadJob?.cancel()
         val generation = ++photoDeckPreviewGeneration
@@ -462,6 +484,7 @@ class KanlemeViewModel @Inject constructor(
                     .distinctBy { it.mediaStoreId }
                 if (generation == photoDeckPreviewGeneration && _photoDeck.value.isEmpty()) {
                     _photoDeckPreview.value = preview
+                    photoDeckPreviewScopeLoaded = true
                 }
             } finally {
                 if (generation == photoDeckPreviewGeneration) _photoDeckPreviewPreparing.value = false
@@ -517,7 +540,12 @@ class KanlemeViewModel @Inject constructor(
             return
         }
         val requestedScope = ensureRandomSeed(scope.copy(sortOrder = if (scope.sortOrder.isBlank()) "random" else scope.sortOrder))
+        if (videoDeckPreviewScope == requestedScope && (_videoDeckPreviewPreparing.value || videoDeckPreviewScopeLoaded)) {
+            return
+        }
         _videoScope.value = requestedScope
+        videoDeckPreviewScope = requestedScope
+        videoDeckPreviewScopeLoaded = false
         _videoDeckPreviewPreparing.value = true
         videoDeckPreviewLoadJob?.cancel()
         val generation = ++videoDeckPreviewGeneration
@@ -529,6 +557,7 @@ class KanlemeViewModel @Inject constructor(
                     .distinctBy { it.mediaStoreId }
                 if (generation == videoDeckPreviewGeneration && _videoDeck.value.isEmpty()) {
                     _videoDeckPreview.value = preview
+                    videoDeckPreviewScopeLoaded = true
                 }
             } finally {
                 if (generation == videoDeckPreviewGeneration) _videoDeckPreviewPreparing.value = false

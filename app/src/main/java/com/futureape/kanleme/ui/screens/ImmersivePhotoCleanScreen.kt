@@ -367,6 +367,9 @@ internal fun KeepixDayMemoryOverlay(
     var restoringPhotoId by remember(currentPhoto.id) { mutableStateOf<Long?>(null) }
     var memoryPlacementSequence by remember(currentPhoto.id) { mutableStateOf(0L) }
     val suppressMemoryOpenUntil = remember(currentPhoto.id) { mutableLongStateOf(0L) }
+    val memoryGridIsScrolling by remember {
+        derivedStateOf { memoryGridState.isScrollInProgress }
+    }
     LaunchedEffect(visible, currentPhoto.id, photos) {
         if (visible) {
             memoryPhotos = buildMemoryPhotoWindow(currentPhoto, photos)
@@ -548,18 +551,16 @@ internal fun KeepixDayMemoryOverlay(
                 LaunchedEffect(visible, currentPhoto.id, initialPhotoIndex) {
                     if (!visible || memoryPhotos.isEmpty()) return@LaunchedEffect
                     memoryGridState.scrollToItem(initialPhotoIndex)
-                    repeat(8) {
-                        withFrameNanos { }
-                        val layoutInfo = memoryGridState.layoutInfo
-                        val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == initialPhotoIndex }
-                        if (itemInfo != null) {
-                            val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
-                            val itemCenter = itemInfo.offset.x + itemInfo.size.width / 2f
-                            val delta = itemCenter - viewportCenter
-                            if (abs(delta) > with(density) { 2.dp.toPx() }) {
-                                memoryGridState.scrollBy(delta)
-                            }
-                            return@LaunchedEffect
+                    withFrameNanos { }
+                    if (memoryGridState.isScrollInProgress) return@LaunchedEffect
+                    val layoutInfo = memoryGridState.layoutInfo
+                    val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == initialPhotoIndex }
+                    if (itemInfo != null) {
+                        val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
+                        val itemCenter = itemInfo.offset.x + itemInfo.size.width / 2f
+                        val delta = itemCenter - viewportCenter
+                        if (abs(delta) > with(density) { 2.dp.toPx() } && !memoryGridState.isScrollInProgress) {
+                            memoryGridState.scrollBy(delta)
                         }
                     }
                 }
@@ -587,6 +588,7 @@ internal fun KeepixDayMemoryOverlay(
                             photo = photo,
                             restoring = restoringPhotoId == photo.id,
                             placementAnimationKey = memoryPlacementSequence,
+                            placementAnimationsEnabled = memoryPlacementSequence > 0L && !memoryGridIsScrolling,
                             openSuppressedUntilMillis = suppressMemoryOpenUntil.longValue,
                             modifier = Modifier
                                 .width(photoWidth)
@@ -689,6 +691,7 @@ private fun KeepixMemoryGridPhoto(
     photo: PhotoEntity,
     restoring: Boolean,
     placementAnimationKey: Long,
+    placementAnimationsEnabled: Boolean,
     openSuppressedUntilMillis: Long,
     modifier: Modifier,
     onOpen: (PhotoEntity) -> Unit,
@@ -730,16 +733,23 @@ private fun KeepixMemoryGridPhoto(
                 val next = coordinates.positionInRoot()
                 val previous = lastPosition
                 if (previous != null && !dismissed && lastPlacementAnimationKey != placementAnimationKey) {
-                    val dx = previous.x - next.x
-                    val dy = previous.y - next.y
-                    if (abs(dx) > 0.5f || abs(dy) > 0.5f) {
-                        scope.launch {
-                            placementX.snapTo(dx)
-                            placementX.animateTo(0f, animationSpec = tween(260, easing = FastOutSlowInEasing))
+                    if (placementAnimationsEnabled) {
+                        val dx = previous.x - next.x
+                        val dy = previous.y - next.y
+                        if (abs(dx) > 0.5f || abs(dy) > 0.5f) {
+                            scope.launch {
+                                placementX.snapTo(dx)
+                                placementX.animateTo(0f, animationSpec = tween(260, easing = FastOutSlowInEasing))
+                            }
+                            scope.launch {
+                                placementY.snapTo(dy)
+                                placementY.animateTo(0f, animationSpec = tween(260, easing = FastOutSlowInEasing))
+                            }
                         }
+                    } else {
                         scope.launch {
-                            placementY.snapTo(dy)
-                            placementY.animateTo(0f, animationSpec = tween(260, easing = FastOutSlowInEasing))
+                            placementX.snapTo(0f)
+                            placementY.snapTo(0f)
                         }
                     }
                     lastPlacementAnimationKey = placementAnimationKey
