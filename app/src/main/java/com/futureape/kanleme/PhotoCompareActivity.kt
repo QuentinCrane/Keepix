@@ -9,7 +9,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.content.IntentCompat
 import com.futureape.kanleme.ui.screens.PhotoCompareScreen
 import com.futureape.kanleme.ui.theme.KanlemeTheme
-import com.futureape.kanleme.ui.util.clearAppCacheOnExit
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -23,11 +22,6 @@ class PhotoCompareActivity : ComponentActivity() {
                 PhotoCompareScreen(uris = uris, onBack = { finish() })
             }
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        if (isFinishing) clearAppCacheOnExit(this)
     }
 
     private fun extractUris(intent: Intent?): List<Uri> {

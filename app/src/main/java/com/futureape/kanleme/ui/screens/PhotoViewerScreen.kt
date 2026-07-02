@@ -52,7 +52,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -125,13 +124,20 @@ fun PhotoViewerScreen(
         photos.indexOfFirst { it.id == initialPhotoId }.takeIf { it >= 0 } ?: 0
     }
     val pagerState = rememberPagerState(initialPage = startIndex) { photos.size }
-    LaunchedEffect(initialPhotoId, photos.size) {
+    LaunchedEffect(initialPhotoId, photos.size, startIndex) {
         if (photos.isNotEmpty()) pagerState.scrollToPage(startIndex.coerceIn(0, photos.lastIndex))
     }
-    val currentPhoto by remember { derivedStateOf { photos.getOrNull(pagerState.currentPage) } }
+    val currentPhoto = photos.getOrNull(pagerState.currentPage.coerceIn(0, photos.lastIndex))
 
     var zoomedPhotoId by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(pagerState.currentPage) { zoomedPhotoId = null }
+    LaunchedEffect(currentPhoto?.id) {
+        if (currentPhoto == null) {
+            showExifSheet = false
+            showMoveSheet = false
+            zoomedPhotoId = null
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -207,20 +213,20 @@ fun PhotoViewerScreen(
         }
     }
 
-    if (showExifSheet && currentPhoto != null) {
+    currentPhoto?.takeIf { showExifSheet }?.let { photo ->
         PhotoExifSheet(
-            photo = currentPhoto!!,
+            photo = photo,
             onDismiss = { showExifSheet = false },
         )
     }
 
-    if (showMoveSheet && currentPhoto != null) {
+    currentPhoto?.takeIf { showMoveSheet }?.let { photo ->
         MoveFolderSheet(
-            currentPhoto = currentPhoto!!,
+            currentPhoto = photo,
             knownFolders = folders,
             onDismiss = { showMoveSheet = false },
             onMove = { path ->
-                viewModel.movePhotoToFolder(currentPhoto!!, path)
+                viewModel.movePhotoToFolder(photo, path)
                 showMoveSheet = false
             },
         )
@@ -396,9 +402,10 @@ private fun ZoomableViewerPhoto(
             },
         contentAlignment = Alignment.Center,
     ) {
-        if (motionSource != null) {
+        val motion = motionSource
+        if (motion != null) {
             MotionPhotoVideoPlayer(
-                uri = motionSource!!.uri,
+                uri = motion.uri,
                 modifier = Modifier.fillMaxSize(),
                 onClose = { motionSource = null },
             )

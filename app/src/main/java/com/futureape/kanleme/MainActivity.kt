@@ -16,7 +16,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Density
 import com.futureape.kanleme.ui.navigation.KanlemeApp
 import com.futureape.kanleme.ui.theme.KanlemeTheme
-import com.futureape.kanleme.ui.util.clearAppCacheOnExit
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -63,11 +62,6 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleShortcutIntent(intent)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        if (isFinishing) clearAppCacheOnExit(this)
     }
 
     private fun extractShortcutTarget(intent: Intent?): String? {

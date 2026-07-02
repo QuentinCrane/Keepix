@@ -1,5 +1,6 @@
 package com.futureape.kanleme.data.repository
 
+import androidx.room.withTransaction
 import com.futureape.kanleme.data.local.AppDatabase
 import com.futureape.kanleme.data.local.CleanupEventEntity
 import com.futureape.kanleme.data.local.DeletionStatus
@@ -39,6 +40,10 @@ class AppRepositoryImpl @Inject constructor(
     private val settingsRepository: AppSettingsRepository,
     private val similarPhotoAnalyzer: SimilarPhotoAnalyzer,
 ) : AppRepository {
+    private companion object {
+        const val SQLITE_BIND_BATCH_SIZE = 900
+    }
+
     private val photoDao = db.photoDao()
     private val videoDao = db.videoDao()
     private val trashDao = db.trashDao()
@@ -139,16 +144,25 @@ class AppRepositoryImpl @Inject constructor(
         val scannedPhotosRaw = photoScan.getOrElse { emptyList() }
         val scannedVideosRaw = videoScan.getOrElse { emptyList() }
         val (scannedPhotos, scannedVideos) = linkSeparateDynamicPhotoPairs(scannedPhotosRaw, scannedVideosRaw)
+        val now = System.currentTimeMillis()
 
         val existingPhotos = if (scannedPhotos.isEmpty()) {
             emptyMap()
         } else {
-            photoDao.byMediaStoreIds(scannedPhotos.map { it.mediaStoreId }).associateBy { it.mediaStoreId }
+            scannedPhotos
+                .map { it.mediaStoreId }
+                .chunked(SQLITE_BIND_BATCH_SIZE)
+                .flatMap { photoDao.byMediaStoreIds(it) }
+                .associateBy { it.mediaStoreId }
         }
         val existingVideos = if (scannedVideos.isEmpty()) {
             emptyMap()
         } else {
-            videoDao.byMediaStoreIds(scannedVideos.map { it.mediaStoreId }).associateBy { it.mediaStoreId }
+            scannedVideos
+                .map { it.mediaStoreId }
+                .chunked(SQLITE_BIND_BATCH_SIZE)
+                .flatMap { videoDao.byMediaStoreIds(it) }
+                .associateBy { it.mediaStoreId }
         }
 
         val mergedPhotos = scannedPhotos.map { fresh ->
@@ -164,7 +178,7 @@ class AppRepositoryImpl @Inject constructor(
                     deletedAt = old.deletedAt,
                     deleteError = old.deleteError,
                     createdAt = old.createdAt,
-                    updatedAt = System.currentTimeMillis(),
+                    updatedAt = now,
                 )
             }
         }
@@ -181,13 +195,21 @@ class AppRepositoryImpl @Inject constructor(
                     deletedAt = old.deletedAt,
                     deleteError = old.deleteError,
                     createdAt = old.createdAt,
-                    updatedAt = System.currentTimeMillis(),
+                    updatedAt = now,
                 )
             }
         }
 
-        photoDao.upsertAll(mergedPhotos)
-        videoDao.upsertAll(mergedVideos)
+        db.withTransaction {
+            if (photoScan.isSuccess) {
+                photoDao.markAllMissing(now)
+                if (mergedPhotos.isNotEmpty()) photoDao.upsertAll(mergedPhotos)
+            }
+            if (videoScan.isSuccess) {
+                videoDao.markAllMissing(now)
+                if (mergedVideos.isNotEmpty()) videoDao.upsertAll(mergedVideos)
+            }
+        }
         mergedPhotos.size to mergedVideos.size
     }
 

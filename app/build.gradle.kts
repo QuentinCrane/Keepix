@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,6 +7,26 @@ plugins {
     id("org.jetbrains.kotlin.kapt")
     id("com.google.dagger.hilt.android")
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) file.inputStream().use(::load)
+}
+
+fun signingValue(propertyName: String, environmentName: String): String? =
+    localProperties.getProperty("kanleme.signing.$propertyName")
+        ?: providers.environmentVariable(environmentName).orNull
+
+val releaseStoreFile = signingValue("storeFile", "KANLEME_SIGNING_STORE_FILE")
+val releaseStorePassword = signingValue("storePassword", "KANLEME_SIGNING_STORE_PASSWORD")
+val releaseKeyAlias = signingValue("keyAlias", "KANLEME_SIGNING_KEY_ALIAS")
+val releaseKeyPassword = signingValue("keyPassword", "KANLEME_SIGNING_KEY_PASSWORD")
+val releaseSigningConfigured = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
 
 android {
     namespace = "com.futureape.kanleme"
@@ -26,11 +48,13 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file("${rootProject.projectDir}/keepix-release.p12")
-            storePassword = "kanleme2026"
-            keyAlias = "keepix-release"
-            keyPassword = "kanleme2026"
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = rootProject.file(requireNotNull(releaseStoreFile))
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
         }
     }
 
@@ -42,7 +66,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.getByName("release")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isMinifyEnabled = false
@@ -107,4 +133,6 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-gif:2.7.0")
+
+    testImplementation("junit:junit:4.13.2")
 }

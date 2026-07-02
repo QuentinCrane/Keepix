@@ -8,33 +8,34 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PhotoDao {
-    @Query("SELECT COUNT(*) FROM photos")
+    @Query("SELECT COUNT(*) FROM photos WHERE missing_since IS NULL")
     fun observeCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM photos WHERE deletion_status = 'none'")
+    @Query("SELECT COUNT(*) FROM photos WHERE deletion_status = 'none' AND missing_since IS NULL")
     fun observeActiveCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM photos WHERE processing_status = :status AND deletion_status = 'none'")
+    @Query("SELECT COUNT(*) FROM photos WHERE processing_status = :status AND deletion_status = 'none' AND missing_since IS NULL")
     fun observeCountByStatus(status: String): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM photos WHERE processing_status != 'unprocessed' OR deletion_status != 'none'")
+    @Query("SELECT COUNT(*) FROM photos WHERE missing_since IS NULL AND (processing_status != 'unprocessed' OR deletion_status != 'none')")
     fun observeProcessedCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM photos WHERE deletion_status IN ('pending','trashed')")
+    @Query("SELECT COUNT(*) FROM photos WHERE deletion_status IN ('pending','trashed') AND missing_since IS NULL")
     fun observeDeleteCount(): Flow<Int>
 
-    @Query("SELECT COALESCE(SUM(size), 0) FROM photos WHERE deletion_status IN ('pending','trashed')")
+    @Query("SELECT COALESCE(SUM(size), 0) FROM photos WHERE deletion_status IN ('pending','trashed') AND missing_since IS NULL")
     fun observeDeleteSize(): Flow<Long>
 
-    @Query("SELECT * FROM photos WHERE deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
+    @Query("SELECT * FROM photos WHERE deletion_status = 'none' AND missing_since IS NULL ORDER BY date_taken DESC LIMIT :limit")
     fun observeRecent(limit: Int): Flow<List<PhotoEntity>>
 
-    @Query("SELECT * FROM photos WHERE deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
+    @Query("SELECT * FROM photos WHERE deletion_status = 'none' AND missing_since IS NULL ORDER BY date_taken DESC LIMIT :limit")
     fun observeTimeline(limit: Int): Flow<List<PhotoEntity>>
 
     @Query("""
         SELECT p.* FROM photos p
         WHERE p.deletion_status = 'none'
+        AND p.missing_since IS NULL
         AND p.id IN (
             SELECT media_id FROM operation_history
             WHERE media_type = 'photo' AND is_undone = 0
@@ -44,17 +45,18 @@ interface PhotoDao {
     """)
     fun observeCleanedHistory(limit: Int): Flow<List<PhotoEntity>>
 
-    @Query("SELECT * FROM photos WHERE deletion_status = 'none' AND strftime('%m-%d', date_taken / 1000, 'unixepoch', 'localtime') = strftime('%m-%d', :now / 1000, 'unixepoch', 'localtime') AND strftime('%Y', date_taken / 1000, 'unixepoch', 'localtime') != strftime('%Y', :now / 1000, 'unixepoch', 'localtime') ORDER BY date_taken DESC LIMIT :limit")
+    @Query("SELECT * FROM photos WHERE deletion_status = 'none' AND missing_since IS NULL AND strftime('%m-%d', date_taken / 1000, 'unixepoch', 'localtime') = strftime('%m-%d', :now / 1000, 'unixepoch', 'localtime') AND strftime('%Y', date_taken / 1000, 'unixepoch', 'localtime') != strftime('%Y', :now / 1000, 'unixepoch', 'localtime') ORDER BY date_taken DESC LIMIT :limit")
     fun observeTodayInHistory(now: Long = System.currentTimeMillis(), limit: Int = 400): Flow<List<PhotoEntity>>
 
-    @Query("SELECT * FROM photos WHERE deletion_status = 'none' AND date_added >= :sinceSeconds ORDER BY date_added DESC LIMIT :limit")
+    @Query("SELECT * FROM photos WHERE deletion_status = 'none' AND missing_since IS NULL AND date_added >= :sinceSeconds ORDER BY date_added DESC LIMIT :limit")
     fun observeRecentlyAdded(sinceSeconds: Long, limit: Int = 120): Flow<List<PhotoEntity>>
 
-    @Query("SELECT DISTINCT folder_path FROM photos WHERE folder_path IS NOT NULL AND folder_path != '' ORDER BY folder_path")
+    @Query("SELECT DISTINCT folder_path FROM photos WHERE folder_path IS NOT NULL AND folder_path != '' AND missing_since IS NULL ORDER BY folder_path")
     fun observeFolderPaths(): Flow<List<String>>
 
     @Query("""
         SELECT COUNT(*) FROM photos WHERE deletion_status = 'none'
+        AND missing_since IS NULL
         AND (:type = 'all'
             OR (:type = 'normal' AND is_screenshot = 0 AND is_selfie = 0 AND is_motion_photo = 0 AND is_long_image = 0 AND is_gif = 0 AND is_raw = 0)
             OR (:type = 'screenshot' AND is_screenshot = 1)
@@ -69,6 +71,7 @@ interface PhotoDao {
     @Query("""
         SELECT * FROM photos
         WHERE processing_status = 'unprocessed' AND deletion_status = 'none'
+        AND missing_since IS NULL
         AND (:folderPath IS NULL OR folder_path = :folderPath)
         AND (:startMillis IS NULL OR date_taken >= :startMillis)
         AND (:endMillis IS NULL OR date_taken < :endMillis)
@@ -101,10 +104,10 @@ interface PhotoDao {
         limit: Int,
     ): List<PhotoEntity>
 
-    @Query("SELECT * FROM photos WHERE processing_status = :status AND deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
+    @Query("SELECT * FROM photos WHERE processing_status = :status AND deletion_status = 'none' AND missing_since IS NULL ORDER BY date_taken DESC LIMIT :limit")
     suspend fun nextBatch(status: String = ProcessingStatus.UNPROCESSED, limit: Int): List<PhotoEntity>
 
-    @Query("SELECT * FROM photos WHERE deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
+    @Query("SELECT * FROM photos WHERE deletion_status = 'none' AND missing_since IS NULL ORDER BY date_taken DESC LIMIT :limit")
     suspend fun allActive(limit: Int): List<PhotoEntity>
 
     @Query("SELECT * FROM photos WHERE id IN (:ids)")
@@ -116,6 +119,7 @@ interface PhotoDao {
                    MAX(date_taken) AS latest
             FROM photos
             WHERE deletion_status = 'none'
+            AND missing_since IS NULL
             AND date_taken > 0
             AND date_taken < :anchorStartMillis
             GROUP BY day_key
@@ -131,6 +135,7 @@ interface PhotoDao {
                    MIN(date_taken) AS earliest
             FROM photos
             WHERE deletion_status = 'none'
+            AND missing_since IS NULL
             AND date_taken > 0
             AND date_taken >= :anchorEndMillis
             GROUP BY day_key
@@ -143,6 +148,7 @@ interface PhotoDao {
     @Query("""
         SELECT * FROM photos
         WHERE deletion_status = 'none'
+        AND missing_since IS NULL
         AND strftime('%Y-%m-%d', date_taken / 1000, 'unixepoch', 'localtime') IN (:dayKeys)
         ORDER BY date_taken ASC, id ASC
         LIMIT :limit
@@ -155,7 +161,7 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE id = :id LIMIT 1")
     suspend fun byId(id: Long): PhotoEntity?
 
-    @Query("SELECT * FROM photos WHERE processing_status = 'favorited' AND deletion_status = 'none' ORDER BY updated_at DESC LIMIT :limit")
+    @Query("SELECT * FROM photos WHERE processing_status = 'favorited' AND deletion_status = 'none' AND missing_since IS NULL ORDER BY updated_at DESC LIMIT :limit")
     fun observeFavorites(limit: Int): Flow<List<PhotoEntity>>
 
     @Query("UPDATE photos SET processing_status = :status, processed_at = :now, updated_at = :now WHERE id = :id")
@@ -170,45 +176,52 @@ interface PhotoDao {
     @Query("UPDATE photos SET relative_path = :relativePath, folder_path = :relativePath, folder_name = :folderName, updated_at = :now WHERE id = :id")
     suspend fun updateFolder(id: Long, relativePath: String, folderName: String, now: Long = System.currentTimeMillis())
 
+    @Query("UPDATE photos SET missing_since = NULL, updated_at = :now WHERE media_store_id IN (:mediaStoreIds)")
+    suspend fun clearMissingForMediaStoreIds(mediaStoreIds: List<Long>, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE photos SET missing_since = COALESCE(missing_since, :now), updated_at = :now WHERE deletion_status = 'none'")
+    suspend fun markAllMissing(now: Long = System.currentTimeMillis())
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(items: List<PhotoEntity>)
 }
 
 @Dao
 interface VideoDao {
-    @Query("SELECT COUNT(*) FROM videos")
+    @Query("SELECT COUNT(*) FROM videos WHERE missing_since IS NULL")
     fun observeCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM videos WHERE deletion_status = 'none'")
+    @Query("SELECT COUNT(*) FROM videos WHERE deletion_status = 'none' AND missing_since IS NULL")
     fun observeActiveCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM videos WHERE processing_status = :status AND deletion_status = 'none'")
+    @Query("SELECT COUNT(*) FROM videos WHERE processing_status = :status AND deletion_status = 'none' AND missing_since IS NULL")
     fun observeCountByStatus(status: String): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM videos WHERE processing_status != 'unprocessed' OR deletion_status != 'none'")
+    @Query("SELECT COUNT(*) FROM videos WHERE missing_since IS NULL AND (processing_status != 'unprocessed' OR deletion_status != 'none')")
     fun observeProcessedCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM videos WHERE deletion_status IN ('pending','trashed')")
+    @Query("SELECT COUNT(*) FROM videos WHERE deletion_status IN ('pending','trashed') AND missing_since IS NULL")
     fun observeDeleteCount(): Flow<Int>
 
-    @Query("SELECT COALESCE(SUM(size), 0) FROM videos WHERE deletion_status IN ('pending','trashed')")
+    @Query("SELECT COALESCE(SUM(size), 0) FROM videos WHERE deletion_status IN ('pending','trashed') AND missing_since IS NULL")
     fun observeDeleteSize(): Flow<Long>
 
-    @Query("SELECT * FROM videos WHERE deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
+    @Query("SELECT * FROM videos WHERE deletion_status = 'none' AND missing_since IS NULL ORDER BY date_taken DESC LIMIT :limit")
     fun observeRecent(limit: Int): Flow<List<VideoEntity>>
 
-    @Query("SELECT * FROM videos WHERE deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
+    @Query("SELECT * FROM videos WHERE deletion_status = 'none' AND missing_since IS NULL ORDER BY date_taken DESC LIMIT :limit")
     fun observeTimeline(limit: Int): Flow<List<VideoEntity>>
 
-    @Query("SELECT * FROM videos WHERE deletion_status = 'none' AND strftime('%m-%d', date_taken / 1000, 'unixepoch', 'localtime') = strftime('%m-%d', :now / 1000, 'unixepoch', 'localtime') AND strftime('%Y', date_taken / 1000, 'unixepoch', 'localtime') != strftime('%Y', :now / 1000, 'unixepoch', 'localtime') ORDER BY date_taken DESC LIMIT :limit")
+    @Query("SELECT * FROM videos WHERE deletion_status = 'none' AND missing_since IS NULL AND strftime('%m-%d', date_taken / 1000, 'unixepoch', 'localtime') = strftime('%m-%d', :now / 1000, 'unixepoch', 'localtime') AND strftime('%Y', date_taken / 1000, 'unixepoch', 'localtime') != strftime('%Y', :now / 1000, 'unixepoch', 'localtime') ORDER BY date_taken DESC LIMIT :limit")
     fun observeTodayInHistory(now: Long = System.currentTimeMillis(), limit: Int = 400): Flow<List<VideoEntity>>
 
-    @Query("SELECT DISTINCT folder_path FROM videos WHERE folder_path IS NOT NULL AND folder_path != '' ORDER BY folder_path")
+    @Query("SELECT DISTINCT folder_path FROM videos WHERE folder_path IS NOT NULL AND folder_path != '' AND missing_since IS NULL ORDER BY folder_path")
     fun observeFolderPaths(): Flow<List<String>>
 
     @Query("""
         SELECT * FROM videos
         WHERE processing_status = 'unprocessed' AND deletion_status = 'none'
+        AND missing_since IS NULL
         AND (:folderPath IS NULL OR folder_path = :folderPath)
         AND (:startMillis IS NULL OR date_taken >= :startMillis)
         AND (:endMillis IS NULL OR date_taken < :endMillis)
@@ -229,7 +242,7 @@ interface VideoDao {
         limit: Int,
     ): List<VideoEntity>
 
-    @Query("SELECT * FROM videos WHERE processing_status = :status AND deletion_status = 'none' ORDER BY date_taken DESC LIMIT :limit")
+    @Query("SELECT * FROM videos WHERE processing_status = :status AND deletion_status = 'none' AND missing_since IS NULL ORDER BY date_taken DESC LIMIT :limit")
     suspend fun nextBatch(status: String = ProcessingStatus.UNPROCESSED, limit: Int): List<VideoEntity>
 
     @Query("SELECT * FROM videos WHERE id = :id LIMIT 1")
@@ -238,7 +251,7 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE media_store_id IN (:mediaStoreIds)")
     suspend fun byMediaStoreIds(mediaStoreIds: List<Long>): List<VideoEntity>
 
-    @Query("SELECT * FROM videos WHERE processing_status = 'favorited' AND deletion_status = 'none' ORDER BY updated_at DESC LIMIT :limit")
+    @Query("SELECT * FROM videos WHERE processing_status = 'favorited' AND deletion_status = 'none' AND missing_since IS NULL ORDER BY updated_at DESC LIMIT :limit")
     fun observeFavorites(limit: Int): Flow<List<VideoEntity>>
 
     @Query("UPDATE videos SET processing_status = :status, processed_at = :now, updated_at = :now WHERE id = :id")
@@ -253,6 +266,12 @@ interface VideoDao {
     @Query("UPDATE videos SET folder_path = :relativePath, folder_name = :folderName, updated_at = :now WHERE id = :id")
     suspend fun updateFolder(id: Long, relativePath: String, folderName: String, now: Long = System.currentTimeMillis())
 
+    @Query("UPDATE videos SET missing_since = NULL, updated_at = :now WHERE media_store_id IN (:mediaStoreIds)")
+    suspend fun clearMissingForMediaStoreIds(mediaStoreIds: List<Long>, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE videos SET missing_since = COALESCE(missing_since, :now), updated_at = :now WHERE deletion_status = 'none'")
+    suspend fun markAllMissing(now: Long = System.currentTimeMillis())
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(items: List<VideoEntity>)
 }
@@ -265,7 +284,7 @@ interface SimilarDao {
     @Query("SELECT * FROM similar_group_photos WHERE group_id = :groupId ORDER BY is_best DESC, similarity DESC")
     suspend fun groupPhotos(groupId: String): List<SimilarGroupPhotoEntity>
 
-    @Query("SELECT * FROM photos WHERE id IN (SELECT photo_id FROM similar_group_photos WHERE group_id = :groupId) ORDER BY id")
+    @Query("SELECT * FROM photos WHERE missing_since IS NULL AND deletion_status = 'none' AND id IN (SELECT photo_id FROM similar_group_photos WHERE group_id = :groupId) ORDER BY id")
     suspend fun groupPhotoEntities(groupId: String): List<PhotoEntity>
 
     @Query("DELETE FROM similar_groups")

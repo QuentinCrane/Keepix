@@ -20,27 +20,6 @@ fun trimAppCache(context: Context) {
     }
 }
 
-fun clearAppCacheOnExit(context: Context) {
-    val appContext = context.applicationContext
-    thread(
-        start = true,
-        isDaemon = false,
-        name = "kanleme-cache-cleaner",
-    ) {
-        listOfNotNull(appContext.cacheDir, appContext.externalCacheDir).forEach { dir ->
-            runCatching { dir.deleteChildren() }
-                .onFailure { Log.w(TAG, "Failed to clear cache directory: " + dir.absolutePath, it) }
-        }
-    }
-}
-
-private fun File.deleteChildren() {
-    listFiles()?.forEach { child ->
-        runCatching { child.deleteRecursively() }
-            .onFailure { Log.w(TAG, "Failed to delete cache entry: " + child.absolutePath, it) }
-    }
-}
-
 private fun trimDirectory(dir: File, maxBytes: Long) {
     val files = dir.walkTopDown().filter { it.isFile }.toList()
     var total = files.sumOf { it.length() }
