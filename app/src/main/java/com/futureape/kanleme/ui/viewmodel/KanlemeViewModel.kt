@@ -14,7 +14,6 @@ import com.futureape.kanleme.data.repository.AnnualReport
 import com.futureape.kanleme.data.repository.AchievementUi
 import com.futureape.kanleme.data.settings.AppSettings
 import com.futureape.kanleme.data.settings.AppSettingsRepository
-import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.data.settings.DeleteMode
 import com.futureape.kanleme.data.settings.FolderDisplayMode
 import com.futureape.kanleme.data.settings.GestureDirection
@@ -224,11 +223,7 @@ class KanlemeViewModel @Inject constructor(
             val videoScope = persisted.toVideoCleaningScope()
             _photoScope.value = photoScope
             _videoScope.value = videoScope
-            if (persisted.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO || persisted.homeMediaTab != "video") {
-                loadPhotoDeckPreview(photoScope)
-            } else {
-                loadVideoDeckPreview(videoScope)
-            }
+            loadPhotoDeckPreview(photoScope)
         }
     }
 
@@ -1351,19 +1346,6 @@ class KanlemeViewModel @Inject constructor(
 
     fun setUndoHapticLevel(value: HapticLevel) = viewModelScope.launch {
         settingsRepository.setUndoHapticLevel(value)
-    }
-
-    fun cycleAppVisualStyle() = viewModelScope.launch {
-        val next = if (settings.value.appVisualStyle == AppVisualStyle.LIQUID_GLASS) {
-            AppVisualStyle.IMMERSIVE_PHOTO
-        } else {
-            AppVisualStyle.LIQUID_GLASS
-        }
-        settingsRepository.setAppVisualStyle(next)
-    }
-
-    fun setAppVisualStyle(value: AppVisualStyle) = viewModelScope.launch {
-        settingsRepository.setAppVisualStyle(value)
     }
 
     fun cycleThemeMode() = viewModelScope.launch {

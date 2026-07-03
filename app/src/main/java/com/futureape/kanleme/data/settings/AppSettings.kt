@@ -23,7 +23,6 @@ data class AppSettings(
     val deleteHapticLevel: HapticLevel = HapticLevel.MEDIUM,
     val favoriteHapticLevel: HapticLevel = HapticLevel.MEDIUM,
     val undoHapticLevel: HapticLevel = HapticLevel.MEDIUM,
-    val appVisualStyle: AppVisualStyle = AppVisualStyle.IMMERSIVE_PHOTO,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val accentColor: Long = 0xFFC7ECFE,
     val folderDisplay: FolderDisplayMode = FolderDisplayMode.SINGLE_LINE,
@@ -90,11 +89,6 @@ enum class HapticLevel(@StringRes val labelRes: Int) {
     LIGHT(R.string.haptic_level_light),
     MEDIUM(R.string.haptic_level_medium),
     STRONG(R.string.haptic_level_strong),
-}
-
-enum class AppVisualStyle {
-    LIQUID_GLASS,
-    IMMERSIVE_PHOTO,
 }
 
 enum class ThemeMode(@StringRes val labelRes: Int) {

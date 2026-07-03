@@ -96,7 +96,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.futureape.kanleme.BuildConfig
 import com.futureape.kanleme.data.settings.AppSettings
-import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.data.settings.DeleteMode
 import com.futureape.kanleme.data.settings.FolderDisplayMode
 import com.futureape.kanleme.data.settings.GestureDirection
@@ -195,11 +194,7 @@ fun SettingsScreen(
     val activePredictiveBackProgress = if (predictiveBackCompleting) 0f else predictiveBackProgress
 
     val baseSettingsColorScheme = MaterialTheme.colorScheme
-    val settingsColorScheme = if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
-        keepixIosSettingsColorScheme(baseSettingsColorScheme)
-    } else {
-        baseSettingsColorScheme
-    }
+    val settingsColorScheme = keepixIosSettingsColorScheme(baseSettingsColorScheme)
 
     MaterialTheme(colorScheme = settingsColorScheme) {
         AdaptiveCenter(
@@ -328,7 +323,6 @@ private fun SettingsPageContent(
                     { SettingsSwitchRow(Icons.Rounded.Visibility, "照片光效", if (settings.photoShowGestureHint) "删除和收藏时显示光效" else "已关闭", checked = settings.photoShowGestureHint, onCheckedChange = { onTick(); viewModel.setPhotoShowGestureHint(it) }, color = Color(0xFF86A7FF), showIcon = false) },
                     { SettingsSwitchRow(Icons.Rounded.Movie, "视频进度条", if (settings.videoShowProgressBar) "细条" else "隐藏", checked = settings.videoShowProgressBar, onCheckedChange = { onTick(); viewModel.setVideoShowProgressBar(it) }, color = Color(0xFFB884FF), showIcon = false) },
                     { SettingsRow(Icons.Rounded.Block, "排除文件夹", if (settings.excludedFolderPaths.isEmpty()) "单独管理" else "已排除 " + settings.excludedFolderPaths.size + " 个文件夹", color = Color(0xFFE46A62), showIcon = false, onClick = { goTo(SettingsPage.EXCLUDED_FOLDERS) }) },
-                    { SettingsRow(Icons.Rounded.Palette, "界面风格", visualStyleLabel(settings.appVisualStyle), color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.APPEARANCE) }) },
                     { SettingsRow(Icons.Rounded.CleaningServices, "数据与更新", "媒体库维护、更新日志、帮助、隐私", color = Color(0xFF6D9E65), showIcon = false, onClick = { goTo(SettingsPage.DATA) }) },
                 ))
                 SectionTitle("服务与支持")
@@ -476,7 +470,6 @@ private fun SettingsPageContent(
             SettingsPage.APPEARANCE -> {
                 SectionTitle("外观显示")
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsSegmentedRow(Icons.Rounded.Palette, "界面风格", visualStyleSummary(settings.appVisualStyle), visualStyleOptions(), settings.appVisualStyle.name, onSelected = { onTick(); viewModel.setAppVisualStyle(AppVisualStyle.valueOf(it)) }) },
                     { SettingsSegmentedRow(Icons.Rounded.Palette, "主题模式", stringResource(settings.themeMode.labelRes), themeModeOptions(), settings.themeMode.name, onSelected = { onTick(); viewModel.setThemeMode(ThemeMode.valueOf(it)) }) },
                     { SettingsColorRow(Icons.Rounded.ColorLens, "主题色", "选择应用高亮色", accentColorOptions(), settings.accentColor, onSelected = { onTick(); viewModel.setAccentColor(it) }) },
                     { SettingsSegmentedRow(Icons.Rounded.Folder, "文件夹显示", stringResource(settings.folderDisplay.labelRes), folderDisplayOptions(), settings.folderDisplay.name, onSelected = { onTick(); viewModel.setFolderDisplay(FolderDisplayMode.valueOf(it)) }) },
@@ -509,16 +502,6 @@ private fun SettingsPageContent(
             }
         }
     }
-}
-
-private fun visualStyleLabel(style: AppVisualStyle): String = when (style) {
-    AppVisualStyle.LIQUID_GLASS -> "经典玻璃"
-    AppVisualStyle.IMMERSIVE_PHOTO -> "沉浸照片"
-}
-
-private fun visualStyleSummary(style: AppVisualStyle): String = when (style) {
-    AppVisualStyle.LIQUID_GLASS -> "保留当前 Liquid Glass 布局"
-    AppVisualStyle.IMMERSIVE_PHOTO -> "暗色沉浸布局，照片优先，控制收进胶囊"
 }
 
 private fun cleaningDisplaySummary(settings: AppSettings): String {
@@ -562,11 +545,6 @@ private fun settingsPhotoTypeOptions(): List<Pair<String, String>> = listOf(
     "gif" to "GIF",
     "long" to "长图",
     "raw" to "RAW",
-)
-
-private fun visualStyleOptions(): List<Pair<String, String>> = listOf(
-    AppVisualStyle.IMMERSIVE_PHOTO.name to "沉浸",
-    AppVisualStyle.LIQUID_GLASS.name to "玻璃",
 )
 
 @Composable

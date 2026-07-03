@@ -49,6 +49,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Movie
@@ -87,7 +88,6 @@ import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.EmptyState
-import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
@@ -99,7 +99,7 @@ import com.futureape.kanleme.ui.i18n.Text
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
+fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> Unit) {
     val trashItems by viewModel.trashItems.collectAsStateWithLifecycle()
     var previewItem by remember { mutableStateOf<TrashItemEntity?>(null) }
     var selectedMediaType by remember { mutableStateOf("photo") }
@@ -206,6 +206,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                 items = visibleTrashItems,
                 initialItem = item,
                 onClose = { previewItem = null },
+                onToday = onToday,
                 onRestore = { target ->
                     viewModel.restoreTrash(target.id)
                     previewItem = null
@@ -229,7 +230,13 @@ private fun TrashGalleryHeader(
     val videoCount = items.size - photoCount
     val selectedCount = if (selectedMediaType == "video") videoCount else photoCount
     val selectedSize = items.filter { if (selectedMediaType == "video") it.mediaType == "video" else it.mediaType != "video" }.sumOf { it.size }
-    GlassSurface(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.72f) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+        shape = RoundedCornerShape(30.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -348,10 +355,12 @@ private fun TrashBottomBar(
     onDeleteAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    GlassSurface(
+    Surface(
         modifier = modifier.fillMaxWidth().navigationBarsPadding().padding(14.dp),
         shape = RoundedCornerShape(30.dp),
-        tonalAlpha = 0.80f,
+        color = Color.Black.copy(alpha = 0.84f),
+        contentColor = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
     ) {
         Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             TrashBottomAction(
@@ -400,6 +409,7 @@ private fun TrashPreviewOverlay(
     items: List<TrashItemEntity>,
     initialItem: TrashItemEntity,
     onClose: () -> Unit,
+    onToday: () -> Unit,
     onRestore: (TrashItemEntity) -> Unit,
     onDelete: (TrashItemEntity) -> Unit,
 ) {
@@ -493,6 +503,13 @@ private fun TrashPreviewOverlay(
                     color = Color.White.copy(alpha = 0.72f),
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2,
+                )
+                TrashPreviewWideAction(
+                    text = "那年今日",
+                    icon = Icons.Rounded.CalendarToday,
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onToday,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     TrashPreviewWideAction(

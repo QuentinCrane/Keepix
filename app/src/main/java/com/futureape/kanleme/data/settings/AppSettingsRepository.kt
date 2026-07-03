@@ -38,7 +38,6 @@ class AppSettingsRepository @Inject constructor(
         val deleteHapticLevel = stringPreferencesKey("delete_haptic_level")
         val favoriteHapticLevel = stringPreferencesKey("favorite_haptic_level")
         val undoHapticLevel = stringPreferencesKey("undo_haptic_level")
-        val appVisualStyle = stringPreferencesKey("app_visual_style")
         val themeMode = stringPreferencesKey("theme_mode")
         val accentColor = longPreferencesKey("accent_color")
         val folderDisplay = stringPreferencesKey("folder_display")
@@ -94,7 +93,6 @@ class AppSettingsRepository @Inject constructor(
             deleteHapticLevel = p[Keys.deleteHapticLevel].toEnum(HapticLevel.MEDIUM),
             favoriteHapticLevel = p[Keys.favoriteHapticLevel].toEnum(HapticLevel.MEDIUM),
             undoHapticLevel = p[Keys.undoHapticLevel].toEnum(HapticLevel.MEDIUM),
-            appVisualStyle = p[Keys.appVisualStyle].toEnum(AppVisualStyle.IMMERSIVE_PHOTO),
             themeMode = p[Keys.themeMode].toEnum(ThemeMode.SYSTEM),
             accentColor = p[Keys.accentColor] ?: 0xFFC7ECFE,
             folderDisplay = p[Keys.folderDisplay].toEnum(FolderDisplayMode.SINGLE_LINE),
@@ -149,7 +147,6 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setDeleteHapticLevel(value: HapticLevel) = editString(Keys.deleteHapticLevel, value.name)
     suspend fun setFavoriteHapticLevel(value: HapticLevel) = editString(Keys.favoriteHapticLevel, value.name)
     suspend fun setUndoHapticLevel(value: HapticLevel) = editString(Keys.undoHapticLevel, value.name)
-    suspend fun setAppVisualStyle(value: AppVisualStyle) = editString(Keys.appVisualStyle, value.name)
     suspend fun setThemeMode(value: ThemeMode) = editString(Keys.themeMode, value.name)
     suspend fun setAccentColor(value: Long) = context.kanlemeSettingsDataStore.edit { it[Keys.accentColor] = value }
     suspend fun setFolderDisplay(value: FolderDisplayMode) = editString(Keys.folderDisplay, value.name)

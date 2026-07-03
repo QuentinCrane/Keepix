@@ -80,6 +80,8 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
     val messageText = message?.asString()
     var visibleMessage by remember { mutableStateOf<String?>(null) }
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val todayInHistoryPhotos by viewModel.todayInHistoryPhotos.collectAsStateWithLifecycle()
+    val todayInHistoryVideos by viewModel.todayInHistoryVideos.collectAsStateWithLifecycle()
     val backStack by navController.currentBackStackEntryAsState()
     val current = backStack?.destination?.route ?: Destinations.HOME
     val configuration = LocalConfiguration.current
@@ -89,7 +91,14 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
     val useSideRail = screenWidthDp >= 840 && screenWidthDp > screenHeightDp && current in setOf(Destinations.HOME, Destinations.ME)
     val homeBottomPadding = if (useSideRail) 30.dp else 108.dp
     val haptic = rememberHapticKit(settings)
-    val transitionBackdrop = if (current.usesDarkTransitionBackdrop(settings.appVisualStyle)) {
+    val openTodayInHistory = {
+        if (todayInHistoryPhotos.isNotEmpty() || todayInHistoryVideos.isNotEmpty()) {
+            navController.navigate(Destinations.TODAY) { launchSingleTop = true }
+        } else {
+            viewModel.showMessage("今天暂无往年照片或视频")
+        }
+    }
+    val transitionBackdrop = if (current.usesDarkTransitionBackdrop()) {
         Color.Black
     } else {
         MaterialTheme.colorScheme.background
@@ -154,7 +163,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onTimeline = { navController.navigate(Destinations.TIMELINE) },
                         onTrash = { navController.navigate(Destinations.TRASH) },
                         onFavorites = { navController.navigate(Destinations.FAVORITES) },
-                        onToday = { navController.navigate(Destinations.TODAY) },
+                        onToday = openTodayInHistory,
                         onSettings = { navController.navigate(Destinations.SETTINGS) },
                     )
                 }
@@ -238,8 +247,8 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onDiagnosis = { navController.navigate(Destinations.settingsPage("DIAGNOSIS")) },
                     )
                 }
-                composable(Destinations.FAVORITES) { FavoritesScreen(viewModel, onBack = { navController.popBackStack() }) }
-                composable(Destinations.TRASH) { TrashScreen(viewModel, onBack = { navController.popBackStack() }) }
+                composable(Destinations.FAVORITES) { FavoritesScreen(viewModel, onBack = { navController.popBackStack() }, onToday = openTodayInHistory) }
+                composable(Destinations.TRASH) { TrashScreen(viewModel, onBack = { navController.popBackStack() }, onToday = openTodayInHistory) }
                 composable(Destinations.PHOTO_HISTORY) {
                     PhotoHistoryScreen(
                         viewModel = viewModel,
@@ -476,10 +485,13 @@ private fun topLevelRouteIndex(route: String?): Int? = when (route) {
     else -> null
 }
 
-private fun String?.usesDarkTransitionBackdrop(appVisualStyle: com.futureape.kanleme.data.settings.AppVisualStyle): Boolean {
-    if (appVisualStyle == com.futureape.kanleme.data.settings.AppVisualStyle.IMMERSIVE_PHOTO) return true
-    return this in setOf(Destinations.PHOTO_START, Destinations.PHOTO, Destinations.VIDEO_START, Destinations.VIDEO, Destinations.VIEWER) ||
-        (this == Destinations.HOME && appVisualStyle == com.futureape.kanleme.data.settings.AppVisualStyle.IMMERSIVE_PHOTO)
-}
+private fun String?.usesDarkTransitionBackdrop(): Boolean = this in setOf(
+    Destinations.HOME,
+    Destinations.PHOTO_START,
+    Destinations.PHOTO,
+    Destinations.VIDEO_START,
+    Destinations.VIDEO,
+    Destinations.VIEWER,
+)
 
 

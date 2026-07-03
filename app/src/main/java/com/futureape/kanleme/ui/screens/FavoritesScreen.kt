@@ -47,6 +47,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PlayCircle
@@ -87,7 +88,6 @@ import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.EmptyState
-import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
@@ -103,7 +103,7 @@ import kotlinx.coroutines.withContext
 import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
-fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
+fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> Unit) {
     val photos by viewModel.favoritePhotos.collectAsStateWithLifecycle()
     val videos by viewModel.favoriteVideos.collectAsStateWithLifecycle()
     var previewPhoto by remember { mutableStateOf<PhotoEntity?>(null) }
@@ -170,6 +170,7 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
             FavoritePhotoPreviewOverlay(
                 photo = photo,
                 onClose = { previewPhoto = null },
+                onToday = onToday,
                 onDelete = {
                     viewModel.onPhotoAction(photo, SwipeAction.Delete)
                     previewPhoto = null
@@ -273,10 +274,12 @@ private fun FavoriteVideoTile(video: VideoEntity, modifier: Modifier) {
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )
-        GlassSurface(
+        Surface(
             modifier = Modifier.align(Alignment.TopStart).padding(7.dp),
             shape = RoundedCornerShape(999.dp),
-            tonalAlpha = 0.34f,
+            color = Color.Black.copy(alpha = 0.54f),
+            contentColor = Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
@@ -438,6 +441,7 @@ private fun Modifier.favoriteTileEnter(key: Any): Modifier {
 private fun FavoritePhotoPreviewOverlay(
     photo: PhotoEntity,
     onClose: () -> Unit,
+    onToday: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -500,14 +504,16 @@ private fun FavoritePhotoPreviewOverlay(
                 )
             }
         }
-        GlassSurface(
+        Surface(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(14.dp),
             shape = RoundedCornerShape(30.dp),
-            tonalAlpha = 0.72f,
+            color = Color.Black.copy(alpha = 0.86f),
+            contentColor = Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
@@ -524,6 +530,7 @@ private fun FavoritePhotoPreviewOverlay(
                 FavoritePreviewAction("分享", Icons.Rounded.Share) {
                     shareMedia(context, Uri.parse(photo.uri), photo.mimeType, photo.displayName)
                 }
+                FavoritePreviewAction("那年今日", Icons.Rounded.CalendarToday, onToday)
                 FavoritePreviewAction("待删", Icons.Rounded.Delete, onDelete)
             }
         }

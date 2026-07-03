@@ -113,7 +113,6 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
-import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.EmptyState

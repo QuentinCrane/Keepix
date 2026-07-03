@@ -94,7 +94,6 @@ import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.CleaningScope
 import com.futureape.kanleme.data.repository.DashboardStats
 import com.futureape.kanleme.data.settings.AppSettings
-import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.GlassSurface

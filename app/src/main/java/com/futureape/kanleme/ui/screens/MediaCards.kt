@@ -97,7 +97,6 @@ import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.data.settings.AppSettings
-import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.data.settings.GestureDirection
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.util.HapticKit
@@ -321,7 +320,6 @@ fun PhotoDeckStage(
     onAction: (PhotoEntity, SwipeAction, Float, Float, Float, Float) -> Unit,
 ) {
     val top = photos.firstOrNull() ?: return
-    val immersiveStyle = settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO
     val deckPromotion = remember(top.id) { Animatable(0f) }
     var exitingPhotoCard by remember { mutableStateOf<ExitingPhotoCard?>(null) }
 
@@ -379,29 +377,21 @@ fun PhotoDeckStage(
             val promotion = deckPromotion.value.coerceIn(0f, 1f)
             val easedPromotion = smoothDeckPromotion(promotion)
             val effectiveDepth = (depth - easedPromotion).coerceAtLeast(0f)
-            fun fillForDepth(value: Float): Float = if (immersiveStyle) {
-                (0.96f - value * 0.048f).coerceAtLeast(0.78f)
-            } else {
-                (0.88f - value * 0.028f).coerceAtLeast(0.76f)
-            }
-            fun scaleForDepth(value: Float): Float = if (immersiveStyle) 1f - value * 0.045f else 1f - value * 0.058f
-            fun alphaForDepth(value: Float): Float = if (value <= 1f) 1f else (1f - (value - 1f) * if (immersiveStyle) 0.10f else 0.16f).coerceIn(0.70f, 1f)
-            fun rotationForDepth(value: Int): Float = if (immersiveStyle) {
-                when (value) { 0 -> 0f; 1 -> -3.8f; 2 -> 4.8f; else -> -2.6f }
-            } else {
-                when (value) { 0, 1 -> 0f; 2 -> 2.2f; else -> -1.2f }
-            }
+            fun fillForDepth(value: Float): Float = (0.96f - value * 0.048f).coerceAtLeast(0.78f)
+            fun scaleForDepth(value: Float): Float = 1f - value * 0.045f
+            fun alphaForDepth(value: Float): Float = if (value <= 1f) 1f else (1f - (value - 1f) * 0.10f).coerceIn(0.70f, 1f)
+            fun rotationForDepth(value: Int): Float = when (value) { 0 -> 0f; 1 -> -3.8f; 2 -> 4.8f; else -> -2.6f }
             val fillWidth = if (depth == 1) {
                 val start = fillForDepth(depth.toFloat())
-                start + ((if (immersiveStyle) 0.99f else 0.96f) - start) * easedPromotion
+                start + (0.99f - start) * easedPromotion
             } else {
                 fillForDepth(effectiveDepth)
             }
-            val liftDp = effectiveDepth * if (immersiveStyle) 18f else 34f
+            val liftDp = effectiveDepth * 18f
             val rotation = rotationForDepth(depth) + (rotationForDepth((depth - 1).coerceAtLeast(0)) - rotationForDepth(depth)) * easedPromotion
             val scale = scaleForDepth(effectiveDepth)
             val cardAlpha = alphaForDepth(effectiveDepth)
-            val backShape = RoundedCornerShape(if (immersiveStyle) 26.dp else 30.dp)
+            val backShape = RoundedCornerShape(26.dp)
             Box(
                 modifier = Modifier
                     .fillMaxWidth(fillWidth)
@@ -413,7 +403,7 @@ fun PhotoDeckStage(
                         scaleY = scale
                         alpha = cardAlpha
                     }
-                    .shadow(if (immersiveStyle) 28.dp else 20.dp, backShape, ambientColor = Color.Black.copy(alpha = if (immersiveStyle) 0.24f else 0.12f), spotColor = Color.Black.copy(alpha = if (immersiveStyle) 0.30f else 0.14f))
+                    .shadow(28.dp, backShape, ambientColor = Color.Black.copy(alpha = 0.24f), spotColor = Color.Black.copy(alpha = 0.30f))
                     .clip(backShape),
             ) {
                 PhotoFitImageWithSoftFill(
@@ -451,13 +441,13 @@ fun PhotoDeckStage(
                 onAction(top, action, startX, startY, targetX, targetY)
             },
             modifier = Modifier
-                .fillMaxWidth(if (immersiveStyle) 0.99f else 0.96f)
+                .fillMaxWidth(0.99f)
                 .onGloballyPositioned { coordinates -> onTopCardPositioned(coordinates.boundsInRoot()) },
         )
         exitingPhotoCard?.let { exiting ->
             ExitingPhotoOverlay(
                 exiting = exiting,
-                modifier = Modifier.fillMaxWidth(if (immersiveStyle) 0.99f else 0.96f),
+                modifier = Modifier.fillMaxWidth(0.99f),
                 onFinished = {
                     if (exitingPhotoCard?.sequence == exiting.sequence) exitingPhotoCard = null
                 },
@@ -482,8 +472,7 @@ fun SwipePhotoCard(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val immersiveStyle = settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO
-    val cardShape = RoundedCornerShape(if (immersiveStyle) 26.dp else 32.dp)
+    val cardShape = RoundedCornerShape(26.dp)
     val photoRatio = remember(photo.id, photo.width, photo.height, photo.exifWidth, photo.exifHeight, photo.exifOrientation) { photoDisplayAspectRatio(photo) }
     val canInlinePlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
     var inlineMotionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
@@ -822,32 +811,8 @@ fun SwipePhotoCard(
             } else {
                 PhotoFitImageWithSoftFill(photo = photo, modifier = Modifier.fillMaxSize(), contentDescription = photo.displayName)
             }
-            if (!settings.photoFocusMode && !immersiveStyle) {
-                PhotoDynamicBadgeRow(
-                    photo = photo,
-                    modifier = Modifier.align(Alignment.TopStart).padding(14.dp),
-                )
-            } else if (canInlinePlayMotion && motionPreview == null) {
+            if (canInlinePlayMotion && motionPreview == null) {
                 MotionPhotoTinyIcon(Modifier.align(Alignment.TopStart).padding(14.dp))
-            }
-            if (!immersiveStyle) {
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.04f), Color.Black.copy(alpha = 0.16f))
-                        )
-                    )
-                )
-            }
-            if (!settings.photoFocusMode && !immersiveStyle) {
-                InlineMotionStatusPill(
-                    isVisible = canInlinePlayMotion,
-                    isPlaying = motionPreview != null,
-                    isLoading = inlineMotionLoading,
-                    isUnavailable = inlineMotionUnavailable,
-                    manualHint = inlineMotionManualHint,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp),
-                )
             }
         }
     }

@@ -99,7 +99,6 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
-import com.futureape.kanleme.data.settings.AppVisualStyle
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.EmptyState
@@ -287,90 +286,69 @@ fun PhotoCleanScreen(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) Color.Black else MaterialTheme.colorScheme.background)
+                .background(Color.Black)
                 .statusBarsPadding()
                 .padding(18.dp),
         ) {
-            if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
-                KeepixRoundButton(
-                    icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                    contentDescription = stringResource(R.string.a11y_back),
-                    onClick = ::leaveCleaning,
-                    modifier = Modifier.align(Alignment.TopStart),
+            KeepixRoundButton(
+                icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                contentDescription = stringResource(R.string.a11y_back),
+                onClick = ::leaveCleaning,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+            Column(
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                CircularProgressIndicator(color = Color.White.copy(alpha = 0.86f), strokeWidth = 3.dp)
+                Text(
+                    "正在准备整理队列",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White.copy(alpha = 0.82f),
+                    fontWeight = FontWeight.SemiBold,
                 )
-                Column(
-                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    CircularProgressIndicator(color = Color.White.copy(alpha = 0.86f), strokeWidth = 3.dp)
-                    Text(
-                        "正在准备整理队列",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.82f),
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        "预览队列会优先进入，完整队列随后补齐",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.50f),
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            } else {
-                Box(Modifier.align(Alignment.Center), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                Text(
+                    "预览队列会优先进入，完整队列随后补齐",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.50f),
+                    textAlign = TextAlign.Center,
+                )
             }
         }
         return
     }
 
     if (deck.isEmpty()) {
-        // New Keepix empty state uses the immersive controls from ImmersivePhotoCleanScreen.kt.
-        if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-                    .statusBarsPadding()
-                    .padding(18.dp),
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .statusBarsPadding()
+                .padding(18.dp),
+        ) {
+            KeepixRoundButton(
+                icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                contentDescription = stringResource(R.string.a11y_back),
+                onClick = ::leaveCleaning,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+            Column(
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                KeepixRoundButton(
-                    icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                    contentDescription = stringResource(R.string.a11y_back),
-                    onClick = ::leaveCleaning,
-                    modifier = Modifier.align(Alignment.TopStart),
+                Text(
+                    "当前没有待整理照片",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
                 )
-                Column(
-                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text(
-                        "当前没有待整理照片",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        "可以回到首页调整整理范围",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.58f),
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-            return
-        }
-        Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-            ScreenHeader("照片整理", "按每组数量完成一轮整理", ::leaveCleaning)
-            Box(Modifier.fillMaxSize().padding(18.dp), contentAlignment = Alignment.Center) {
-                EmptyState(
-                    title = "当前筛选下暂无待整理照片",
-                    message = "这里为空通常表示当前筛选、排除文件夹或相册权限下已经没有可整理内容。",
-                    actionText = "重新读取队列",
-                    onAction = { haptics.success(); if (dashboard.photoCount == 0) viewModel.refreshLibrary() else viewModel.loadPhotoDeck(scope) },
+                Text(
+                    "可以回到首页调整整理范围",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.58f),
+                    textAlign = TextAlign.Center,
                 )
             }
         }
@@ -423,19 +401,17 @@ fun PhotoCleanScreen(
         0
     }
 
-    // New Keepix visual path lives in ImmersivePhotoCleanScreen.kt.
-    if (settings.appVisualStyle == AppVisualStyle.IMMERSIVE_PHOTO) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .detectScreenPinchToMemory(
-                    key = currentPhoto.id,
-                    disabled = showDayMemory,
-                    onProgress = ::previewDayMemory,
-                    onCommit = ::commitDayMemory,
-                    onCancel = { dayMemoryPinch = DayMemoryPinchState() },
-                ),
-        ) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .detectScreenPinchToMemory(
+                key = currentPhoto.id,
+                disabled = showDayMemory,
+                onProgress = ::previewDayMemory,
+                onCommit = ::commitDayMemory,
+                onCancel = { dayMemoryPinch = DayMemoryPinchState() },
+            ),
+    ) {
             ImmersivePhotoCleanContent(
                 photos = visibleDeck,
                 currentPhoto = currentPhoto,
@@ -527,233 +503,7 @@ fun PhotoCleanScreen(
                 )
             }
         }
-        return
     }
-
-    // Legacy Liquid Glass photo cleaning path. Keep old visual code here only.
-    Box(
-        Modifier
-            .fillMaxSize()
-            .detectScreenPinchToMemory(
-                key = currentPhoto.id,
-                disabled = showDayMemory,
-                onProgress = ::previewDayMemory,
-                onCommit = ::commitDayMemory,
-                onCancel = { dayMemoryPinch = DayMemoryPinchState() },
-            ),
-    ) {
-        Crossfade(
-            targetState = currentPhoto.uri,
-            animationSpec = tween(durationMillis = 560),
-            label = "photo_background_crossfade",
-        ) { photoUri ->
-            Box(Modifier.fillMaxSize().background(Color.Black)) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(Uri.parse(photoUri))
-                        .memoryCacheKey(photoUri)
-                        .diskCacheKey(photoUri)
-                        .placeholderMemoryCacheKey(photoUri)
-                        .crossfade(false)
-                        .build(),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize().blur(18.dp),
-                    contentScale = ContentScale.Crop,
-                )
-            }
-        }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = if (chromeVisible) 0.24f else 0.10f),
-                            Color.Black.copy(alpha = if (chromeVisible) 0.10f else 0.04f),
-                            Color.Black.copy(alpha = if (chromeVisible) 0.30f else 0.12f),
-                        )
-                    )
-                )
-        )
-        AdaptiveWidthInfo { _, isExpanded ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .padding(horizontal = if (isExpanded) 34.dp else 18.dp, vertical = 10.dp),
-            ) {
-                PhotoDeckStage(
-                    photos = visibleDeck,
-                    settings = settings,
-                    haptics = haptics,
-                    modifier = (if (isExpanded) {
-                        Modifier
-                            .align(Alignment.Center)
-                            .widthIn(max = 720.dp)
-                            .fillMaxWidth()
-                            .zIndex(1f)
-                    } else {
-                        Modifier
-                            .align(Alignment.Center)
-                            .fillMaxWidth()
-                            .zIndex(1f)
-                    }),
-                    onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
-                    onTopCardPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.PhotoCard, rect) },
-                    onSwipeFeedbackChanged = { photoSwipeFeedback = it },
-                    undoAnimation = undoAnimation,
-                    onUndoAnimationConsumed = { sequence -> viewModel.clearPhotoUndoAnimation(sequence) },
-                    onAction = { photo, action, _, _, targetX, targetY -> perform(photo, action, targetX, targetY) },
-                )
-
-                if (chromeVisible && (settings.photoShowInfoBar || settings.photoShowFolderChips)) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(bottom = 4.dp)
-                            .zIndex(8f)
-                            .onGloballyPositioned { coordinates ->
-                                updateGuideTarget(PhotoGuideTarget.BottomInfo, coordinates.boundsInRoot())
-                            },
-                    ) {
-                        CompactPhotoInfoBar(
-                            remaining = remainingPhotos,
-                            photo = currentPhoto,
-                            selectedAlbum = "指定归档",
-                            sessionActionCount = sessionActionCount,
-                            lastAction = lastPhotoAction,
-                            showInfo = settings.photoShowInfoBar,
-                            showAlbum = settings.photoShowFolderChips,
-                            onOpen = { haptics.tick(); onOpenPhoto(currentPhoto) },
-                            onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
-                            onAlbumClick = { haptics.tick(); showFolderPicker = true },
-                            onAlbumPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.AlbumButton, rect) },
-                        )
-                    }
-                }
-            }
-        }
-        if (chromeVisible && (settings.photoShowTopBar || settings.photoShowShuffleButton || settings.photoShowFilterChips)) {
-            PhotoOrganizerTopControls(
-                remainingCount = remainingPhotos,
-                progressPercent = progressPercent,
-                deletedSizeBytes = dashboard.pendingDeleteBytes,
-                mediaCounts = listOf(
-                    "全部" to typeStats.all.toString(),
-                    "普通照片" to typeStats.normal.toString(),
-                    "截图" to typeStats.screenshot.toString(),
-                    "自拍" to typeStats.selfie.toString(),
-                    "实况" to typeStats.motion.toString(),
-                    "GIF" to typeStats.gif.toString(),
-                    "长图" to typeStats.longImage.toString(),
-                ),
-                selectedMediaIndex = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long").indexOf(scope.mediaType).coerceAtLeast(0),
-                dateMode = scope.dateMode,
-                randomEnabled = scope.sortOrder == "random",
-                showShuffle = settings.photoShowShuffleButton,
-                showFilters = settings.photoShowFilterChips,
-                showRemaining = settings.photoShowTopBar,
-                onShuffle = { haptics.threshold(); viewModel.reshufflePhotoCleaningSession() },
-                onMediaSelected = { index ->
-                    val type = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long").getOrElse(index) { "all" }
-                    haptics.tick()
-                    viewModel.setPhotoTypeFilter(type)
-                },
-                onDateClick = { haptics.tick(); showDatePicker = true },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(top = 10.dp)
-                    .zIndex(9f)
-                    .onGloballyPositioned { coordinates ->
-                        updateGuideTarget(PhotoGuideTarget.TopBar, coordinates.boundsInRoot())
-                    },
-            )
-        }
-        PhotoChromeControl(
-            focusMode = settings.photoFocusMode,
-            actionCount = sessionActionCount,
-            onToggle = { haptics.tick(); viewModel.setPhotoFocusMode(!settings.photoFocusMode) },
-            onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(top = 64.dp, end = 18.dp)
-                .zIndex(10f),
-        )
-        if (chromeVisible && settings.photoShowGestureHint) {
-            PhotoEdgeGlow(feedback = photoSwipeFeedback)
-        }
-
-        if (dimAlpha > 0.01f) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dimAlpha)))
-        }
-        androidx.compose.animation.AnimatedVisibility(visible = showGuide, modifier = Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                PhotoGuideDialog(onDismiss = { haptics.tick(); showGuide = false; viewModel.markPhotoGuideShown() })
-            }
-        }
-        OrganizerDatePickerAnimatedOverlay(
-            visible = showDatePicker,
-            title = "照片时间筛选",
-            currentMode = scope.dateMode,
-            onApply = { mode -> haptics.tick(); viewModel.setPhotoSessionDateMode(mode) },
-            onDismiss = { showDatePicker = false },
-        )
-        OrganizerFolderPickerOverlay(
-            visible = showFolderPicker,
-            title = "归档当前照片",
-            folders = folders.ifEmpty { listOf("DCIM/Camera/", "Pictures/", "Download/") },
-            onArchive = { path -> haptics.keep(); viewModel.archivePhotoToFolder(currentPhoto, path) },
-            onDismiss = { showFolderPicker = false },
-        )
-        KeepixDayMemoryOverlay(
-            visible = dayMemoryVisible,
-            currentPhoto = currentPhoto,
-            photos = memoryPhotos,
-            entryProgress = if (showDayMemory) 1f else dayMemoryPinch.progress,
-            entryScale = dayMemoryPinch.scale,
-            entryActive = dayMemoryPinch.active,
-            onDismiss = ::closeDayMemory,
-            onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
-            onDelete = { photo -> haptics.delete(); viewModel.markPhotoForTrashOutsideCleaning(photo) },
-            onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
-            onApply = { mode ->
-                haptics.threshold()
-                viewModel.setPhotoSessionDateMode(mode)
-                closeDayMemory()
-            },
-        )
-        batchSummary?.let { summary ->
-            PhotoBatchSummaryOverlay(
-                summary = summary,
-                onContinue = {
-                    viewModel.finishPhotoCleaningSession()
-                    batchSummary = null
-                    clearBatchCounters()
-                },
-                onBackHome = {
-                    viewModel.finishPhotoCleaningSession()
-                    batchSummary = null
-                    viewModel.resetPhotoSessionDateMode()
-                    clearBatchCounters()
-                    onBack()
-                },
-                onOpenTrash = {
-                    viewModel.finishPhotoCleaningSession()
-                    batchSummary = null
-                    viewModel.resetPhotoSessionDateMode()
-                    clearBatchCounters()
-                    onBatchFinished()
-                },
-                onUndoLast = { undoLastBatchAction(summary) },
-            )
-        }
-    }
-}
 
 
 private data class PhotoBatchSummary(
