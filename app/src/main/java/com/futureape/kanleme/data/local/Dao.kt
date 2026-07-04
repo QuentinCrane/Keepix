@@ -84,12 +84,10 @@ interface PhotoDao {
             OR (:mediaType = 'long' AND is_long_image = 1)
             OR (:mediaType = 'gif' AND is_gif = 1)
             OR (:mediaType = 'raw' AND is_raw = 1))
-        ORDER BY CASE WHEN :randomOrder = 1 THEN ABS((
-            ((media_store_id % 2147483647) * ((:randomSeed % 1000003) + 1009))
-            + (((date_taken / 1000) % 2147483647) * ((:randomSeed % 65537) + 257))
-            + ((size % 1000003) * ((:randomSeed % 4099) + 8191))
-            + ((media_store_id % 9973) * ((:randomSeed % 131071) + 17))
-        ) % 2147483647) ELSE date_taken END DESC, date_taken DESC
+        ORDER BY
+            CASE WHEN :randomOrder = 1 THEN random() + (:randomSeed - :randomSeed) END ASC,
+            CASE WHEN :randomOrder = 0 THEN date_taken END DESC,
+            date_taken DESC
         LIMIT :limit
     """)
     suspend fun nextFilteredBatch(
@@ -225,12 +223,10 @@ interface VideoDao {
         AND (:folderPath IS NULL OR folder_path = :folderPath)
         AND (:startMillis IS NULL OR date_taken >= :startMillis)
         AND (:endMillis IS NULL OR date_taken < :endMillis)
-        ORDER BY CASE WHEN :randomOrder = 1 THEN ABS((
-            ((media_store_id % 2147483647) * ((:randomSeed % 1000003) + 1009))
-            + (((date_taken / 1000) % 2147483647) * ((:randomSeed % 65537) + 257))
-            + ((size % 1000003) * ((:randomSeed % 4099) + 8191))
-            + ((media_store_id % 9973) * ((:randomSeed % 131071) + 17))
-        ) % 2147483647) ELSE date_taken END DESC, date_taken DESC
+        ORDER BY
+            CASE WHEN :randomOrder = 1 THEN random() + (:randomSeed - :randomSeed) END ASC,
+            CASE WHEN :randomOrder = 0 THEN date_taken END DESC,
+            date_taken DESC
         LIMIT :limit
     """)
     suspend fun nextFilteredBatch(

@@ -554,7 +554,7 @@ private fun dateModeMenuLabel(mode: String): String = when (mode) {
     "seven_days" -> "最近 7 天"
     "month" -> "最近 1 个月"
     "year" -> "最近 1 年"
-    "today_history" -> "回到那天"
+    "today_history" -> "那年今日"
     else -> if (mode.startsWith("d:")) mode.removePrefix("d:").replace("-", "/") else "全部"
 }
 

@@ -492,6 +492,10 @@ private fun String?.usesDarkTransitionBackdrop(): Boolean = this in setOf(
     Destinations.VIDEO_START,
     Destinations.VIDEO,
     Destinations.VIEWER,
+    Destinations.FAVORITES,
+    Destinations.TRASH,
+    Destinations.PHOTO_HISTORY,
+    Destinations.TODAY,
 )
 
 

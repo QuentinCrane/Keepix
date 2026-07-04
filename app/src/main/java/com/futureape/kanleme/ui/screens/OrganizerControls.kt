@@ -459,7 +459,7 @@ fun organizerDateModeLabel(mode: String): String = when {
     }
     mode.startsWith("d:") -> mode.removePrefix("d:").replace("-", "/")
     mode.startsWith("multiym:") -> "多选月份 " + mode.removePrefix("multiym:").split(",").count { it.isNotBlank() }
-    mode == "today_history" -> "当年今日"
+    mode == "today_history" -> "那年今日"
     else -> "全部时间"
 }
 

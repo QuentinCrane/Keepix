@@ -39,6 +39,7 @@ class AppSettingsRepository @Inject constructor(
         val favoriteHapticLevel = stringPreferencesKey("favorite_haptic_level")
         val undoHapticLevel = stringPreferencesKey("undo_haptic_level")
         val themeMode = stringPreferencesKey("theme_mode")
+        val todayInHistoryEntryMode = stringPreferencesKey("today_in_history_entry_mode")
         val accentColor = longPreferencesKey("accent_color")
         val folderDisplay = stringPreferencesKey("folder_display")
         val immersiveBackground = booleanPreferencesKey("immersive_background")
@@ -94,6 +95,7 @@ class AppSettingsRepository @Inject constructor(
             favoriteHapticLevel = p[Keys.favoriteHapticLevel].toEnum(HapticLevel.MEDIUM),
             undoHapticLevel = p[Keys.undoHapticLevel].toEnum(HapticLevel.MEDIUM),
             themeMode = p[Keys.themeMode].toEnum(ThemeMode.SYSTEM),
+            todayInHistoryEntryMode = sanitizeTodayInHistoryEntryMode(p[Keys.todayInHistoryEntryMode]),
             accentColor = p[Keys.accentColor] ?: 0xFFC7ECFE,
             folderDisplay = p[Keys.folderDisplay].toEnum(FolderDisplayMode.SINGLE_LINE),
             immersiveBackground = p[Keys.immersiveBackground] ?: true,
@@ -148,6 +150,7 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setFavoriteHapticLevel(value: HapticLevel) = editString(Keys.favoriteHapticLevel, value.name)
     suspend fun setUndoHapticLevel(value: HapticLevel) = editString(Keys.undoHapticLevel, value.name)
     suspend fun setThemeMode(value: ThemeMode) = editString(Keys.themeMode, value.name)
+    suspend fun setTodayInHistoryEntryMode(value: TodayInHistoryEntryMode) = editString(Keys.todayInHistoryEntryMode, value.name)
     suspend fun setAccentColor(value: Long) = context.kanlemeSettingsDataStore.edit { it[Keys.accentColor] = value }
     suspend fun setFolderDisplay(value: FolderDisplayMode) = editString(Keys.folderDisplay, value.name)
     suspend fun setImmersiveBackground(value: Boolean) = editBoolean(Keys.immersiveBackground, value)
@@ -226,6 +229,12 @@ class AppSettingsRepository @Inject constructor(
     private fun sanitizePhotoMediaType(value: String?): String = when (value) {
         "normal", "screenshot", "selfie", "motion", "long", "gif", "raw" -> value
         else -> "all"
+    }
+
+    private fun sanitizeTodayInHistoryEntryMode(value: String?): TodayInHistoryEntryMode = when (value) {
+        TodayInHistoryEntryMode.PINCH_MEMORY.name, "PHOTO_CLEANING" -> TodayInHistoryEntryMode.PINCH_MEMORY
+        TodayInHistoryEntryMode.MEMORY_PAGE.name -> TodayInHistoryEntryMode.MEMORY_PAGE
+        else -> TodayInHistoryEntryMode.MEMORY_PAGE
     }
 
     private suspend fun editString(key: androidx.datastore.preferences.core.Preferences.Key<String>, value: String) {

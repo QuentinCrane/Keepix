@@ -2,6 +2,7 @@ package com.futureape.kanleme.ui.screens
 
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -76,9 +77,9 @@ import coil.compose.AsyncImage
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.R
-import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
+import com.futureape.kanleme.ui.util.photoImageRequest
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.util.shareMedia
@@ -411,7 +412,7 @@ private fun ZoomableViewerPhoto(
             )
         } else {
             AsyncImage(
-                model = Uri.parse(photo.uri),
+                model = photoImageRequest(context, photo, "viewer_photo", 1440, 1920),
                 contentDescription = photo.displayName,
                 modifier = Modifier
                     .fillMaxSize()
@@ -425,12 +426,14 @@ private fun ZoomableViewerPhoto(
             )
 
             if (canPlayMotion && scale <= 1.01f) {
-                GlassSurface(
+                Surface(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 106.dp, start = 18.dp, end = 18.dp),
                     shape = RoundedCornerShape(999.dp),
-                    tonalAlpha = 0.74f,
+                    color = Color.Black.copy(alpha = 0.78f),
+                    contentColor = Color.White,
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
@@ -464,18 +467,20 @@ private fun ZoomableViewerPhoto(
             }
 
             motionError?.let { message ->
-                GlassSurface(
+                Surface(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 98.dp, start = 18.dp, end = 18.dp),
                     shape = RoundedCornerShape(22.dp),
-                    tonalAlpha = 0.86f,
+                    color = Color.Black.copy(alpha = 0.78f),
+                    contentColor = Color.White,
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
                 ) {
                     Text(
                         text = message,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = Color.White,
                     )
                 }
             }

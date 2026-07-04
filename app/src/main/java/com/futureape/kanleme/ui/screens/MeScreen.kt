@@ -244,11 +244,6 @@ private fun MediaStatCard(
     cleaned: Long,
     accent: Color,
 ) {
-    val progress = when {
-        viewed <= 0 && deleted <= 0 -> 0f
-        viewed <= 0 -> 1f
-        else -> (deleted.toFloat() / viewed.toFloat()).coerceIn(0f, 1f)
-    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -256,29 +251,21 @@ private fun MediaStatCard(
         contentColor = Color.White,
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.09f)),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(
-                    modifier = Modifier.size(42.dp),
-                    shape = RoundedCornerShape(13.dp),
-                    color = accent.copy(alpha = 0.20f),
-                    contentColor = accent,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
-                    }
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(
+                modifier = Modifier.size(42.dp),
+                shape = RoundedCornerShape(13.dp),
+                color = accent.copy(alpha = 0.20f),
+                contentColor = accent,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
                 }
-                Text(title, modifier = Modifier.width(54.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, maxLines = 1)
-                StatColumn("浏览", viewed.toString(), Color(0xFF86A7FF), Modifier.weight(1f))
-                StatColumn("待确认", deleted.toString(), Color(0xFFFF7B70), Modifier.weight(1f))
-                StatColumn("预计释放", if (cleaned > 0L) formatSize(cleaned) else "0 字节", Color(0xFFC8EF67), Modifier.weight(1.15f))
             }
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(5.dp),
-                color = accent.copy(alpha = 0.88f),
-                trackColor = Color.White.copy(alpha = 0.09f),
-            )
+            Text(title, modifier = Modifier.width(54.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, maxLines = 1)
+            StatColumn("浏览", viewed.toString(), Color(0xFF86A7FF), Modifier.weight(1f))
+            StatColumn("待确认", deleted.toString(), Color(0xFFFF7B70), Modifier.weight(1f))
+            StatColumn("预计释放", if (cleaned > 0L) formatSize(cleaned) else "0 字节", Color(0xFFC8EF67), Modifier.weight(1.15f))
         }
     }
 }

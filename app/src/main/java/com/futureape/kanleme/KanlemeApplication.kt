@@ -7,6 +7,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import coil.memory.MemoryCache
 import com.futureape.kanleme.ui.util.IMAGE_DISK_CACHE_MAX_BYTES
 import com.futureape.kanleme.ui.util.installCrashLogger
 import com.futureape.kanleme.ui.util.trimAppCache
@@ -23,6 +24,11 @@ class KanlemeApplication : Application(), ImageLoaderFactory {
 
     override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
         .crossfade(false)
+        .memoryCache {
+            MemoryCache.Builder(this)
+                .maxSizePercent(0.30)
+                .build()
+        }
         .diskCache {
             DiskCache.Builder()
                 .directory(File(cacheDir, "image_cache"))

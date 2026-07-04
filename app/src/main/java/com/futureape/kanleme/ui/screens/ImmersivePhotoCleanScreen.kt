@@ -1,6 +1,5 @@
 package com.futureape.kanleme.ui.screens
 
-import android.net.Uri
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
@@ -110,7 +109,6 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.imageLoader
-import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.R
@@ -120,6 +118,8 @@ import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.photoDisplayAspectRatio
+import com.futureape.kanleme.ui.util.photoImageRequest
+import com.futureape.kanleme.ui.util.photoThumbnailImageRequest
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import com.futureape.kanleme.ui.i18n.Text
@@ -175,18 +175,12 @@ internal fun ImmersivePhotoCleanContent(
     )
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Crossfade(
-            targetState = currentPhoto.uri,
+            targetState = currentPhoto,
             animationSpec = tween(durationMillis = 520),
             label = "keepix_photo_background",
-        ) { photoUri ->
+        ) { photo ->
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(Uri.parse(photoUri))
-                    .memoryCacheKey(photoUri)
-                    .diskCacheKey(photoUri)
-                    .placeholderMemoryCacheKey(photoUri)
-                    .crossfade(false)
-                    .build(),
+                model = photoImageRequest(context, photo, "clean_background", 1080, 1440),
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
@@ -865,14 +859,7 @@ private fun KeepixMemoryGridPhoto(
             }
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(Uri.parse(photo.uri))
-                .memoryCacheKey(photo.uri + "#day_memory_grid")
-                .diskCacheKey(photo.uri)
-                .placeholderMemoryCacheKey(photo.uri + "#day_memory_grid")
-                .size(560, 560)
-                .crossfade(false)
-                .build(),
+            model = photoThumbnailImageRequest(context, photo),
             contentDescription = photo.displayName,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,

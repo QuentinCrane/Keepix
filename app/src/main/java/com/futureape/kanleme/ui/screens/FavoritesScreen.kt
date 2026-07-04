@@ -1,9 +1,7 @@
 package com.futureape.kanleme.ui.screens
 
-import android.content.ContentUris
 import android.graphics.Bitmap
 import android.net.Uri
-import android.provider.MediaStore
 import android.util.Size
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -42,8 +40,11 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
@@ -66,11 +67,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -80,24 +83,33 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
+import com.futureape.kanleme.data.settings.TodayInHistoryEntryMode
 import com.futureape.kanleme.R
-import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.photoDisplayAspectRatio
+import com.futureape.kanleme.ui.util.photoImageRequest
+import com.futureape.kanleme.ui.util.photoThumbnailImageRequest
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
 import com.futureape.kanleme.ui.util.openVideoInSystemGallery
 import com.futureape.kanleme.ui.util.shareMedia
+import com.futureape.kanleme.ui.util.videoContentUri
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.futureape.kanleme.ui.i18n.Text
@@ -106,15 +118,19 @@ import com.futureape.kanleme.ui.i18n.Text
 fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> Unit) {
     val photos by viewModel.favoritePhotos.collectAsStateWithLifecycle()
     val videos by viewModel.favoriteVideos.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val dayMemoryPhotos by viewModel.photoDayMemoryWindow.collectAsStateWithLifecycle()
     var previewPhoto by remember { mutableStateOf<PhotoEntity?>(null) }
     var photoColumnCount by rememberSaveable { mutableStateOf(3) }
     var selectedType by rememberSaveable { mutableStateOf("photo") }
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().padding(top = 36.dp, start = 18.dp, end = 18.dp)) {
-            ScreenHeader("我的收藏", "照片 " + photos.size + " 张 · 视频 " + videos.size + " 个", onBack)
+        ProfileDarkPage {
+            Column(Modifier.fillMaxSize().padding(top = 46.dp, start = 22.dp, end = 22.dp)) {
+                ProfilePageHeader("我的收藏", "照片 " + photos.size + " 张 · 视频 " + videos.size + " 个", onBack)
+                Spacer(Modifier.height(18.dp))
             if (photos.isEmpty() && videos.isEmpty()) {
-                EmptyState("暂无收藏", "在整理时下滑照片或点击视频收藏按钮，就会出现在这里。", "去同步媒体库", { viewModel.refreshLibrary() })
+                ProfileEmptyState("暂无收藏", "在整理时下滑照片或点击视频收藏按钮，就会出现在这里。", "去同步媒体库", { viewModel.refreshLibrary() })
             } else {
                 FavoriteMediaSelector(
                     selectedType = selectedType,
@@ -140,9 +156,19 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: ()
                 ) { type ->
                     if (type == "video") {
                         if (videos.isEmpty()) {
-                            EmptyState("暂无收藏视频", "收藏的视频会单独显示在这里。", "刷新媒体库", { viewModel.refreshLibrary() }, modifier = Modifier.fillMaxSize())
+                            ProfileEmptyState(
+                                "暂无收藏视频",
+                                "收藏的视频会单独显示在这里。",
+                                "刷新媒体库",
+                                { viewModel.refreshLibrary() },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         } else {
-                            FavoriteVideoGrid(videos, modifier = Modifier.fillMaxSize())
+                            Column(Modifier.fillMaxSize()) {
+                                FavoriteVideosHeader(videoCount = videos.size)
+                                Spacer(Modifier.height(12.dp))
+                                FavoriteVideoGrid(videos, modifier = Modifier.weight(1f))
+                            }
                         }
                     } else if (photos.isNotEmpty()) {
                         Column(Modifier.fillMaxSize()) {
@@ -160,17 +186,31 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: ()
                             )
                         }
                     } else {
-                        EmptyState("暂无收藏照片", "收藏的照片会单独显示在这里。", "刷新媒体库", { viewModel.refreshLibrary() }, modifier = Modifier.fillMaxSize())
+                        ProfileEmptyState(
+                            "暂无收藏照片",
+                            "收藏的照片会单独显示在这里。",
+                            "刷新媒体库",
+                            { viewModel.refreshLibrary() },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
+            }
             }
         }
 
         previewPhoto?.let { photo ->
             FavoritePhotoPreviewOverlay(
                 photo = photo,
+                todayEntryMode = settings.todayInHistoryEntryMode,
+                dayMemoryPhotos = dayMemoryPhotos,
                 onClose = { previewPhoto = null },
                 onToday = onToday,
+                onOpenDayMemory = { viewModel.loadPhotoDayMemoryWindow(it) },
+                onClearDayMemory = { viewModel.clearPhotoDayMemoryWindow() },
+                onDayMemoryDelete = { target -> viewModel.onPhotoAction(target, SwipeAction.Delete) },
+                onDayMemoryUndo = { viewModel.undoLastAction() },
+                onDayMemoryApply = { onToday() },
                 onDelete = {
                     viewModel.onPhotoAction(photo, SwipeAction.Delete)
                     previewPhoto = null
@@ -187,31 +227,35 @@ private fun FavoriteMediaSelector(
     videoCount: Int,
     onSelected: (String) -> Unit,
 ) {
+    ProfileSegmentedControl(
+        options = listOf("photo" to ("照片 " + photoCount), "video" to ("视频 " + videoCount)),
+        selectedValue = selectedType,
+        onSelected = onSelected,
+    )
+}
+
+@Composable
+private fun FavoriteVideosHeader(videoCount: Int) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(46.dp)
-            .clip(RoundedCornerShape(999.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        listOf("photo" to ("照片 " + photoCount), "video" to ("视频 " + videoCount)).forEach { (type, label) ->
-            val selected = selectedType == type
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(999.dp))
-                    .clickable { onSelected(type) },
-                shape = RoundedCornerShape(999.dp),
-                color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-            ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(label, style = MaterialTheme.typography.labelLarge)
-                }
-            }
+        Column(Modifier.weight(1f)) {
+            Text("收藏视频 " + videoCount + " 个", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(
+                "沉浸卡片 · 点击在相册查看",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.56f),
+            )
+        }
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = ProfileScreenAccent.copy(alpha = 0.16f),
+            contentColor = ProfileScreenAccent,
+            border = androidx.compose.foundation.BorderStroke(1.dp, ProfileScreenAccent.copy(alpha = 0.26f)),
+        ) {
+            Text("视频", modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -219,12 +263,12 @@ private fun FavoriteMediaSelector(
 @Composable
 private fun FavoriteVideoGrid(videos: List<VideoEntity>, modifier: Modifier = Modifier) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+        columns = GridCells.Adaptive(156.dp),
         modifier = modifier
             .fillMaxWidth(),
         contentPadding = PaddingValues(bottom = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         gridItems(videos, key = { it.mediaStoreId }) { video ->
             FavoriteVideoTile(video, Modifier.fillMaxWidth())
@@ -241,11 +285,7 @@ private fun FavoriteVideoTile(video: VideoEntity) {
 private fun FavoriteVideoTile(video: VideoEntity, modifier: Modifier) {
     val context = LocalContext.current
     val videoUri = remember(video.mediaStoreId, video.uri) {
-        if (video.mediaStoreId > 0L) {
-            ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, video.mediaStoreId)
-        } else {
-            Uri.parse(video.uri)
-        }
+        videoContentUri(video)
     }
     val thumbnail by produceState<Bitmap?>(initialValue = null, videoUri) {
         value = withContext(Dispatchers.IO) {
@@ -256,38 +296,81 @@ private fun FavoriteVideoTile(video: VideoEntity, modifier: Modifier) {
     }
     Box(
         modifier = modifier
-            .aspectRatio(0.78f)
             .favoriteTileEnter(video.id)
-            .clip(RoundedCornerShape(18.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
-            .clickable { openVideoInSystemGallery(context, video) },
+            .clip(RoundedCornerShape(22.dp))
+            .background(ProfileScreenSurface.copy(alpha = 0.92f))
+            .clickable { openVideoInSystemGallery(context, video) }
+            .padding(6.dp),
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(thumbnail ?: videoUri)
-                .memoryCacheKey(videoUri.toString())
-                .diskCacheKey(videoUri.toString())
-                .placeholderMemoryCacheKey(videoUri.toString())
-                .crossfade(false)
-                .build(),
-            contentDescription = video.displayName,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-        )
-        Surface(
-            modifier = Modifier.align(Alignment.TopStart).padding(7.dp),
-            shape = RoundedCornerShape(999.dp),
-            color = Color.Black.copy(alpha = 0.54f),
-            contentColor = Color.White,
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(0.82f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color.White.copy(alpha = 0.08f)),
             ) {
-                Icon(Icons.Rounded.PlayCircle, contentDescription = null, modifier = Modifier.height(14.dp), tint = Color.White)
-                Text(formatDuration(video.duration), color = Color.White, style = MaterialTheme.typography.labelSmall)
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(thumbnail ?: videoUri)
+                        .memoryCacheKey(videoUri.toString())
+                        .diskCacheKey(videoUri.toString())
+                        .placeholderMemoryCacheKey(videoUri.toString())
+                        .crossfade(false)
+                        .build(),
+                    contentDescription = video.displayName,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.46f)))))
+                Surface(
+                    modifier = Modifier.align(Alignment.TopStart).padding(7.dp),
+                    shape = RoundedCornerShape(999.dp),
+                    color = Color.Black.copy(alpha = 0.58f),
+                    contentColor = Color.White,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(Icons.Rounded.PlayCircle, contentDescription = null, modifier = Modifier.height(14.dp), tint = Color.White)
+                        Text(formatDuration(video.duration), color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+                Surface(
+                    modifier = Modifier.align(Alignment.Center),
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.42f),
+                    contentColor = Color.White,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+                ) {
+                    Icon(Icons.Rounded.PlayCircle, contentDescription = null, modifier = Modifier.padding(12.dp).size(28.dp))
+                }
+            }
+            Column(
+                modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    video.displayName,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    video.folderName + " · " + formatSize(video.size),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.54f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -305,11 +388,11 @@ private fun FavoritePhotosHeader(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text("收藏照片 " + photoCount + " 张", style = MaterialTheme.typography.titleMedium)
+            Text("收藏照片 " + photoCount + " 张", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
             Text(
                 "照片墙 · " + columnCount + " 列",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color.White.copy(alpha = 0.56f),
             )
         }
         FavoriteColumnSelector(
@@ -324,34 +407,12 @@ private fun FavoriteColumnSelector(
     selectedColumnCount: Int,
     onSelected: (Int) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .width(136.dp)
-            .height(44.dp)
-            .clip(RoundedCornerShape(999.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        listOf(2, 3).forEach { count ->
-            val selected = selectedColumnCount == count
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(999.dp))
-                    .clickable { onSelected(count) },
-                shape = RoundedCornerShape(999.dp),
-                color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-            ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(count.toString() + " 列", style = MaterialTheme.typography.labelLarge)
-                }
-            }
-        }
-    }
+    ProfileSegmentedControl(
+        options = listOf(2 to "2 列", 3 to "3 列").map { it.first.toString() to it.second },
+        selectedValue = selectedColumnCount.toString(),
+        onSelected = { onSelected(it.toIntOrNull() ?: selectedColumnCount) },
+        modifier = Modifier.width(136.dp),
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -362,8 +423,11 @@ private fun FavoritePhotoMasonryGrid(
     modifier: Modifier = Modifier,
     onPhotoClick: (PhotoEntity) -> Unit,
 ) {
+    val gridState = rememberLazyStaggeredGridState()
+    FavoritePhotoPrefetch(photos = photos, gridState = gridState)
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Fixed(columnCount.coerceIn(2, 3)),
+        state = gridState,
         modifier = modifier
             .fillMaxWidth(),
         contentPadding = PaddingValues(bottom = 18.dp),
@@ -392,23 +456,57 @@ private fun FavoritePhotoTile(
             .aspectRatio(favoriteOriginalAspectRatio(photo))
             .favoriteTileEnter(photo.id)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f))
+            .background(Color.White.copy(alpha = 0.08f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(Uri.parse(photo.uri))
-                .memoryCacheKey(photo.uri + "#favorite_photo_tile")
-                .diskCacheKey(photo.uri)
-                .placeholderMemoryCacheKey(photo.uri + "#favorite_photo_tile")
-                .size(900, 900)
-                .crossfade(false)
-                .build(),
+            model = photoThumbnailImageRequest(context, photo),
             contentDescription = photo.displayName,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FavoritePhotoPrefetch(
+    photos: List<PhotoEntity>,
+    gridState: LazyStaggeredGridState,
+) {
+    val context = LocalContext.current
+    LaunchedEffect(photos) {
+        photos
+            .take(42)
+            .chunked(12)
+            .forEach { chunk ->
+                chunk.forEach { photo ->
+                    context.imageLoader.execute(photoThumbnailImageRequest(context, photo))
+                }
+                delay(45)
+            }
+    }
+    LaunchedEffect(photos, gridState) {
+        snapshotFlow {
+            val visible = gridState.layoutInfo.visibleItemsInfo
+            val first = visible.minOfOrNull { it.index } ?: 0
+            val last = visible.maxOfOrNull { it.index } ?: -1
+            first to last
+        }
+            .distinctUntilChanged()
+            .collectLatest { (firstIndex, lastIndex) ->
+                if (lastIndex < 0 || photos.isEmpty()) return@collectLatest
+                delay(80)
+                val start = (firstIndex - 12).coerceAtLeast(0).coerceAtMost(photos.size)
+                val end = (lastIndex + 48).coerceAtLeast(start).coerceAtMost(photos.size)
+                photos.subList(start, end).chunked(8).forEach { chunk ->
+                    chunk.forEach { photo ->
+                        context.imageLoader.execute(photoThumbnailImageRequest(context, photo))
+                    }
+                    delay(24)
+                }
+            }
     }
 }
 
@@ -440,8 +538,15 @@ private fun Modifier.favoriteTileEnter(key: Any): Modifier {
 @Composable
 private fun FavoritePhotoPreviewOverlay(
     photo: PhotoEntity,
+    todayEntryMode: TodayInHistoryEntryMode,
+    dayMemoryPhotos: List<PhotoEntity>,
     onClose: () -> Unit,
     onToday: () -> Unit,
+    onOpenDayMemory: (PhotoEntity) -> Unit,
+    onClearDayMemory: () -> Unit,
+    onDayMemoryDelete: (PhotoEntity) -> Unit,
+    onDayMemoryUndo: () -> Unit,
+    onDayMemoryApply: (String) -> Unit,
     onDelete: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -449,6 +554,12 @@ private fun FavoritePhotoPreviewOverlay(
     val canPlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
     var motionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
     var motionLoading by remember(photo.id) { mutableStateOf(false) }
+    var showDayMemory by remember(photo.id) { mutableStateOf(false) }
+
+    fun closeDayMemory() {
+        showDayMemory = false
+        onClearDayMemory()
+    }
 
     fun playMotion() {
         if (!canPlayMotion || motionLoading) return
@@ -462,7 +573,8 @@ private fun FavoritePhotoPreviewOverlay(
         }
     }
 
-    BackHandler(onBack = onClose)
+    BackHandler(enabled = showDayMemory, onBack = ::closeDayMemory)
+    BackHandler(enabled = !showDayMemory, onBack = onClose)
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -530,10 +642,36 @@ private fun FavoritePhotoPreviewOverlay(
                 FavoritePreviewAction("分享", Icons.Rounded.Share) {
                     shareMedia(context, Uri.parse(photo.uri), photo.mimeType, photo.displayName)
                 }
-                FavoritePreviewAction("那年今日", Icons.Rounded.CalendarToday, onToday)
+                FavoritePreviewAction("那年今日", Icons.Rounded.CalendarToday) {
+                    if (todayEntryMode == TodayInHistoryEntryMode.PINCH_MEMORY) {
+                        onOpenDayMemory(photo)
+                        showDayMemory = true
+                    } else {
+                        onToday()
+                    }
+                }
                 FavoritePreviewAction("待删", Icons.Rounded.Delete, onDelete)
             }
         }
+        KeepixDayMemoryOverlay(
+            visible = showDayMemory,
+            currentPhoto = photo,
+            photos = dayMemoryPhotos.ifEmpty { listOf(photo) },
+            entryProgress = 1f,
+            entryScale = 1f,
+            entryActive = false,
+            onDismiss = ::closeDayMemory,
+            onOpen = { target ->
+                closeDayMemory()
+                openPhotoInSystemGallery(context, target)
+            },
+            onDelete = onDayMemoryDelete,
+            onUndo = onDayMemoryUndo,
+            onApply = { mode ->
+                closeDayMemory()
+                onDayMemoryApply(mode)
+            },
+        )
     }
 }
 
@@ -596,7 +734,7 @@ private fun ZoomableFavoritePhoto(
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
-            model = Uri.parse(photo.uri),
+            model = photoImageRequest(LocalContext.current, photo, "favorite_preview", 1440, 1920),
             contentDescription = photo.displayName,
             modifier = Modifier
                 .fillMaxSize()

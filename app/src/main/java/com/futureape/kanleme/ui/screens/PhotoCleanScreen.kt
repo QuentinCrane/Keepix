@@ -1,6 +1,5 @@
 package com.futureape.kanleme.ui.screens
 
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedVisibility
@@ -96,7 +95,6 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.imageLoader
-import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.R
@@ -105,6 +103,7 @@ import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.photoImageRequest
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.util.sharePhoto
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
@@ -229,24 +228,24 @@ fun PhotoCleanScreen(
         guideTargets = guideTargets + (target to rect)
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(deck.isEmpty(), deckPreparing, dashboard.photoCount, dashboard.processedPhotoCount, scope, batchSummary, batchFinishing) {
         // Do not reload a non-empty deck when returning from the viewer.
-        // In random mode, reloading would rebuild the deck and make the user lose
-        // the first random sequence they were already browsing.
-        if (deck.isEmpty() && !deckPreparing) viewModel.loadPhotoDeck(scope)
-    }
-    LaunchedEffect(deck.isEmpty(), deckPreparing, dashboard.photoCount, dashboard.processedPhotoCount, scope) {
-        if (deck.isEmpty() && !deckPreparing && dashboard.processedPhotoCount < dashboard.photoCount) viewModel.loadPhotoDeck(scope)
+        // Also avoid preparing a new deck behind the batch summary overlay.
+        if (
+            deck.isEmpty() &&
+            !deckPreparing &&
+            batchSummary == null &&
+            !batchFinishing &&
+            dashboard.processedPhotoCount < dashboard.photoCount
+        ) {
+            viewModel.loadPhotoDeck(scope)
+        }
     }
     LaunchedEffect(deck, settings.photoGuideShown) {
         showGuide = false
         deck.take(3).forEach { photo ->
             context.imageLoader.enqueue(
-                ImageRequest.Builder(context)
-                    .data(Uri.parse(photo.uri))
-                    .diskCacheKey(photo.uri)
-                    .size(1280, 1280)
-                    .build()
+                photoImageRequest(context, photo, "clean_prefetch", 1280, 1280)
             )
         }
     }

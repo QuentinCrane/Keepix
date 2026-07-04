@@ -169,6 +169,7 @@ object UiTextLocalizer {
         "回收站" to "Trash",
         "我的收藏" to "Favorites",
         "当年今日" to "On This Day",
+        "那年今日" to "On This Day",
         "今日整理" to "Today",
         "今日整理贴纸" to "Today sticker",
         "今日总计" to "Today total",

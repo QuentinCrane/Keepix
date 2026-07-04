@@ -84,16 +84,22 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil.imageLoader
+import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
+import com.futureape.kanleme.data.repository.SwipeAction
+import com.futureape.kanleme.data.settings.TodayInHistoryEntryMode
 import com.futureape.kanleme.R
-import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.openMediaInSystemGallery
+import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
 import com.futureape.kanleme.ui.util.shareMedia
+import com.futureape.kanleme.ui.util.trashImageRequest
+import com.futureape.kanleme.ui.util.trashThumbnailImageRequest
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import kotlinx.coroutines.delay
 import kotlin.math.ceil
 import com.futureape.kanleme.ui.i18n.Text
 
@@ -101,6 +107,8 @@ import com.futureape.kanleme.ui.i18n.Text
 @Composable
 fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> Unit) {
     val trashItems by viewModel.trashItems.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val dayMemoryPhotos by viewModel.photoDayMemoryWindow.collectAsStateWithLifecycle()
     var previewItem by remember { mutableStateOf<TrashItemEntity?>(null) }
     var selectedMediaType by remember { mutableStateOf("photo") }
     val context = LocalContext.current
@@ -131,10 +139,17 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
     val visibleTrashItems = if (selectedMediaType == "video") videoTrashItems else photoTrashItems
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-            ScreenHeader(if (selectedMediaType == "video") "视频回收站" else "照片回收站", "照片和视频分开处理，30 天安全期内可恢复", onBack)
+        ProfileDarkPage {
+            Column(Modifier.fillMaxSize().padding(top = 46.dp)) {
+                ProfilePageHeader(
+                    title = if (selectedMediaType == "video") "视频回收站" else "照片回收站",
+                    subtitle = "照片和视频分开处理，30 天安全期内可恢复",
+                    onBack = onBack,
+                    modifier = Modifier.padding(horizontal = 22.dp),
+                )
+                Spacer(Modifier.height(18.dp))
             if (trashItems.isEmpty()) {
-                EmptyState("回收站为空", "上滑待删或删除视频后，会先进入这里；你可以恢复或永久删除。", "返回整理", onBack, modifier = Modifier.padding(18.dp))
+                ProfileEmptyState("回收站为空", "上滑待删或删除视频后，会先进入这里；你可以恢复或永久删除。", "返回整理", onBack, modifier = Modifier.padding(horizontal = 22.dp))
             } else {
                 TrashGalleryHeader(
                     items = trashItems,
@@ -158,18 +173,19 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                 ) { type ->
                     val typedItems = if (type == "video") videoTrashItems else photoTrashItems
                     if (typedItems.isEmpty()) {
-                        EmptyState(
-                            title = if (type == "video") "视频回收站为空" else "照片回收站为空",
-                            message = if (type == "video") "待删视频会单独显示在这里，不会和照片混在一起。" else "待删照片会单独显示在这里，不会和视频混在一起。",
-                            actionText = "切换类别",
-                            onAction = { selectedMediaType = if (type == "video") "photo" else "video" },
+                        ProfileEmptyState(
+                            if (type == "video") "视频回收站为空" else "照片回收站为空",
+                            if (type == "video") "待删视频会单独显示在这里，不会和照片混在一起。" else "待删照片会单独显示在这里，不会和视频混在一起。",
+                            "切换类别",
+                            { selectedMediaType = if (type == "video") "photo" else "video" },
                             modifier = Modifier.fillMaxSize().padding(18.dp),
                         )
                     } else {
+                        TrashThumbnailPrefetch(items = typedItems)
                         LazyVerticalStaggeredGrid(
                             columns = StaggeredGridCells.Adaptive(118.dp),
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 104.dp),
+                            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 14.dp, bottom = 104.dp),
                             horizontalArrangement = Arrangement.spacedBy(7.dp),
                             verticalItemSpacing = 7.dp,
                         ) {
@@ -182,6 +198,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                         }
                     }
                 }
+            }
             }
         }
 
@@ -205,8 +222,15 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
             TrashPreviewOverlay(
                 items = visibleTrashItems,
                 initialItem = item,
+                todayEntryMode = settings.todayInHistoryEntryMode,
+                dayMemoryPhotos = dayMemoryPhotos,
                 onClose = { previewItem = null },
                 onToday = onToday,
+                onOpenDayMemory = { viewModel.loadPhotoDayMemoryWindow(it) },
+                onClearDayMemory = { viewModel.clearPhotoDayMemoryWindow() },
+                onDayMemoryDelete = { target -> viewModel.onPhotoAction(target, SwipeAction.Delete) },
+                onDayMemoryUndo = { viewModel.undoLastAction() },
+                onDayMemoryApply = { onToday() },
                 onRestore = { target ->
                     viewModel.restoreTrash(target.id)
                     previewItem = null
@@ -231,20 +255,20 @@ private fun TrashGalleryHeader(
     val selectedCount = if (selectedMediaType == "video") videoCount else photoCount
     val selectedSize = items.filter { if (selectedMediaType == "video") it.mediaType == "video" else it.mediaType != "video" }.sumOf { it.size }
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp),
         shape = RoundedCornerShape(30.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+        color = ProfileScreenSurface.copy(alpha = 0.92f),
+        contentColor = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, ProfileScreenCardBorder),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (selectedMediaType == "video") "视频安全回收" else "照片安全回收", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    Text(selectedCount.toString() + " 个项目等待确认", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-                    Text("预计可释放 " + formatSize(selectedSize), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (selectedMediaType == "video") "视频安全回收" else "照片安全回收", style = MaterialTheme.typography.labelLarge, color = ProfileScreenAccent, fontWeight = FontWeight.Bold)
+                    Text(selectedCount.toString() + " 个项目等待确认", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Black)
+                    Text("预计可释放 " + formatSize(selectedSize), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.58f))
                 }
-                Surface(shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), contentColor = MaterialTheme.colorScheme.primary) {
+                Surface(shape = RoundedCornerShape(999.dp), color = ProfileScreenAccent.copy(alpha = 0.16f), contentColor = ProfileScreenAccent) {
                     Text("30 天内可恢复", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
                 }
             }
@@ -261,9 +285,9 @@ private fun TrashFilterPill(text: String, selected: Boolean = false, onClick: ()
     Surface(
         modifier = Modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(999.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.13f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.46f),
-        contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
+        color = if (selected) ProfileScreenAccent else Color.White.copy(alpha = 0.08f),
+        contentColor = if (selected) Color.White else Color.White.copy(alpha = 0.62f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) ProfileScreenAccent.copy(alpha = 0.32f) else Color.White.copy(alpha = 0.10f)),
     ) {
         Text(text, modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp), style = MaterialTheme.typography.labelLarge)
     }
@@ -278,17 +302,11 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit) {
             .aspectRatio(trashWallAspectRatio(item))
             .trashTileEnter(item.id)
             .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.08f))
             .clickable(onClick = onPreview),
     ) {
         AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(Uri.parse(item.uri))
-                .memoryCacheKey(item.uri + "#trash_tile")
-                .diskCacheKey(item.uri)
-                .placeholderMemoryCacheKey(item.uri + "#trash_tile")
-                .size(640, 840)
-                .crossfade(false)
-                .build(),
+            model = trashThumbnailImageRequest(context, item),
             contentDescription = item.displayName,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
@@ -313,6 +331,22 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit) {
                 .padding(4.dp)
                 .size(16.dp),
         )
+    }
+}
+
+@Composable
+private fun TrashThumbnailPrefetch(items: List<TrashItemEntity>) {
+    val context = LocalContext.current
+    LaunchedEffect(items) {
+        items
+            .take(48)
+            .chunked(12)
+            .forEach { chunk ->
+                chunk.forEach { item ->
+                    context.imageLoader.execute(trashThumbnailImageRequest(context, item))
+                }
+                delay(45)
+            }
     }
 }
 
@@ -408,17 +442,32 @@ private fun TrashBottomAction(
 private fun TrashPreviewOverlay(
     items: List<TrashItemEntity>,
     initialItem: TrashItemEntity,
+    todayEntryMode: TodayInHistoryEntryMode,
+    dayMemoryPhotos: List<PhotoEntity>,
     onClose: () -> Unit,
     onToday: () -> Unit,
+    onOpenDayMemory: (PhotoEntity) -> Unit,
+    onClearDayMemory: () -> Unit,
+    onDayMemoryDelete: (PhotoEntity) -> Unit,
+    onDayMemoryUndo: () -> Unit,
+    onDayMemoryApply: (String) -> Unit,
     onRestore: (TrashItemEntity) -> Unit,
     onDelete: (TrashItemEntity) -> Unit,
 ) {
-    BackHandler(onBack = onClose)
     if (items.isEmpty()) return
     val context = LocalContext.current
     val startIndex = items.indexOfFirst { it.id == initialItem.id }.takeIf { it >= 0 } ?: 0
     val pagerState = rememberPagerState(initialPage = startIndex) { items.size }
     val currentItem = items.getOrNull(pagerState.currentPage) ?: initialItem
+    var dayMemoryAnchor by remember(initialItem.id) { mutableStateOf<PhotoEntity?>(null) }
+
+    fun closeDayMemory() {
+        dayMemoryAnchor = null
+        onClearDayMemory()
+    }
+
+    BackHandler(enabled = dayMemoryAnchor != null, onBack = ::closeDayMemory)
+    BackHandler(enabled = dayMemoryAnchor == null, onBack = onClose)
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(
@@ -509,7 +558,15 @@ private fun TrashPreviewOverlay(
                     icon = Icons.Rounded.CalendarToday,
                     color = Color.White,
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = onToday,
+                    onClick = {
+                        if (todayEntryMode == TodayInHistoryEntryMode.PINCH_MEMORY && currentItem.mediaType != "video") {
+                            val anchor = currentItem.toMemoryPhoto()
+                            dayMemoryAnchor = anchor
+                            onOpenDayMemory(anchor)
+                        } else {
+                            onToday()
+                        }
+                    },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     TrashPreviewWideAction(
@@ -537,11 +594,34 @@ private fun TrashPreviewOverlay(
                 }
             }
         }
+
+        dayMemoryAnchor?.let { anchor ->
+            KeepixDayMemoryOverlay(
+                visible = true,
+                currentPhoto = anchor,
+                photos = dayMemoryPhotos.ifEmpty { listOf(anchor) },
+                entryProgress = 1f,
+                entryScale = 1f,
+                entryActive = false,
+                onDismiss = ::closeDayMemory,
+                onOpen = { target ->
+                    closeDayMemory()
+                    openPhotoInSystemGallery(context, target)
+                },
+                onDelete = onDayMemoryDelete,
+                onUndo = onDayMemoryUndo,
+                onApply = { mode ->
+                    closeDayMemory()
+                    onDayMemoryApply(mode)
+                },
+            )
+        }
     }
 }
 
 @Composable
 private fun ZoomableTrashMedia(item: TrashItemEntity, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     var scale by remember(item.id) { mutableStateOf(1f) }
     var offset by remember(item.id) { mutableStateOf(Offset.Zero) }
     var containerSize by remember(item.id) { mutableStateOf(IntSize.Zero) }
@@ -591,7 +671,7 @@ private fun ZoomableTrashMedia(item: TrashItemEntity, modifier: Modifier = Modif
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
-            model = Uri.parse(item.uri),
+            model = trashImageRequest(context, item, "trash_preview", 1440, 1920),
             contentDescription = item.displayName,
             modifier = Modifier.fillMaxSize().graphicsLayer {
                 scaleX = scale
@@ -611,6 +691,23 @@ private fun trashPreviewSubtitle(item: TrashItemEntity): String {
     return listOfNotNull(item.displayName, dimensionPart, durationPart, sizePart)
         .joinToString("  ·  ")
 }
+
+private fun TrashItemEntity.toMemoryPhoto(): PhotoEntity = PhotoEntity(
+    id = mediaId,
+    mediaStoreId = mediaStoreId,
+    uri = uri,
+    displayName = displayName,
+    size = size,
+    dateTaken = dateTaken,
+    dateAdded = dateTaken / 1000L,
+    dateModified = dateTaken / 1000L,
+    folderPath = folderPath,
+    folderName = folderName,
+    mimeType = mimeType,
+    width = width,
+    height = height,
+    isGif = mimeType.contains("gif", ignoreCase = true),
+)
 
 @Composable
 private fun TrashPreviewWideAction(

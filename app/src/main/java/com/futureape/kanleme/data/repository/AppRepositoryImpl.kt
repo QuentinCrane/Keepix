@@ -28,6 +28,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.Random
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -266,24 +267,38 @@ class AppRepositoryImpl @Inject constructor(
         val range = rangeFor(scope.dateMode)
         val requiresPostDateFilter = scope.dateMode.startsWith("multiym:")
         val targetLimit = scope.batchSize.takeIf { it > 0 } ?: settings.photoBatchSize
-        val queryLimit = if (settings.excludedFolderPaths.isEmpty()) {
-            if (requiresPostDateFilter) 5000 else (targetLimit * 6).coerceAtLeast(120)
+        val randomMode = scope.sortOrder == "random"
+        val randomQueryLimit = if (targetLimit <= 24) {
+            (targetLimit * 120).coerceIn(240, 1200)
         } else {
-            20000
+            (targetLimit * 18).coerceIn(4000, 16000)
         }
-        photoDao.nextFilteredBatch(
+        val queryLimit = if (settings.excludedFolderPaths.isEmpty()) {
+            when {
+                randomMode -> randomQueryLimit
+                requiresPostDateFilter -> 5000
+                else -> (targetLimit * 6).coerceAtLeast(120)
+            }
+        } else {
+            if (randomMode) (randomQueryLimit * 2).coerceAtMost(24000) else 20000
+        }
+        val photos = photoDao.nextFilteredBatch(
             folderPath = scope.folderPaths.firstOrNull(),
             startMillis = range?.first,
             endMillis = range?.second,
             mediaType = scope.mediaType,
-            randomOrder = scope.sortOrder == "random",
+            randomOrder = randomMode,
             randomSeed = scope.randomSeed,
             todayOnly = scope.todayInHistory,
             limit = queryLimit,
         )
             .filter { dateModeMatches(it.dateTaken, scope.dateMode) }
             .filterNot { isExcludedFolder(it.folderPath, settings.excludedFolderPaths) }
-            .take(targetLimit)
+        if (randomMode) {
+            spreadRandomPhotosForCleaning(photos, scope.randomSeed, targetLimit)
+        } else {
+            photos.take(targetLimit)
+        }
     }
 
     override suspend fun loadVideoDeck(scope: CleaningScope): List<VideoEntity> = withContext(Dispatchers.IO) {
@@ -296,7 +311,7 @@ class AppRepositoryImpl @Inject constructor(
         } else {
             5000
         }
-        videoDao.nextFilteredBatch(
+        val videos = videoDao.nextFilteredBatch(
             folderPath = scope.folderPaths.firstOrNull(),
             startMillis = range?.first,
             endMillis = range?.second,
@@ -306,7 +321,146 @@ class AppRepositoryImpl @Inject constructor(
         )
             .filter { dateModeMatches(it.dateTaken, scope.dateMode) }
             .filterNot { isExcludedFolder(it.folderPath, settings.excludedFolderPaths) }
-            .take(targetLimit)
+        if (scope.sortOrder == "random") {
+            spreadRandomVideosByFolder(videos, scope.randomSeed, targetLimit)
+        } else {
+            videos.take(targetLimit)
+        }
+    }
+
+    private data class ShufflePhotoBucket(
+        val dayKey: String,
+        val monthKey: String,
+        val folderKey: String,
+        val photos: MutableList<PhotoEntity>,
+    )
+
+    private data class ShufflePhotoKey(
+        val dayKey: String,
+        val monthKey: String,
+        val folderKey: String,
+    )
+
+    private data class ShuffleVideoFolderBucket(
+        val folderKey: String,
+        val videos: MutableList<VideoEntity>,
+    )
+
+    private fun spreadRandomPhotosForCleaning(
+        photos: List<PhotoEntity>,
+        randomSeed: Long,
+        limit: Int,
+    ): List<PhotoEntity> {
+        if (photos.size <= 2 || limit <= 0) return photos.take(limit.coerceAtLeast(0))
+        val random = Random(randomSeed xor (photos.size.toLong() * 1_103_515_245L))
+        val buckets = photos
+            .groupBy { photoShuffleKey(it) }
+            .map { (key, bucketPhotos) ->
+                val shuffled = bucketPhotos.toMutableList()
+                java.util.Collections.shuffle(shuffled, random)
+                ShufflePhotoBucket(
+                    dayKey = key.dayKey,
+                    monthKey = key.monthKey,
+                    folderKey = key.folderKey,
+                    photos = shuffled,
+                )
+            }
+            .toMutableList()
+        java.util.Collections.shuffle(buckets, random)
+
+        val result = ArrayList<PhotoEntity>(limit.coerceAtMost(photos.size))
+        val recentDays = ArrayDeque<String>()
+        val recentMonths = ArrayDeque<String>()
+        val recentFolders = ArrayDeque<String>()
+        while (result.size < limit && buckets.any { it.photos.isNotEmpty() }) {
+            val available = buckets.filter { it.photos.isNotEmpty() }
+            val differentDay = available.filter { it.dayKey !in recentDays }
+            val differentMonth = differentDay.filter { it.monthKey !in recentMonths }
+            val differentFolder = differentMonth.filter { it.folderKey !in recentFolders }
+            val candidateBuckets = when {
+                differentFolder.isNotEmpty() -> differentFolder
+                differentMonth.isNotEmpty() -> differentMonth
+                differentDay.isNotEmpty() -> differentDay
+                else -> available
+            }
+            val selectedBucket = candidateBuckets.maxByOrNull { bucket ->
+                bucket.photos.size.coerceAtMost(5) * 8 + random.nextInt(1024)
+            } ?: break
+            val next = selectedBucket.photos.removeAt(0)
+            result += next
+            recentDays.addLast(selectedBucket.dayKey)
+            recentMonths.addLast(selectedBucket.monthKey)
+            recentFolders.addLast(selectedBucket.folderKey)
+            while (recentDays.size > 6) recentDays.removeFirst()
+            while (recentMonths.size > 3) recentMonths.removeFirst()
+            while (recentFolders.size > 4) recentFolders.removeFirst()
+        }
+        return result
+    }
+
+    private fun photoShuffleKey(photo: PhotoEntity): ShufflePhotoKey {
+        val folderKey = photoShuffleFolderKey(photo)
+        if (photo.dateTaken <= 0L) {
+            val group = Math.floorMod(photo.mediaStoreId, 31L).toString().padStart(2, '0')
+            return ShufflePhotoKey(dayKey = "unknown-" + group, monthKey = "unknown", folderKey = folderKey)
+        }
+        val cal = Calendar.getInstance().apply { timeInMillis = photo.dateTaken }
+        val year = cal.get(Calendar.YEAR).toString()
+        val month = (cal.get(Calendar.MONTH) + 1).toString().padStart(2, '0')
+        val day = cal.get(Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
+        val monthKey = year + "-" + month
+        return ShufflePhotoKey(dayKey = monthKey + "-" + day, monthKey = monthKey, folderKey = folderKey)
+    }
+
+    private fun photoShuffleFolderKey(photo: PhotoEntity): String {
+        val normalized = photo.folderPath.trim().trim('/').lowercase(Locale.ROOT)
+        return normalized.ifBlank {
+            photo.folderName.trim().lowercase(Locale.ROOT).ifBlank {
+                "unknown-" + Math.floorMod(photo.mediaStoreId, 17L)
+            }
+        }
+    }
+
+    private fun spreadRandomVideosByFolder(
+        videos: List<VideoEntity>,
+        randomSeed: Long,
+        limit: Int,
+    ): List<VideoEntity> {
+        if (videos.size <= 2 || limit <= 0) return videos.take(limit.coerceAtLeast(0))
+        val random = Random(randomSeed xor (videos.size.toLong() * 2_654_435_761L))
+        val buckets = videos
+            .groupBy { videoShuffleFolderKey(it) }
+            .map { (folderKey, folderVideos) ->
+                val shuffled = folderVideos.toMutableList()
+                java.util.Collections.shuffle(shuffled, random)
+                ShuffleVideoFolderBucket(folderKey = folderKey, videos = shuffled)
+            }
+            .toMutableList()
+        java.util.Collections.shuffle(buckets, random)
+
+        val result = ArrayList<VideoEntity>(limit.coerceAtMost(videos.size))
+        val recentFolders = ArrayDeque<String>()
+        while (result.size < limit && buckets.any { it.videos.isNotEmpty() }) {
+            val available = buckets.filter { it.videos.isNotEmpty() }
+            val lessRecent = available.filter { it.folderKey !in recentFolders }
+            val candidateBuckets = lessRecent.ifEmpty { available }
+            val selectedBucket = candidateBuckets.maxByOrNull { bucket ->
+                bucket.videos.size * 10 + random.nextInt(512)
+            } ?: break
+            result += selectedBucket.videos.removeAt(0)
+            recentFolders.addLast(selectedBucket.folderKey)
+            while (recentFolders.size > 3) recentFolders.removeFirst()
+        }
+        return result
+    }
+
+    private fun videoShuffleFolderKey(video: VideoEntity): String {
+        val normalized = video.folderPath.trim().trim('/').lowercase(Locale.ROOT)
+        return normalized.ifBlank {
+            video.folderName.trim().lowercase(Locale.ROOT).ifBlank {
+                "unknown-" + Math.floorMod(video.mediaStoreId, 17L)
+            }
+        }
     }
 
     override suspend fun loadPhotoMemoryWindow(

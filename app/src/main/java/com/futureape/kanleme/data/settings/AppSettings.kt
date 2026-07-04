@@ -24,6 +24,7 @@ data class AppSettings(
     val favoriteHapticLevel: HapticLevel = HapticLevel.MEDIUM,
     val undoHapticLevel: HapticLevel = HapticLevel.MEDIUM,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val todayInHistoryEntryMode: TodayInHistoryEntryMode = TodayInHistoryEntryMode.MEMORY_PAGE,
     val accentColor: Long = 0xFFC7ECFE,
     val folderDisplay: FolderDisplayMode = FolderDisplayMode.SINGLE_LINE,
     val immersiveBackground: Boolean = true,
@@ -95,6 +96,11 @@ enum class ThemeMode(@StringRes val labelRes: Int) {
     SYSTEM(R.string.theme_mode_system),
     LIGHT(R.string.theme_mode_light),
     DARK(R.string.theme_mode_dark),
+}
+
+enum class TodayInHistoryEntryMode {
+    MEMORY_PAGE,
+    PINCH_MEMORY,
 }
 
 enum class FolderDisplayMode(@StringRes val labelRes: Int) {

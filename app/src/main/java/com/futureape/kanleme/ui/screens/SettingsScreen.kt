@@ -85,6 +85,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -103,6 +104,7 @@ import com.futureape.kanleme.data.settings.HapticLevel
 import com.futureape.kanleme.data.settings.PhotoCleanMode
 import com.futureape.kanleme.data.settings.SwipeSensitivity
 import com.futureape.kanleme.data.settings.ThemeMode
+import com.futureape.kanleme.data.settings.TodayInHistoryEntryMode
 import com.futureape.kanleme.data.settings.VideoDisplayMode
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveCenter
@@ -361,6 +363,7 @@ private fun SettingsPageContent(
                     { SettingsSegmentedRow(Icons.Rounded.Image, "照片类型", settingsPhotoTypeLabel(settings.photoMediaType), settingsPhotoTypeOptions(), settings.photoMediaType, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoTypeFilter(it) }) },
                     { SettingsSegmentedRow(Icons.Rounded.Tune, "排序", settingsSortLabel(settings.photoSortOrder), settingsSortOptions(), settings.photoSortOrder, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoSortOrder(it) }) },
                     { SettingsStepperRow(Icons.Rounded.Layers, "每组数量", settings.photoBatchSize.toString() + " 张", color = Color(0xFF86A7FF), onDecrease = { onTick(); viewModel.setPhotoBatchSize(settings.photoBatchSize - 10) }, onIncrease = { onTick(); viewModel.setPhotoBatchSize(settings.photoBatchSize + 10) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.CalendarToday, "那年今日入口", todayEntryModeLabel(settings.todayInHistoryEntryMode), todayEntryModeOptions(), settings.todayInHistoryEntryMode.name, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setTodayInHistoryEntryMode(TodayInHistoryEntryMode.valueOf(it)) }) },
                 ))
                 SectionTitle("视频默认")
                 SettingsGroup(listOf<@Composable () -> Unit>(
@@ -512,12 +515,22 @@ private fun cleaningDisplaySummary(settings: AppSettings): String {
 
 private fun settingsSortLabel(order: String): String = if (order == "newest") "最新在前" else "随机"
 
+private fun todayEntryModeLabel(mode: TodayInHistoryEntryMode): String = when (mode) {
+    TodayInHistoryEntryMode.MEMORY_PAGE -> "打开回忆页"
+    TodayInHistoryEntryMode.PINCH_MEMORY -> "打开沉浸回忆层"
+}
+
+private fun todayEntryModeOptions(): List<Pair<String, String>> = listOf(
+    TodayInHistoryEntryMode.MEMORY_PAGE.name to "回忆页",
+    TodayInHistoryEntryMode.PINCH_MEMORY.name to "沉浸层",
+)
+
 private fun settingsDateModeOptions(): List<Pair<String, String>> = listOf(
     "all" to "全部",
     "year" to "今年",
     "month" to "本月",
     "seven_days" to "7天",
-    "today_history" to "那天",
+    "today_history" to "那年",
 )
 
 private fun settingsSortOptions(): List<Pair<String, String>> = listOf(
@@ -1425,35 +1438,44 @@ private fun PhotoOrganizerMockPreview(
             .fillMaxWidth()
             .height(468.dp)
             .clip(RoundedCornerShape(30.dp))
-            .background(MaterialTheme.colorScheme.background)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.30f), RoundedCornerShape(30.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF030406),
+                        Color(0xFF111821),
+                        Color.Black,
+                    )
+                )
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(30.dp))
             .padding(14.dp),
     ) {
-        PreviewAreaTitle(
-            "照片整理页实时布局",
-            "新版布局以中间图片为核心：顶部一行操作，底部只放信息和相册入口。",
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text("沉浸式照片整理", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Text("中间是当前照片，顶部是筛选与随机，底部保留信息、相册和手势入口。", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.62f))
+        }
 
         if (settings.photoShowGestureHint) {
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .width(174.dp)
-                    .height(248.dp)
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.11f))
-                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f), RoundedCornerShape(32.dp))
+                    .width(188.dp)
+                    .height(278.dp)
+                    .clip(RoundedCornerShape(34.dp))
+                    .background(Color.White.copy(alpha = 0.08f))
+                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(34.dp))
                     .clickable(onClick = onToggleGestureHint),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.width(118.dp).height(166.dp).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.26f)))
-                    Text("图片居中", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                    Text("点击图片放大", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(Modifier.width(146.dp).height(206.dp).align(Alignment.Center).padding(top = 14.dp, start = 18.dp).clip(RoundedCornerShape(28.dp)).background(Color(0xFF334052)))
+                Box(Modifier.width(146.dp).height(206.dp).align(Alignment.Center).padding(bottom = 14.dp, end = 18.dp).clip(RoundedCornerShape(28.dp)).background(Color(0xFF6E7E93)))
+                Box(Modifier.width(144.dp).height(212.dp).align(Alignment.Center).clip(RoundedCornerShape(28.dp)).background(Color(0xFFD9E2EC))) {
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(72.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.44f)))))
+                    Text("双指缩小 · 那年今日", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp), style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         } else {
-            PreviewHiddenBlock("图片手势提示已隐藏", onToggleGestureHint, Modifier.align(Alignment.Center).width(190.dp))
+            PreviewDarkHiddenBlock("图片手势入口", onToggleGestureHint, Modifier.align(Alignment.Center).width(190.dp))
         }
 
         Column(
@@ -1464,18 +1486,18 @@ private fun PhotoOrganizerMockPreview(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (settings.photoShowTopBar) PreviewComponentBlock("顶部进度", "42% · 剩余 120", onToggleTopBar, true, Color(0xFF67A9D6), Modifier.weight(1f))
-                else PreviewHiddenBlock("顶部进度/筛选", onToggleTopBar, Modifier.weight(1f))
-                if (settings.photoShowShuffleButton) PreviewComponentBlock("重新随机", "同一行", onToggleShuffleButton, true, Color(0xFFD89A45), Modifier.weight(1f))
-                else PreviewHiddenBlock("重新随机", onToggleShuffleButton, Modifier.weight(1f))
+                if (settings.photoShowTopBar) PreviewDarkComponentBlock("顶部进度", "42% · 剩余 120", onToggleTopBar, Modifier.weight(1f))
+                else PreviewDarkHiddenBlock("顶部进度", onToggleTopBar, Modifier.weight(1f))
+                if (settings.photoShowShuffleButton) PreviewDarkComponentBlock("重新随机", "真实打散队列", onToggleShuffleButton, Modifier.weight(1f))
+                else PreviewDarkHiddenBlock("重新随机", onToggleShuffleButton, Modifier.weight(1f))
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (settings.photoShowFilterChips) {
-                    PreviewComponentBlock("图片筛选", "点开后展开", onToggleFilterChips, true, Color(0xFF8CA7FF), Modifier.weight(1f))
-                    PreviewComponentBlock("时间筛选", "点开后展开", onToggleFilterChips, true, Color(0xFF8CA7FF), Modifier.weight(1f))
+                    PreviewDarkComponentBlock("图片筛选", "全部 / 截图 / 实况", onToggleFilterChips, Modifier.weight(1f))
+                    PreviewDarkComponentBlock("时间筛选", "全部 / 今天 / 年月", onToggleFilterChips, Modifier.weight(1f))
                 } else {
-                    PreviewHiddenBlock("图片筛选", onToggleFilterChips, Modifier.weight(1f))
-                    PreviewHiddenBlock("时间筛选", onToggleFilterChips, Modifier.weight(1f))
+                    PreviewDarkHiddenBlock("图片筛选", onToggleFilterChips, Modifier.weight(1f))
+                    PreviewDarkHiddenBlock("时间筛选", onToggleFilterChips, Modifier.weight(1f))
                 }
             }
         }
@@ -1487,10 +1509,10 @@ private fun PhotoOrganizerMockPreview(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (settings.photoShowInfoBar) PreviewComponentBlock("图片信息", "日期 · 文件夹 · 大小", onToggleInfoBar, true, Color(0xFFB47DE2), Modifier.weight(1f))
-            else PreviewHiddenBlock("图片信息已隐藏", onToggleInfoBar, Modifier.weight(1f))
-            if (settings.photoShowFolderChips) PreviewComponentBlock("相册", "替代分享按钮", onToggleFolderChips, true, Color(0xFF72B778), Modifier.width(96.dp))
-            else PreviewHiddenBlock("相册按钮", onToggleFolderChips, Modifier.width(96.dp))
+            if (settings.photoShowInfoBar) PreviewDarkComponentBlock("底部信息", "日期 · 文件夹 · 大小", onToggleInfoBar, Modifier.weight(1f))
+            else PreviewDarkHiddenBlock("底部信息", onToggleInfoBar, Modifier.weight(1f))
+            if (settings.photoShowFolderChips) PreviewDarkComponentBlock("相册", "文件夹入口", onToggleFolderChips, Modifier.width(112.dp))
+            else PreviewDarkHiddenBlock("相册", onToggleFolderChips, Modifier.width(112.dp))
         }
     }
 }

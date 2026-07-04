@@ -21,6 +21,7 @@ import com.futureape.kanleme.data.settings.HapticLevel
 import com.futureape.kanleme.data.settings.PhotoCleanMode
 import com.futureape.kanleme.data.settings.SwipeSensitivity
 import com.futureape.kanleme.data.settings.ThemeMode
+import com.futureape.kanleme.data.settings.TodayInHistoryEntryMode
 import com.futureape.kanleme.data.settings.VideoDisplayMode
 import com.futureape.kanleme.data.settings.nextAccentColor
 import com.futureape.kanleme.data.settings.nextBatchSize
@@ -195,6 +196,9 @@ class KanlemeViewModel @Inject constructor(
     private var photoDeckRefilling = false
     private var videoDeckRefilling = false
     private var photoDeckLoadJob: Job? = null
+    private var photoDeckLoadScope: CleaningScope? = null
+    private var lastEmptyPhotoDeckLoadScope: CleaningScope? = null
+    private var lastEmptyPhotoDeckLoadAt = 0L
     private var videoDeckLoadJob: Job? = null
     private var photoDeckPreviewLoadJob: Job? = null
     private var videoDeckPreviewLoadJob: Job? = null
@@ -215,6 +219,7 @@ class KanlemeViewModel @Inject constructor(
     private val photoSessionActions = ArrayDeque<PhotoSessionAction>()
     private val photoPersistenceBarriers = mutableMapOf<Long, Job>()
     private val handledVideoActionMediaIds = mutableSetOf<Long>()
+    private val pendingVideoKeepOperations = mutableMapOf<Long, Deferred<Long>>()
 
     init {
         viewModelScope.launch {
@@ -264,6 +269,7 @@ class KanlemeViewModel @Inject constructor(
 
     private fun nextPhotoDeckGeneration(): Long {
         photoDeckLoadJob?.cancel()
+        photoDeckLoadScope = null
         photoDeckGeneration += 1L
         return photoDeckGeneration
     }
@@ -276,6 +282,9 @@ class KanlemeViewModel @Inject constructor(
 
     private fun invalidatePhotoDeckLoads() {
         photoDeckLoadJob?.cancel()
+        photoDeckLoadScope = null
+        lastEmptyPhotoDeckLoadScope = null
+        lastEmptyPhotoDeckLoadAt = 0L
         photoDeckGeneration += 1L
         photoDeckPreviewLoadJob?.cancel()
         photoDeckPreviewGeneration += 1L
@@ -344,7 +353,6 @@ class KanlemeViewModel @Inject constructor(
         if (photo.mediaStoreId in pendingPhotoActionMediaIds || photo.mediaStoreId in handledPhotoActionMediaIds) return false
         pendingPhotoActionMediaIds += photo.mediaStoreId
         handledPhotoActionMediaIds += photo.mediaStoreId
-        invalidatePhotoDeckLoads()
         _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
         _photoSessionActionCount.value += 1
         _lastPhotoAction.value = action
@@ -443,10 +451,24 @@ class KanlemeViewModel @Inject constructor(
 
     fun loadPhotoDeck(scope: CleaningScope = _photoScope.value) {
         val requestedScope = ensureRandomSeed(scope)
+        val now = System.currentTimeMillis()
+        if (photoDeckLoadJob?.isActive == true && photoDeckLoadScope == requestedScope) {
+            if (_photoDeck.value.isEmpty()) _photoDeckPreparing.value = true
+            return
+        }
+        if (
+            _photoDeck.value.isEmpty() &&
+            lastEmptyPhotoDeckLoadScope == requestedScope &&
+            now - lastEmptyPhotoDeckLoadAt < 1_200L
+        ) {
+            _photoDeckPreparing.value = false
+            return
+        }
         _photoScope.value = requestedScope
         val showPreparing = _photoDeck.value.isEmpty()
         if (showPreparing) _photoDeckPreparing.value = true
         val generation = nextPhotoDeckGeneration()
+        photoDeckLoadScope = requestedScope
         photoDeckLoadJob = viewModelScope.launch {
             try {
                 val loaded = repository
@@ -456,9 +478,19 @@ class KanlemeViewModel @Inject constructor(
                 if (generation == photoDeckGeneration) {
                     _photoDeck.value = loaded
                     _photoDeckPreview.value = loaded.take(HOME_PREVIEW_DECK_SIZE)
+                    if (loaded.isEmpty()) {
+                        lastEmptyPhotoDeckLoadScope = requestedScope
+                        lastEmptyPhotoDeckLoadAt = System.currentTimeMillis()
+                    } else {
+                        lastEmptyPhotoDeckLoadScope = null
+                        lastEmptyPhotoDeckLoadAt = 0L
+                    }
                 }
             } finally {
-                if (showPreparing && generation == photoDeckGeneration) _photoDeckPreparing.value = false
+                if (generation == photoDeckGeneration) {
+                    if (showPreparing) _photoDeckPreparing.value = false
+                    photoDeckLoadScope = null
+                }
             }
         }
     }
@@ -623,7 +655,7 @@ class KanlemeViewModel @Inject constructor(
         _videoScope.value = session
         _videoSessionActionCount.value = 0
         _lastVideoAction.value = null
-        _pendingVideoKeeps.value = emptyMap()
+        clearPendingVideoKeeps()
         _videoDeck.value = _videoDeck.value.withoutLocalVideoExclusions()
         if (_videoDeck.value.isNotEmpty()) {
             if (session.sortOrder == "random") {
@@ -678,7 +710,7 @@ class KanlemeViewModel @Inject constructor(
         _videoDeckPreparing.value = true
         _videoSessionActionCount.value = 0
         _lastVideoAction.value = null
-        _pendingVideoKeeps.value = emptyMap()
+        clearPendingVideoKeeps()
         _videoDeck.value = emptyList()
         val generation = nextVideoDeckGeneration()
         videoDeckLoadJob = viewModelScope.launch {
@@ -961,10 +993,16 @@ class KanlemeViewModel @Inject constructor(
     fun onVideoAction(video: VideoEntity, action: SwipeAction) = viewModelScope.launch {
         handledVideoActionMediaIds += video.mediaStoreId
         invalidateVideoDeckLoads()
-        val wasPending = removePendingVideoKeep(video)
+        val pendingKeepOperation = removePendingVideoKeep(video)
         _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == video.mediaStoreId }
-        repository.handleVideoAction(video, action)
-        if (!wasPending) _videoSessionActionCount.value += 1
+        if (pendingKeepOperation != null && action == SwipeAction.Keep) {
+            runCatching { pendingKeepOperation.await() }
+                .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_video_action_failed) }
+        } else {
+            pendingKeepOperation?.let { runCatching { it.await() } }
+            repository.handleVideoAction(video, action)
+        }
+        if (pendingKeepOperation == null) _videoSessionActionCount.value += 1
         _lastVideoAction.value = action
         refillVideoDeckIfNeeded()
     }
@@ -975,15 +1013,25 @@ class KanlemeViewModel @Inject constructor(
         val pending = _pendingVideoKeeps.value
         if (video.mediaStoreId in pending) return
         _pendingVideoKeeps.value = pending + (video.mediaStoreId to video)
+        handledVideoActionMediaIds += video.mediaStoreId
+        invalidateVideoDeckLoads()
+        pendingVideoKeepOperations[video.mediaStoreId] = viewModelScope.async {
+            repository.handleVideoAction(video, SwipeAction.Keep)
+        }
         _videoSessionActionCount.value += 1
         _lastVideoAction.value = SwipeAction.Keep
     }
 
-    private fun removePendingVideoKeep(video: VideoEntity): Boolean {
+    private fun removePendingVideoKeep(video: VideoEntity): Deferred<Long>? {
         val pending = _pendingVideoKeeps.value
-        if (video.mediaStoreId !in pending) return false
+        if (video.mediaStoreId !in pending) return null
         _pendingVideoKeeps.value = pending - video.mediaStoreId
-        return true
+        return pendingVideoKeepOperations.remove(video.mediaStoreId)
+    }
+
+    private fun clearPendingVideoKeeps() {
+        _pendingVideoKeeps.value = emptyMap()
+        pendingVideoKeepOperations.clear()
     }
 
     fun undoPendingVideoKeep(): Long? {
@@ -991,8 +1039,21 @@ class KanlemeViewModel @Inject constructor(
         if (pending.isEmpty()) return null
         val mediaStoreId = pending.keys.last()
         _pendingVideoKeeps.value = pending - mediaStoreId
+        val pendingKeepOperation = pendingVideoKeepOperations.remove(mediaStoreId)
+        handledVideoActionMediaIds -= mediaStoreId
+        invalidateVideoDeckLoads()
         _videoSessionActionCount.value = (_videoSessionActionCount.value - 1).coerceAtLeast(0)
         _lastVideoAction.value = SwipeAction.Keep
+        if (pendingKeepOperation != null) {
+            viewModelScope.launch {
+                runCatching {
+                    val operationId = pendingKeepOperation.await()
+                    repository.undoOperation(operationId)
+                }.onFailure {
+                    _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed)
+                }
+            }
+        }
         return mediaStoreId
     }
 
@@ -1003,11 +1064,12 @@ class KanlemeViewModel @Inject constructor(
         val pendingIds = pending.keys
         handledVideoActionMediaIds += pendingIds
         invalidateVideoDeckLoads()
-        pending.values.forEach { video ->
-            repository.handleVideoAction(video, SwipeAction.Keep)
+        pendingVideoKeepOperations.values.forEach { operation ->
+            runCatching { operation.await() }
+                .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_video_action_failed) }
         }
         _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId in pendingIds }
-        _pendingVideoKeeps.value = emptyMap()
+        clearPendingVideoKeeps()
         refillVideoDeckIfNeeded()
     }
 
@@ -1075,14 +1137,18 @@ class KanlemeViewModel @Inject constructor(
         handledVideoActionMediaIds += video.mediaStoreId
         invalidateVideoDeckLoads()
         runCatching {
+            val pendingKeepOperation = removePendingVideoKeep(video)
             val result = repository.moveVideoToFolder(video, relativePath)
             if (!result.success) error(result.message)
-            repository.handleVideoAction(video, SwipeAction.Keep)
-            result.message
-        }.onSuccess { message ->
-            val wasPending = removePendingVideoKeep(video)
+            if (pendingKeepOperation != null) {
+                pendingKeepOperation.await()
+            } else {
+                repository.handleVideoAction(video, SwipeAction.Keep)
+            }
+            result.message to pendingKeepOperation
+        }.onSuccess { (message, pendingKeepOperation) ->
             _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == video.mediaStoreId }
-            if (!wasPending) _videoSessionActionCount.value += 1
+            if (pendingKeepOperation == null) _videoSessionActionCount.value += 1
             _lastVideoAction.value = SwipeAction.Keep
             _message.value = dynamicUiText(message)
             refillVideoDeckIfNeeded()
@@ -1226,6 +1292,7 @@ class KanlemeViewModel @Inject constructor(
         if (videoMediaStoreIds.isNotEmpty()) {
             handledVideoActionMediaIds.removeAll(videoMediaStoreIds)
             _pendingVideoKeeps.value = _pendingVideoKeeps.value - videoMediaStoreIds
+            videoMediaStoreIds.forEach { pendingVideoKeepOperations.remove(it) }
             invalidateVideoDeckLoads()
             loadVideoDeck()
         }
@@ -1239,6 +1306,7 @@ class KanlemeViewModel @Inject constructor(
                     handledPhotoActionMediaIds.clear()
                     clearPhotoActionHistory()
                     handledVideoActionMediaIds.clear()
+                    clearPendingVideoKeeps()
                     invalidatePhotoDeckLoads()
                     invalidateVideoDeckLoads()
                 }
@@ -1355,6 +1423,10 @@ class KanlemeViewModel @Inject constructor(
 
     fun setThemeMode(value: ThemeMode) = viewModelScope.launch {
         settingsRepository.setThemeMode(value)
+    }
+
+    fun setTodayInHistoryEntryMode(value: TodayInHistoryEntryMode) = viewModelScope.launch {
+        settingsRepository.setTodayInHistoryEntryMode(value)
     }
 
     fun cycleAccentColor() = viewModelScope.launch { settingsRepository.setAccentColor(nextAccentColor(settings.value.accentColor)) }

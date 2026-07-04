@@ -1,6 +1,8 @@
 package com.futureape.kanleme.ui.screens
 
 import android.net.Uri
+import android.content.ContentUris
+import android.provider.MediaStore
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.imageLoader
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.ProcessingStatus
 import com.futureape.kanleme.data.local.TrashItemEntity
@@ -68,8 +71,10 @@ import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.components.MetricPill
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.mediaImageRequest
 import com.futureape.kanleme.ui.util.openVideoInSystemGallery
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -84,6 +89,7 @@ private sealed class TodayMemoryItem {
     abstract val folderName: String
     abstract val size: Long
     abstract val uri: String
+    abstract val mediaStoreId: Long
     abstract val status: String
     abstract val isVideo: Boolean
 
@@ -95,6 +101,7 @@ private sealed class TodayMemoryItem {
         override val folderName: String = photo.folderName
         override val size: Long = photo.size
         override val uri: String = photo.uri
+        override val mediaStoreId: Long = photo.mediaStoreId
         override val status: String = photo.processingStatus
         override val isVideo: Boolean = false
     }
@@ -107,6 +114,7 @@ private sealed class TodayMemoryItem {
         override val folderName: String = video.folderName
         override val size: Long = video.size
         override val uri: String = video.uri
+        override val mediaStoreId: Long = video.mediaStoreId
         override val status: String = video.processingStatus
         override val isVideo: Boolean = true
     }
@@ -128,20 +136,28 @@ fun TodayInHistoryScreen(
     val grouped = remember(memories) { memories.groupBy { it.year }.toSortedMap(compareByDescending { it }) }
     var expandedYears by remember(grouped.keys) { mutableStateOf(grouped.keys.take(1).toSet()) }
 
-    Column(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 36.dp)) {
-        ScreenHeader("当年今日", "按年份回看往年今天的照片和视频，展开后可查看状态", onBack)
+    ProfileDarkPage {
+        Column(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 46.dp)) {
+            ProfilePageHeader(
+                title = "那年今日",
+                subtitle = "按年份回看往年今天的照片和视频",
+                onBack = onBack,
+                modifier = Modifier.padding(horizontal = 22.dp),
+            )
+            Spacer(Modifier.height(18.dp))
         if (memories.isEmpty()) {
-            EmptyState(
+            ProfileEmptyState(
                 "今天暂无往年记忆",
                 "同步媒体库后，会自动按月日匹配往年今日的照片和视频。",
                 "同步媒体库",
                 { viewModel.refreshLibrary() },
-                modifier = Modifier.padding(18.dp),
+                modifier = Modifier.padding(horizontal = 22.dp),
             )
         } else {
+            TodayMemoryPrefetch(memories = memories)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 96.dp),
+                contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
@@ -180,6 +196,7 @@ fun TodayInHistoryScreen(
                 }
             }
         }
+        }
     }
 }
 
@@ -190,36 +207,44 @@ fun PhotoHistoryScreen(
     onOpenPhoto: (PhotoEntity) -> Unit,
 ) {
     val photos by viewModel.cleanedPhotoHistory.collectAsStateWithLifecycle()
-    Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-        ScreenHeader("整理历史", "最近整理过的照片，方便反悔后再找回", onBack)
+    ProfileDarkPage {
+        Column(Modifier.fillMaxSize().padding(top = 46.dp)) {
+            ProfilePageHeader(
+                title = "整理历史",
+                subtitle = "最近整理过的照片，方便反悔后再找回",
+                onBack = onBack,
+                modifier = Modifier.padding(horizontal = 22.dp),
+            )
+            Spacer(Modifier.height(18.dp))
         if (photos.isEmpty()) {
-            EmptyState(
+            ProfileEmptyState(
                 "还没有照片整理记录",
                 "开始整理后，保留、收藏和待删操作会自动出现在这里。",
                 "同步媒体库",
                 { viewModel.refreshLibrary() },
-                modifier = Modifier.padding(18.dp),
+                modifier = Modifier.padding(horizontal = 22.dp),
             )
         } else {
             PhotoGrid(
                 photos = photos,
-                modifier = Modifier.fillMaxSize().padding(18.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp),
                 onPhotoClick = onOpenPhoto,
             )
+        }
         }
     }
 }
 
 @Composable
 private fun TodaySummaryCard(yearCount: Int, photoCount: Int, videoCount: Int) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), tonalAlpha = 0.78f) {
+    ProfilePanel(shape = RoundedCornerShape(30.dp)) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.CalendarToday, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Box(Modifier.size(52.dp).clip(CircleShape).background(ProfileScreenAccent.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.CalendarToday, contentDescription = null, tint = ProfileScreenAccent)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("找到 $yearCount 个年份的往年今日", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("$photoCount 张照片 · $videoCount 个视频", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("找到 $yearCount 个年份的往年今日", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text("$photoCount 张照片 · $videoCount 个视频", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.58f))
             }
         }
     }
@@ -234,14 +259,14 @@ private fun TodayYearHeader(
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
-    GlassSurface(modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle), shape = RoundedCornerShape(24.dp), tonalAlpha = 0.70f) {
+    ProfilePanel(modifier = Modifier.clickable(onClick = onToggle), shape = RoundedCornerShape(24.dp)) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(if (expanded) Icons.Rounded.ExpandMore else Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(if (expanded) Icons.Rounded.ExpandMore else Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = ProfileScreenAccent)
             Column(Modifier.weight(1f)) {
-                Text(year.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("$count 个媒体 · $photoCount 张照片 · $videoCount 个视频", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(year.toString(), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+                Text("$count 个媒体 · $photoCount 张照片 · $videoCount 个视频", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.56f))
             }
-            Text(if (expanded) "收起" else "展开", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(if (expanded) "收起" else "展开", style = MaterialTheme.typography.labelLarge, color = ProfileScreenAccent)
         }
     }
 }
@@ -273,6 +298,7 @@ private fun TodayMemoryTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     Box(
         modifier = modifier
             .aspectRatio(0.76f)
@@ -280,7 +306,7 @@ private fun TodayMemoryTile(
             .clickable(onClick = onClick),
     ) {
         AsyncImage(
-            model = Uri.parse(item.uri),
+            model = todayMemoryImageRequest(context, item, "today_tile", 560, 760),
             contentDescription = item.displayName,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
@@ -319,12 +345,28 @@ private fun TodayMemoryTile(
 }
 
 @Composable
+private fun TodayMemoryPrefetch(memories: List<TodayMemoryItem>) {
+    val context = LocalContext.current
+    LaunchedEffect(memories) {
+        memories
+            .take(48)
+            .chunked(12)
+            .forEach { chunk ->
+                chunk.forEach { item ->
+                    context.imageLoader.execute(todayMemoryImageRequest(context, item, "today_tile", 560, 760))
+                }
+                delay(45)
+            }
+    }
+}
+
+@Composable
 private fun TodayMemoryRow(item: TodayMemoryItem, onClick: () -> Unit) {
     GlassSurface(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(24.dp), tonalAlpha = 0.62f) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.size(76.dp).clip(RoundedCornerShape(18.dp))) {
                 AsyncImage(
-                    model = Uri.parse(item.uri),
+                    model = todayMemoryImageRequest(LocalContext.current, item, "today_row", 320, 320),
                     contentDescription = item.displayName,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
@@ -343,6 +385,30 @@ private fun TodayMemoryRow(item: TodayMemoryItem, onClick: () -> Unit) {
             }
         }
     }
+}
+
+private fun todayMemoryImageRequest(
+    context: android.content.Context,
+    item: TodayMemoryItem,
+    suffix: String,
+    width: Int,
+    height: Int,
+) = mediaImageRequest(
+    context = context,
+    uri = todayMemoryContentUri(item),
+    cacheKey = "today:" + item.stableId + ":" + item.mediaStoreId + ":" + suffix,
+    width = width,
+    height = height,
+)
+
+private fun todayMemoryContentUri(item: TodayMemoryItem): Uri {
+    if (item.mediaStoreId <= 0L) return Uri.parse(item.uri)
+    val baseUri = if (item.isVideo) {
+        MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+    } else {
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+    }
+    return ContentUris.withAppendedId(baseUri, item.mediaStoreId)
 }
 
 @Composable

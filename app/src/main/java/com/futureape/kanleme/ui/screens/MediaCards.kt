@@ -29,8 +29,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,6 +64,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -92,6 +95,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.VideoEntity
@@ -103,12 +107,18 @@ import com.futureape.kanleme.ui.util.HapticKit
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.photoImageRequest
 import com.futureape.kanleme.ui.util.photoMediaBadges
+import com.futureape.kanleme.ui.util.photoThumbnailImageRequest
 import com.futureape.kanleme.ui.util.photoDisplayAspectRatio as correctedPhotoAspectRatio
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
+import com.futureape.kanleme.ui.util.videoContentUri
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.viewmodel.PhotoUndoAnimation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -870,14 +880,8 @@ private fun PhotoFitImageWithSoftFill(
     contentDescription: String? = photo.displayName,
 ) {
     val context = LocalContext.current
-    val model = remember(photo.uri) {
-        ImageRequest.Builder(context)
-            .data(Uri.parse(photo.uri))
-            .memoryCacheKey(photo.uri)
-            .diskCacheKey(photo.uri)
-            .placeholderMemoryCacheKey(photo.uri)
-            .crossfade(false)
-            .build()
+    val model = remember(photo.mediaStoreId, photo.updatedAt) {
+        photoImageRequest(context, photo, "photo_fit", 1080, 1440)
     }
     Box(modifier.background(Color.Black)) {
         AsyncImage(
@@ -1326,9 +1330,12 @@ private fun ActionBubble(icon: ImageVector, label: String, onClick: () -> Unit, 
 fun PhotoGrid(photos: List<PhotoEntity>, modifier: Modifier = Modifier, onPhotoClick: ((PhotoEntity) -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val gridState = rememberLazyStaggeredGridState()
     var playingMotionPhotoId by remember { mutableStateOf<Long?>(null) }
+    PhotoGridPrefetch(photos = photos, gridState = gridState)
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Adaptive(118.dp),
+        state = gridState,
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalItemSpacing = 7.dp,
@@ -1355,13 +1362,7 @@ fun PhotoGrid(photos: List<PhotoEntity>, modifier: Modifier = Modifier, onPhotoC
                         )
                     } else {
                         AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(Uri.parse(photo.uri))
-                                .memoryCacheKey(photo.uri)
-                                .diskCacheKey(photo.uri)
-                                .placeholderMemoryCacheKey(photo.uri)
-                                .crossfade(false)
-                                .build(),
+                            model = photoThumbnailImageRequest(context, photo),
                             contentDescription = photo.displayName,
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1399,6 +1400,47 @@ fun PhotoGrid(photos: List<PhotoEntity>, modifier: Modifier = Modifier, onPhotoC
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PhotoGridPrefetch(
+    photos: List<PhotoEntity>,
+    gridState: LazyStaggeredGridState,
+) {
+    val context = LocalContext.current
+    LaunchedEffect(photos) {
+        photos
+            .take(48)
+            .chunked(12)
+            .forEach { chunk ->
+                chunk.forEach { photo ->
+                    context.imageLoader.execute(photoThumbnailImageRequest(context, photo))
+                }
+                delay(45)
+            }
+    }
+    LaunchedEffect(photos, gridState) {
+        snapshotFlow {
+            val visible = gridState.layoutInfo.visibleItemsInfo
+            val first = visible.minOfOrNull { it.index } ?: 0
+            val last = visible.maxOfOrNull { it.index } ?: -1
+            first to last
+        }
+            .distinctUntilChanged()
+            .collectLatest { (firstIndex, lastIndex) ->
+                if (lastIndex < 0 || photos.isEmpty()) return@collectLatest
+                delay(80)
+                val start = (firstIndex - 12).coerceAtLeast(0).coerceAtMost(photos.size)
+                val end = (lastIndex + 54).coerceAtLeast(start).coerceAtMost(photos.size)
+                photos.subList(start, end).chunked(8).forEach { chunk ->
+                    chunk.forEach { photo ->
+                        context.imageLoader.execute(photoThumbnailImageRequest(context, photo))
+                    }
+                    delay(24)
+                }
+            }
     }
 }
 
@@ -1466,7 +1508,7 @@ fun VideoCard(video: VideoEntity, onAction: (SwipeAction) -> Unit) {
         Column(Modifier.padding(14.dp)) {
             Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(24.dp))) {
                 AsyncImage(
-                    model = Uri.parse(video.uri),
+                    model = videoContentUri(video),
                     contentDescription = video.displayName,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,

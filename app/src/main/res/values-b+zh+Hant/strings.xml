@@ -43,6 +43,7 @@
     <string name="message_back_to_previous_video">已回到上一部影片</string>
     <string name="message_video_undo_success">已撤回上一部影片</string>
     <string name="message_video_undo_empty">沒有可撤回的影片</string>
+    <string name="message_video_action_failed">影片處理失敗</string>
     <string name="message_undo_failed">撤回失敗</string>
     <string name="message_move_folder_failed">移動資料夾失敗</string>
     <string name="message_archive_failed">歸檔失敗</string>

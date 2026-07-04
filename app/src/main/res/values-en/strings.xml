@@ -43,6 +43,7 @@
     <string name="message_back_to_previous_video">Back to the previous video</string>
     <string name="message_video_undo_success">Previous video action undone</string>
     <string name="message_video_undo_empty">No video to undo</string>
+    <string name="message_video_action_failed">Video action failed</string>
     <string name="message_undo_failed">Undo failed</string>
     <string name="message_move_folder_failed">Move to folder failed</string>
     <string name="message_archive_failed">Archive failed</string>
