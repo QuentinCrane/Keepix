@@ -98,10 +98,11 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
             viewModel.showMessage("今天暂无往年照片或视频")
         }
     }
-    val transitionBackdrop = if (current.usesDarkTransitionBackdrop()) {
-        Color.Black
-    } else {
-        MaterialTheme.colorScheme.background
+    val transitionBackdrop = Color.Black
+
+    LaunchedEffect(Unit) {
+        viewModel.loadPhotoDeck()
+        viewModel.loadVideoDeck()
     }
 
     LaunchedEffect(initialShortcutTarget, shortcutNonce) {
@@ -484,18 +485,5 @@ private fun topLevelRouteIndex(route: String?): Int? = when (route) {
     Destinations.ME -> 2
     else -> null
 }
-
-private fun String?.usesDarkTransitionBackdrop(): Boolean = this in setOf(
-    Destinations.HOME,
-    Destinations.PHOTO_START,
-    Destinations.PHOTO,
-    Destinations.VIDEO_START,
-    Destinations.VIDEO,
-    Destinations.VIEWER,
-    Destinations.FAVORITES,
-    Destinations.TRASH,
-    Destinations.PHOTO_HISTORY,
-    Destinations.TODAY,
-)
 
 

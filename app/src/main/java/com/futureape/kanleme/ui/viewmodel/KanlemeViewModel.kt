@@ -196,9 +196,6 @@ class KanlemeViewModel @Inject constructor(
     private var photoDeckRefilling = false
     private var videoDeckRefilling = false
     private var photoDeckLoadJob: Job? = null
-    private var photoDeckLoadScope: CleaningScope? = null
-    private var lastEmptyPhotoDeckLoadScope: CleaningScope? = null
-    private var lastEmptyPhotoDeckLoadAt = 0L
     private var videoDeckLoadJob: Job? = null
     private var photoDeckPreviewLoadJob: Job? = null
     private var videoDeckPreviewLoadJob: Job? = null
@@ -246,6 +243,13 @@ class KanlemeViewModel @Inject constructor(
                 if (showMessage) {
                     _message.value = uiText(R.string.message_library_synced, p, v)
                 }
+                if (_photoDeck.value.isEmpty()) {
+                    photoDeckPreviewScope = null
+                    photoDeckPreviewScopeLoaded = false
+                    loadPhotoDeckPreview(_photoScope.value)
+                }
+                loadPhotoDeck()
+                loadVideoDeck()
             }
             .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_library_sync_failed) }
     }
@@ -269,7 +273,6 @@ class KanlemeViewModel @Inject constructor(
 
     private fun nextPhotoDeckGeneration(): Long {
         photoDeckLoadJob?.cancel()
-        photoDeckLoadScope = null
         photoDeckGeneration += 1L
         return photoDeckGeneration
     }
@@ -282,9 +285,6 @@ class KanlemeViewModel @Inject constructor(
 
     private fun invalidatePhotoDeckLoads() {
         photoDeckLoadJob?.cancel()
-        photoDeckLoadScope = null
-        lastEmptyPhotoDeckLoadScope = null
-        lastEmptyPhotoDeckLoadAt = 0L
         photoDeckGeneration += 1L
         photoDeckPreviewLoadJob?.cancel()
         photoDeckPreviewGeneration += 1L
@@ -449,26 +449,12 @@ class KanlemeViewModel @Inject constructor(
         }
     }
 
-    fun loadPhotoDeck(scope: CleaningScope = _photoScope.value) {
+    fun loadPhotoDeck(scope: CleaningScope = _photoScope.value, replaceWithEmpty: Boolean = false) {
         val requestedScope = ensureRandomSeed(scope)
-        val now = System.currentTimeMillis()
-        if (photoDeckLoadJob?.isActive == true && photoDeckLoadScope == requestedScope) {
-            if (_photoDeck.value.isEmpty()) _photoDeckPreparing.value = true
-            return
-        }
-        if (
-            _photoDeck.value.isEmpty() &&
-            lastEmptyPhotoDeckLoadScope == requestedScope &&
-            now - lastEmptyPhotoDeckLoadAt < 1_200L
-        ) {
-            _photoDeckPreparing.value = false
-            return
-        }
         _photoScope.value = requestedScope
         val showPreparing = _photoDeck.value.isEmpty()
         if (showPreparing) _photoDeckPreparing.value = true
         val generation = nextPhotoDeckGeneration()
-        photoDeckLoadScope = requestedScope
         photoDeckLoadJob = viewModelScope.launch {
             try {
                 val loaded = repository
@@ -476,21 +462,15 @@ class KanlemeViewModel @Inject constructor(
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == photoDeckGeneration) {
-                    _photoDeck.value = loaded
-                    _photoDeckPreview.value = loaded.take(HOME_PREVIEW_DECK_SIZE)
-                    if (loaded.isEmpty()) {
-                        lastEmptyPhotoDeckLoadScope = requestedScope
-                        lastEmptyPhotoDeckLoadAt = System.currentTimeMillis()
-                    } else {
-                        lastEmptyPhotoDeckLoadScope = null
-                        lastEmptyPhotoDeckLoadAt = 0L
+                    if (loaded.isNotEmpty() || _photoDeck.value.isEmpty() || replaceWithEmpty) {
+                        _photoDeck.value = loaded
+                        _photoDeckPreview.value = loaded.take(HOME_PREVIEW_DECK_SIZE)
+                        photoDeckPreviewScope = requestedScope
+                        photoDeckPreviewScopeLoaded = loaded.isNotEmpty()
                     }
                 }
             } finally {
-                if (generation == photoDeckGeneration) {
-                    if (showPreparing) _photoDeckPreparing.value = false
-                    photoDeckLoadScope = null
-                }
+                if (showPreparing && generation == photoDeckGeneration) _photoDeckPreparing.value = false
             }
         }
     }
@@ -518,7 +498,7 @@ class KanlemeViewModel @Inject constructor(
                     .distinctBy { it.mediaStoreId }
                 if (generation == photoDeckPreviewGeneration && _photoDeck.value.isEmpty()) {
                     _photoDeckPreview.value = preview
-                    photoDeckPreviewScopeLoaded = true
+                    photoDeckPreviewScopeLoaded = preview.isNotEmpty()
                 }
             } finally {
                 if (generation == photoDeckPreviewGeneration) _photoDeckPreviewPreparing.value = false
@@ -787,7 +767,7 @@ class KanlemeViewModel @Inject constructor(
 
     fun setPhotoTypeFilter(type: String) = viewModelScope.launch {
         settingsRepository.setPhotoMediaType(type)
-        loadPhotoDeck(_photoScope.value.copy(mediaType = type))
+        loadPhotoDeck(_photoScope.value.copy(mediaType = type), replaceWithEmpty = true)
     }
 
     fun setPhotoTypePreview(type: String) = viewModelScope.launch {
@@ -797,7 +777,7 @@ class KanlemeViewModel @Inject constructor(
 
     fun setPhotoDateMode(mode: String) = viewModelScope.launch {
         settingsRepository.setPhotoDateMode(mode)
-        loadPhotoDeck(_photoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
+        loadPhotoDeck(_photoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"), replaceWithEmpty = true)
     }
 
     fun setPhotoDateModePreview(mode: String) = viewModelScope.launch {
@@ -806,7 +786,7 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun setPhotoSessionDateMode(mode: String) {
-        loadPhotoDeck(_photoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
+        loadPhotoDeck(_photoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"), replaceWithEmpty = true)
     }
 
     fun resetPhotoSessionDateMode() {
@@ -833,7 +813,7 @@ class KanlemeViewModel @Inject constructor(
 
     fun setPhotoFolder(path: String?) = viewModelScope.launch {
         settingsRepository.setPhotoFolderPath(path)
-        loadPhotoDeck(_photoScope.value.copy(folderPaths = path?.let { setOf(it) } ?: emptySet()))
+        loadPhotoDeck(_photoScope.value.copy(folderPaths = path?.let { setOf(it) } ?: emptySet()), replaceWithEmpty = true)
     }
 
     fun setPhotoFolderPreview(path: String?) = viewModelScope.launch {
@@ -845,7 +825,7 @@ class KanlemeViewModel @Inject constructor(
         val next = if (_photoScope.value.sortOrder == "random") "newest" else "random"
         val seed = if (next == "random") nextRandomSeed() else _photoScope.value.randomSeed
         settingsRepository.setPhotoSortOrderWithSeed(next, seed)
-        loadPhotoDeck(_photoScope.value.copy(sortOrder = next, randomSeed = seed))
+        loadPhotoDeck(_photoScope.value.copy(sortOrder = next, randomSeed = seed), replaceWithEmpty = true)
     }
 
     fun togglePhotoRandomPreview() = viewModelScope.launch {
@@ -859,7 +839,7 @@ class KanlemeViewModel @Inject constructor(
         val next = if (order == "newest") "newest" else "random"
         val seed = if (next == "random") nextRandomSeed() else _photoScope.value.randomSeed
         settingsRepository.setPhotoSortOrderWithSeed(next, seed)
-        loadPhotoDeck(_photoScope.value.copy(sortOrder = next, randomSeed = seed))
+        loadPhotoDeck(_photoScope.value.copy(sortOrder = next, randomSeed = seed), replaceWithEmpty = true)
     }
 
     fun setPhotoSortOrderPreview(order: String) = viewModelScope.launch {
