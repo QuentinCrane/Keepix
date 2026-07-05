@@ -105,13 +105,38 @@ fun PhotoViewerScreen(
 ) {
     val timelinePhotos by viewModel.timelinePhotos.collectAsStateWithLifecycle()
     val cleaningDeck by viewModel.photoDeck.collectAsStateWithLifecycle()
+    val dayMemoryPhotos by viewModel.photoDayMemoryWindow.collectAsStateWithLifecycle()
+    val cleanedHistoryPhotos by viewModel.cleanedPhotoHistory.collectAsStateWithLifecycle()
+    val favoritePhotos by viewModel.favoritePhotos.collectAsStateWithLifecycle()
+    val todayInHistoryPhotos by viewModel.todayInHistoryPhotos.collectAsStateWithLifecycle()
+    val recentPhotos by viewModel.recentPhotos.collectAsStateWithLifecycle()
     val folders by viewModel.photoFolders.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showMoveSheet by remember { mutableStateOf(false) }
     var showExifSheet by remember { mutableStateOf(false) }
 
-    val photos = remember(cleaningDeck, timelinePhotos, initialPhotoId) {
-        if (cleaningDeck.any { it.id == initialPhotoId }) cleaningDeck else timelinePhotos
+    val photos = remember(
+        cleaningDeck,
+        dayMemoryPhotos,
+        cleanedHistoryPhotos,
+        favoritePhotos,
+        todayInHistoryPhotos,
+        recentPhotos,
+        timelinePhotos,
+        initialPhotoId,
+    ) {
+        val sources = listOf(
+            cleaningDeck,
+            dayMemoryPhotos,
+            cleanedHistoryPhotos,
+            favoritePhotos,
+            todayInHistoryPhotos,
+            recentPhotos,
+            timelinePhotos,
+        )
+        sources.firstOrNull { candidates -> candidates.any { it.id == initialPhotoId } }
+            ?: sources.firstOrNull { it.isNotEmpty() }
+            ?: emptyList()
     }
 
     if (photos.isEmpty()) {

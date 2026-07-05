@@ -100,11 +100,6 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
     }
     val transitionBackdrop = Color.Black
 
-    LaunchedEffect(Unit) {
-        viewModel.loadPhotoDeck()
-        viewModel.loadVideoDeck()
-    }
-
     LaunchedEffect(initialShortcutTarget, shortcutNonce) {
         when (initialShortcutTarget) {
             "photo" -> {

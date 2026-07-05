@@ -122,13 +122,18 @@ fun CleanHomeScreen(
     val todayInHistoryPhotos by viewModel.todayInHistoryPhotos.collectAsStateWithLifecycle()
     val todayInHistoryVideos by viewModel.todayInHistoryVideos.collectAsStateWithLifecycle()
     val photoDeck by viewModel.photoDeck.collectAsStateWithLifecycle()
+    val photoDeckMatchesCurrentScope by viewModel.photoDeckMatchesCurrentScope.collectAsStateWithLifecycle()
     val videoDeck by viewModel.videoDeck.collectAsStateWithLifecycle()
     val photoDeckPreview by viewModel.photoDeckPreview.collectAsStateWithLifecycle()
     val videoDeckPreview by viewModel.videoDeckPreview.collectAsStateWithLifecycle()
     val photoDeckPreparing by viewModel.photoDeckPreparing.collectAsStateWithLifecycle()
     val videoDeckPreparing by viewModel.videoDeckPreparing.collectAsStateWithLifecycle()
     val photoDeckPreviewPreparing by viewModel.photoDeckPreviewPreparing.collectAsStateWithLifecycle()
+    val photoDeckPreviewReady by viewModel.photoDeckPreviewReady.collectAsStateWithLifecycle()
     val videoDeckPreviewPreparing by viewModel.videoDeckPreviewPreparing.collectAsStateWithLifecycle()
+    val mediaLibraryRefreshing by viewModel.mediaLibraryRefreshing.collectAsStateWithLifecycle()
+    val organizerScopesReady by viewModel.organizerScopesReady.collectAsStateWithLifecycle()
+    val startupMediaBootstrapPending by viewModel.startupMediaBootstrapPending.collectAsStateWithLifecycle()
     val photoScope by viewModel.photoScope.collectAsStateWithLifecycle()
     val videoScope by viewModel.videoScope.collectAsStateWithLifecycle()
     val haptics = rememberHapticKit(settings)
@@ -137,6 +142,8 @@ fun CleanHomeScreen(
     var showDailyReport by remember { mutableStateOf(false) }
     var exportingDailyReport by remember { mutableStateOf(false) }
     var dailyReportExportError by remember { mutableStateOf<String?>(null) }
+    var lastEmptyPhotoPreviewReloadKey by remember { mutableStateOf<Any?>(null) }
+    var lastPhotoQueuePrepareKey by remember { mutableStateOf<Any?>(null) }
     val selectedIsPhoto = true
     val hasTodayMemories = todayInHistoryPhotos.isNotEmpty() || todayInHistoryVideos.isNotEmpty()
     val openTodayIfAvailable = {
@@ -150,19 +157,63 @@ fun CleanHomeScreen(
     LaunchedEffect(settings.homeMediaTab) {
         if (settings.homeMediaTab != "photo") viewModel.setHomeMediaTab("photo")
     }
-    LaunchedEffect(photoScope, settings.excludedFolderPaths, photoDeck.isEmpty()) {
-        if (photoDeck.isEmpty()) viewModel.loadPhotoDeckPreview(photoScope)
+    LaunchedEffect(
+        photoScope,
+        settings.excludedFolderPaths,
+        dashboard.photoCount,
+        dashboard.processedPhotoCount,
+        photoDeckMatchesCurrentScope,
+        photoDeck.size,
+        photoDeckPreparing,
+        photoDeckPreviewReady,
+        photoDeckPreview.size,
+        organizerScopesReady,
+    ) {
+        if (!organizerScopesReady) return@LaunchedEffect
+        val prepareKey = photoScope to (dashboard.photoCount to dashboard.processedPhotoCount)
+        if (
+            dashboard.processedPhotoCount < dashboard.photoCount &&
+            (!photoDeckMatchesCurrentScope || photoDeck.isEmpty()) &&
+            lastPhotoQueuePrepareKey != prepareKey
+        ) {
+            lastPhotoQueuePrepareKey = prepareKey
+            viewModel.preparePhotoHomeQueue(photoScope)
+        }
+        if (photoDeck.isNotEmpty() && photoDeckMatchesCurrentScope) {
+            lastPhotoQueuePrepareKey = null
+        }
+        val reloadKey = photoScope to (dashboard.photoCount to dashboard.processedPhotoCount)
+        if (
+            photoDeckPreviewReady &&
+            photoDeckPreview.isEmpty() &&
+            dashboard.processedPhotoCount < dashboard.photoCount &&
+            lastEmptyPhotoPreviewReloadKey != reloadKey
+        ) {
+            lastEmptyPhotoPreviewReloadKey = reloadKey
+            viewModel.reloadPhotoDeckPreview(photoScope)
+        } else {
+            if (photoDeckPreview.isNotEmpty()) lastEmptyPhotoPreviewReloadKey = null
+            viewModel.loadPhotoDeckPreview(photoScope)
+        }
     }
+    val scopedPhotoDeck = if (organizerScopesReady && photoDeckMatchesCurrentScope) photoDeck else emptyList()
     ImmersiveCleanHomeScreen(
         contentPadding = contentPadding,
         dashboard = dashboard,
         settings = settings,
         photoScope = photoScope,
         videoScope = videoScope,
-        photos = photoDeck.ifEmpty { photoDeckPreview },
-        videos = videoDeck.ifEmpty { videoDeckPreview },
-        photoPreparing = photoDeckPreparing || (photoDeck.isEmpty() && photoDeckPreviewPreparing),
-        videoPreparing = videoDeckPreparing || (videoDeck.isEmpty() && videoDeckPreviewPreparing),
+        photos = if (organizerScopesReady) scopedPhotoDeck.ifEmpty { photoDeckPreview } else emptyList(),
+        videos = if (organizerScopesReady) videoDeck.ifEmpty { videoDeckPreview } else emptyList(),
+        photoPreparing = !organizerScopesReady ||
+            startupMediaBootstrapPending ||
+            mediaLibraryRefreshing ||
+            photoDeckPreparing ||
+            (scopedPhotoDeck.isEmpty() && (photoDeckPreviewPreparing || (photoDeckPreview.isEmpty() && !photoDeckPreviewReady))),
+        videoPreparing = !organizerScopesReady ||
+            startupMediaBootstrapPending ||
+            videoDeckPreparing ||
+            (videoDeck.isEmpty() && videoDeckPreviewPreparing),
         selectedIsPhoto = selectedIsPhoto,
         onPhotoTab = {
             haptics.tick()

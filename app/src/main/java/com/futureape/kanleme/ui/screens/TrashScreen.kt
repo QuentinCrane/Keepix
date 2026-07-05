@@ -14,6 +14,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -66,6 +67,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -100,6 +102,7 @@ import com.futureape.kanleme.ui.util.trashImageRequest
 import com.futureape.kanleme.ui.util.trashThumbnailImageRequest
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import com.futureape.kanleme.ui.i18n.Text
 
@@ -112,13 +115,27 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
     var previewItem by remember { mutableStateOf<TrashItemEntity?>(null) }
     var selectedMediaType by remember { mutableStateOf("photo") }
     val context = LocalContext.current
+    var deletingTrashIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    val trashAnimationScope = rememberCoroutineScope()
     var pendingDeleteAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val systemDeleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) pendingDeleteAction?.invoke()
         pendingDeleteAction = null
     }
 
+    fun deleteTrashItemWithAnimation(target: TrashItemEntity) {
+        if (target.id in deletingTrashIds) return
+        deletingTrashIds = deletingTrashIds + target.id
+        if (previewItem?.id == target.id) previewItem = null
+        trashAnimationScope.launch {
+            delay(240)
+            viewModel.confirmTrashDeleted(target.id)
+            deletingTrashIds = deletingTrashIds - target.id
+        }
+    }
+
     fun requestSystemDeleteAuthorization(targets: List<TrashItemEntity>, onConfirmed: () -> Unit) {
+        if (targets.isEmpty()) return
         val uris = targets.mapNotNull { item -> runCatching { Uri.parse(item.uri) }.getOrNull() }
         if (uris.isEmpty()) {
             viewModel.showMessage("媒体地址无效，无法调起系统删除确认")
@@ -132,6 +149,11 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
             pendingDeleteAction = null
             viewModel.showMessage("无法调起系统删除确认，请稍后再试")
         }
+    }
+
+    LaunchedEffect(trashItems) {
+        val activeIds = trashItems.map { it.id }.toSet()
+        deletingTrashIds = deletingTrashIds.filter { it in activeIds }.toSet()
     }
 
     val photoTrashItems = trashItems.filter { it.mediaType != "video" }
@@ -190,10 +212,22 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                             verticalItemSpacing = 7.dp,
                         ) {
                             items(typedItems, key = { it.id }) { item ->
-                                TrashGridTile(
-                                    item = item,
-                                    onPreview = { previewItem = item },
-                                )
+                                AnimatedVisibility(
+                                    visible = item.id !in deletingTrashIds,
+                                    enter = fadeIn(tween(90, easing = FastOutSlowInEasing)),
+                                    exit = fadeOut(tween(160, easing = FastOutSlowInEasing)) +
+                                        scaleOut(tween(240, easing = FastOutSlowInEasing), targetScale = 0.72f),
+                                ) {
+                                    TrashGridTile(
+                                        item = item,
+                                        onPreview = { previewItem = item },
+                                        onDelete = {
+                                            requestSystemDeleteAuthorization(listOf(item)) {
+                                                deleteTrashItemWithAnimation(item)
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -212,8 +246,14 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                 items = visibleTrashItems,
                 onRestoreAll = { visibleTrashItems.forEach { viewModel.restoreTrash(it.id) } },
                 onDeleteAll = {
-                    val targets = visibleTrashItems
-                    requestSystemDeleteAuthorization(targets) { viewModel.confirmTrashDeleted(targets.map { it.id }) }
+                    val targets = visibleTrashItems.filterNot { it.id in deletingTrashIds }
+                    requestSystemDeleteAuthorization(targets) {
+                        if (targets.size == 1) {
+                            deleteTrashItemWithAnimation(targets.first())
+                        } else {
+                            viewModel.confirmTrashDeleted(targets.map { it.id })
+                        }
+                    }
                 },
             )
         }
@@ -236,8 +276,9 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                     previewItem = null
                 },
                 onDelete = { target ->
-                    requestSystemDeleteAuthorization(listOf(target)) { viewModel.confirmTrashDeleted(target.id) }
-                    previewItem = null
+                    requestSystemDeleteAuthorization(listOf(target)) {
+                        deleteTrashItemWithAnimation(target)
+                    }
                 },
             )
         }
@@ -294,7 +335,7 @@ private fun TrashFilterPill(text: String, selected: Boolean = false, onClick: ()
 }
 
 @Composable
-private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit) {
+private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit, onDelete: () -> Unit) {
     val context = LocalContext.current
     Box(
         modifier = Modifier
@@ -319,6 +360,21 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit) {
             contentColor = Color.White,
         ) {
             Text("${item.daysLeft()}天", modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall)
+        }
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(48.dp)
+                .background(Color.Black.copy(alpha = 0.48f), CircleShape),
+        ) {
+            Icon(
+                Icons.Rounded.DeleteForever,
+                contentDescription = "永久删除",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp),
+            )
         }
         Icon(
             if (item.mediaType == "video") Icons.Rounded.Movie else Icons.Rounded.Photo,

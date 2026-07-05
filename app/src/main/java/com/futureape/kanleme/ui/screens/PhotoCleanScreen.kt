@@ -127,6 +127,7 @@ fun PhotoCleanScreen(
     val deck by viewModel.photoDeck.collectAsStateWithLifecycle()
     val dayMemoryPhotos by viewModel.photoDayMemoryWindow.collectAsStateWithLifecycle()
     val deckPreparing by viewModel.photoDeckPreparing.collectAsStateWithLifecycle()
+    val mediaLibraryRefreshing by viewModel.mediaLibraryRefreshing.collectAsStateWithLifecycle()
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val typeStats by viewModel.photoTypeStats.collectAsStateWithLifecycle()
     val scope by viewModel.photoScope.collectAsStateWithLifecycle()
@@ -153,6 +154,8 @@ fun PhotoCleanScreen(
     var lastBatchDeleteBytes by rememberSaveable { mutableStateOf(0L) }
     var batchSummary by remember { mutableStateOf<PhotoBatchSummary?>(null) }
     var dayMemoryPinch by remember { mutableStateOf(DayMemoryPinchState()) }
+    var emptyStateVisible by remember { mutableStateOf(false) }
+    var lastEmptyPhotoDeckPrepareKey by remember { mutableStateOf<Any?>(null) }
 
     fun clearBatchCounters() {
         batchKeepCount = 0
@@ -228,18 +231,37 @@ fun PhotoCleanScreen(
         guideTargets = guideTargets + (target to rect)
     }
 
-    LaunchedEffect(deck.isEmpty(), deckPreparing, dashboard.photoCount, dashboard.processedPhotoCount, scope, batchSummary, batchFinishing) {
-        // Do not reload a non-empty deck when returning from the viewer.
-        // Also avoid preparing a new deck behind the batch summary overlay.
-        if (
-            deck.isEmpty() &&
-            !deckPreparing &&
-            batchSummary == null &&
-            !batchFinishing &&
-            dashboard.processedPhotoCount < dashboard.photoCount
-        ) {
-            viewModel.loadPhotoDeck(scope)
+    LaunchedEffect(
+        deck.isEmpty(),
+        deckPreparing,
+        mediaLibraryRefreshing,
+        dashboard.photoCount,
+        dashboard.processedPhotoCount,
+        scope,
+        batchSummary,
+        batchFinishing,
+    ) {
+        if (deck.isNotEmpty()) {
+            emptyStateVisible = false
+            lastEmptyPhotoDeckPrepareKey = null
+            return@LaunchedEffect
         }
+        if (deckPreparing || mediaLibraryRefreshing || batchSummary != null || batchFinishing) {
+            emptyStateVisible = false
+            return@LaunchedEffect
+        }
+        val prepareKey = scope to (dashboard.photoCount to dashboard.processedPhotoCount)
+        if (
+            dashboard.processedPhotoCount < dashboard.photoCount &&
+            lastEmptyPhotoDeckPrepareKey != prepareKey
+        ) {
+            emptyStateVisible = false
+            lastEmptyPhotoDeckPrepareKey = prepareKey
+            viewModel.ensurePhotoCleaningQueuePrepared(scope)
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(420)
+        emptyStateVisible = true
     }
     LaunchedEffect(deck, settings.photoGuideShown) {
         showGuide = false
@@ -281,7 +303,7 @@ fun PhotoCleanScreen(
         return
     }
 
-    if (deck.isEmpty() && deckPreparing) {
+    if (deck.isEmpty() && (deckPreparing || mediaLibraryRefreshing || !emptyStateVisible)) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -540,7 +562,7 @@ private fun PhotoBatchSummaryOverlay(
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.58f))
                 .padding(horizontal = 18.dp, vertical = 22.dp),
-            contentAlignment = Alignment.BottomCenter,
+            contentAlignment = Alignment.Center,
         ) {
             Surface(
                 modifier = Modifier

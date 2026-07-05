@@ -147,6 +147,11 @@ internal fun ImmersiveCleanHomeScreen(
     } else {
         videos.take(3).map { KeepixPreviewItem(it.uri, it.displayName, true, keepixPhotoAspectRatio(it.width, it.height)) }
     }
+    val canOpenDeck = if (selectedIsPhoto) {
+        previews.isNotEmpty() || photoPreparing || dashboard.processedPhotoCount < dashboard.photoCount
+    } else {
+        previews.isNotEmpty() || videoPreparing || dashboard.processedVideoCount < dashboard.videoCount
+    }
     val heroUri = previews.firstOrNull()?.uri
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (heroUri != null) {
@@ -229,6 +234,7 @@ internal fun ImmersiveCleanHomeScreen(
                             items = previews,
                             preparing = if (selectedIsPhoto) photoPreparing else videoPreparing,
                             selectedIsPhoto = selectedIsPhoto,
+                            canOpen = canOpenDeck,
                             onClick = if (selectedIsPhoto) onPhoto else onVideo,
                         )
                     }
@@ -586,6 +592,7 @@ private fun KeepixHomeDeck(
     items: List<KeepixPreviewItem>,
     preparing: Boolean,
     selectedIsPhoto: Boolean,
+    canOpen: Boolean,
     onClick: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -629,7 +636,7 @@ private fun KeepixHomeDeck(
                 interactionSource = deckClickSource,
                 indication = null,
                 onClick = {
-                    if (opening) return@clickable
+                    if (opening || !canOpen) return@clickable
                     opening = true
                     scope.launch {
                         deckOpenProgress.animateTo(1f, tween(260, easing = FastOutSlowInEasing))
@@ -649,16 +656,20 @@ private fun KeepixHomeDeck(
                     .height(500.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    if (preparing) {
-                        if (selectedIsPhoto) "正在准备照片" else "正在准备视频"
-                    } else {
-                        if (selectedIsPhoto) "当前没有待整理照片" else "当前没有待整理视频"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.62f),
-                    textAlign = TextAlign.Center,
-                )
+                if (preparing) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(0.26f),
+                        color = Color.White.copy(alpha = 0.58f),
+                        trackColor = Color.White.copy(alpha = 0.12f),
+                    )
+                } else if (!canOpen) {
+                    Text(
+                        if (selectedIsPhoto) "当前没有待整理照片" else "当前没有待整理视频",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.62f),
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         } else {
             val rotations = listOf(6f, -7f, 9f)

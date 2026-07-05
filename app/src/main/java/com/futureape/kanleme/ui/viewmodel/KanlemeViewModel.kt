@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -86,6 +87,10 @@ class KanlemeViewModel @Inject constructor(
     }
     private val _settingsLoaded = MutableStateFlow(false)
     val settingsLoaded = _settingsLoaded.asStateFlow()
+    private val _organizerScopesReady = MutableStateFlow(false)
+    val organizerScopesReady = _organizerScopesReady.asStateFlow()
+    private val _startupMediaBootstrapPending = MutableStateFlow(false)
+    val startupMediaBootstrapPending = _startupMediaBootstrapPending.asStateFlow()
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings
         .onEach { _settingsLoaded.value = true }
@@ -165,6 +170,9 @@ class KanlemeViewModel @Inject constructor(
     private val _photoDeckPreviewPreparing = MutableStateFlow(false)
     val photoDeckPreviewPreparing = _photoDeckPreviewPreparing.asStateFlow()
 
+    private val _photoDeckPreviewReady = MutableStateFlow(false)
+    val photoDeckPreviewReady = _photoDeckPreviewReady.asStateFlow()
+
     private val _photoUndoAnimation = MutableStateFlow<PhotoUndoAnimation?>(null)
     val photoUndoAnimation = _photoUndoAnimation.asStateFlow()
 
@@ -191,6 +199,8 @@ class KanlemeViewModel @Inject constructor(
 
     private val _message = MutableStateFlow<UiText?>(null)
     val message = _message.asStateFlow()
+    private val _mediaLibraryRefreshing = MutableStateFlow(false)
+    val mediaLibraryRefreshing = _mediaLibraryRefreshing.asStateFlow()
 
     private var lastAutoRefreshAccessKey: String? = null
     private var photoDeckRefilling = false
@@ -199,10 +209,15 @@ class KanlemeViewModel @Inject constructor(
     private var videoDeckLoadJob: Job? = null
     private var photoDeckPreviewLoadJob: Job? = null
     private var videoDeckPreviewLoadJob: Job? = null
+    private val _photoDeckScope = MutableStateFlow<CleaningScope?>(null)
+    private var photoDeckScope: CleaningScope?
+        get() = _photoDeckScope.value
+        set(value) { _photoDeckScope.value = value }
     private var photoDeckPreviewScope: CleaningScope? = null
     private var videoDeckPreviewScope: CleaningScope? = null
     private var photoDeckPreviewScopeLoaded = false
     private var videoDeckPreviewScopeLoaded = false
+    private var photoCleaningSessionActive = false
     private var photoDayMemoryWindowJob: Job? = null
     private var photoDeckGeneration = 0L
     private var videoDeckGeneration = 0L
@@ -218,40 +233,76 @@ class KanlemeViewModel @Inject constructor(
     private val handledVideoActionMediaIds = mutableSetOf<Long>()
     private val pendingVideoKeepOperations = mutableMapOf<Long, Deferred<Long>>()
 
+    val photoDeckMatchesCurrentScope = combine(_photoScope, _photoDeckScope) { scope, deckScope ->
+        samePhotoDeckScope(deckScope, scope)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     init {
         viewModelScope.launch {
-            val persisted = settingsRepository.settings.first()
-            val photoScope = persisted.toPhotoCleaningScope()
-            val videoScope = persisted.toVideoCleaningScope()
+            val persisted = settingsRepository.loadStartupSettings()
+            val photoScope = startupSeededScope(persisted.toPhotoCleaningScope())
+            val videoScope = startupSeededScope(persisted.toVideoCleaningScope())
             _photoScope.value = photoScope
             _videoScope.value = videoScope
+            _organizerScopesReady.value = true
             loadPhotoDeckPreview(photoScope)
+            loadPhotoDeck(photoScope)
         }
     }
 
     fun onMediaAccessReady(accessKey: String, accessLabel: String) {
         if (lastAutoRefreshAccessKey == accessKey) return
         lastAutoRefreshAccessKey = accessKey
+        val needsBootstrap = _photoDeck.value.isEmpty() &&
+            _videoDeck.value.isEmpty() &&
+            dashboard.value.photoCount == 0 &&
+            dashboard.value.videoCount == 0
+        if (needsBootstrap) _startupMediaBootstrapPending.value = true
         // 首次授权后的自动同步不再弹出悬浮提示，避免遮挡首页或整理页按钮。
-        refreshLibrary(accessLabel = accessLabel, showMessage = false)
+        refreshLibrary(accessLabel = accessLabel, showMessage = false, startupBootstrap = needsBootstrap)
     }
 
-    fun refreshLibrary(accessLabel: String? = null, showMessage: Boolean = true) = viewModelScope.launch {
+    fun refreshLibrary(
+        accessLabel: String? = null,
+        showMessage: Boolean = true,
+        startupBootstrap: Boolean = false,
+    ) = viewModelScope.launch {
         val prefix = accessLabel?.let { it + "：" }.orEmpty()
-        runCatching { repository.refreshMediaLibrary() }
-            .onSuccess { (p, v) ->
-                if (showMessage) {
-                    _message.value = uiText(R.string.message_library_synced, p, v)
+        val showPhotoPreparing = _photoDeck.value.isEmpty()
+        if (showPhotoPreparing) _photoDeckPreparing.value = true
+        _mediaLibraryRefreshing.value = true
+        try {
+            runCatching { repository.refreshMediaLibrary() }
+                .onSuccess { (p, v) ->
+                    if (showMessage) {
+                        _message.value = uiText(R.string.message_library_synced, p, v)
+                    }
+                    if (_photoDeck.value.isEmpty()) {
+                        invalidatePhotoDeckLoads()
+                        _photoDeckPreview.value = emptyList()
+                        requestPhotoDeckPreview(
+                            scope = _photoScope.value,
+                            allowDuringSession = true,
+                            promoteToDeckWhenReady = photoCleaningSessionActive,
+                        )
+                        loadPhotoDeck(_photoScope.value)
+                    } else if (showPhotoPreparing) {
+                        _photoDeckPreparing.value = false
+                    }
+                    if (_videoDeck.value.isEmpty()) {
+                        videoDeckPreviewScope = null
+                        videoDeckPreviewScopeLoaded = false
+                        loadVideoDeckPreview(_videoScope.value)
+                    }
                 }
-                if (_photoDeck.value.isEmpty()) {
-                    photoDeckPreviewScope = null
-                    photoDeckPreviewScopeLoaded = false
-                    loadPhotoDeckPreview(_photoScope.value)
+                .onFailure {
+                    if (showPhotoPreparing) _photoDeckPreparing.value = false
+                    _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_library_sync_failed)
                 }
-                loadPhotoDeck()
-                loadVideoDeck()
-            }
-            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_library_sync_failed) }
+        } finally {
+            _mediaLibraryRefreshing.value = false
+            if (startupBootstrap) _startupMediaBootstrapPending.value = false
+        }
     }
 
     fun clearMessage() { _message.value = null }
@@ -271,6 +322,24 @@ class KanlemeViewModel @Inject constructor(
     private fun ensureRandomSeed(scope: CleaningScope): CleaningScope =
         if (scope.sortOrder == "random" && scope.randomSeed <= 1L) scope.copy(randomSeed = nextRandomSeed()) else scope
 
+    private fun startupSeededScope(scope: CleaningScope): CleaningScope {
+        val normalized = if (scope.sortOrder.isBlank()) scope.copy(sortOrder = "random") else scope
+        return ensureRandomSeed(normalized)
+    }
+
+    // Home preview must come from the same generated deck as the actual cleaning session,
+    // otherwise random candidate-pool differences will make the preview jump on entry.
+    private fun homePhotoPreviewLoadScope(scope: CleaningScope): CleaningScope =
+        scope.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE)
+
+    private fun homeVideoPreviewLoadScope(scope: CleaningScope): CleaningScope =
+        scope.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE)
+
+    private fun CleaningScope.deckScopeKey(): CleaningScope = copy(batchSize = 0)
+
+    private fun samePhotoDeckScope(left: CleaningScope?, right: CleaningScope): Boolean =
+        left?.deckScopeKey() == right.deckScopeKey()
+
     private fun nextPhotoDeckGeneration(): Long {
         photoDeckLoadJob?.cancel()
         photoDeckGeneration += 1L
@@ -288,8 +357,10 @@ class KanlemeViewModel @Inject constructor(
         photoDeckGeneration += 1L
         photoDeckPreviewLoadJob?.cancel()
         photoDeckPreviewGeneration += 1L
+        photoDeckScope = null
         photoDeckPreviewScope = null
         photoDeckPreviewScopeLoaded = false
+        _photoDeckPreviewReady.value = false
         _photoDeckPreviewPreparing.value = false
     }
 
@@ -354,6 +425,7 @@ class KanlemeViewModel @Inject constructor(
         pendingPhotoActionMediaIds += photo.mediaStoreId
         handledPhotoActionMediaIds += photo.mediaStoreId
         _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
+        if (_photoDeck.value.isEmpty()) _photoDeckPreparing.value = true
         _photoSessionActionCount.value += 1
         _lastPhotoAction.value = action
         return true
@@ -369,6 +441,7 @@ class KanlemeViewModel @Inject constructor(
             _photoDeck.value = (listOf(photo) + _photoDeck.value)
                 .distinctBy { it.mediaStoreId }
                 .take(CONTINUOUS_PHOTO_DECK_SIZE)
+            photoDeckScope = _photoScope.value
         }
         _photoSessionActionCount.value = (_photoSessionActionCount.value - 1).coerceAtLeast(0)
     }
@@ -386,6 +459,7 @@ class KanlemeViewModel @Inject constructor(
         _photoDeck.value = (listOf(photo) + _photoDeck.value)
             .distinctBy { it.mediaStoreId }
             .take(CONTINUOUS_PHOTO_DECK_SIZE)
+        photoDeckScope = _photoScope.value
         _photoSessionActionCount.value = (_photoSessionActionCount.value - 1).coerceAtLeast(0)
         _lastPhotoAction.value = snapshot.action
         _photoUndoAnimation.value = PhotoUndoAnimation(
@@ -435,6 +509,7 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun finishPhotoCleaningSession() {
+        photoCleaningSessionActive = false
         pendingPhotoActionMediaIds.clear()
         clearPhotoActionHistory()
         clearPhotoDayMemoryWindow()
@@ -452,6 +527,14 @@ class KanlemeViewModel @Inject constructor(
     fun loadPhotoDeck(scope: CleaningScope = _photoScope.value, replaceWithEmpty: Boolean = false) {
         val requestedScope = ensureRandomSeed(scope)
         _photoScope.value = requestedScope
+        if (replaceWithEmpty && !samePhotoDeckScope(photoDeckScope, requestedScope)) {
+            _photoDeck.value = emptyList()
+            _photoDeckPreview.value = emptyList()
+            photoDeckScope = null
+            photoDeckPreviewScope = null
+            photoDeckPreviewScopeLoaded = false
+            _photoDeckPreviewReady.value = false
+        }
         val showPreparing = _photoDeck.value.isEmpty()
         if (showPreparing) _photoDeckPreparing.value = true
         val generation = nextPhotoDeckGeneration()
@@ -465,8 +548,10 @@ class KanlemeViewModel @Inject constructor(
                     if (loaded.isNotEmpty() || _photoDeck.value.isEmpty() || replaceWithEmpty) {
                         _photoDeck.value = loaded
                         _photoDeckPreview.value = loaded.take(HOME_PREVIEW_DECK_SIZE)
+                        photoDeckScope = requestedScope
                         photoDeckPreviewScope = requestedScope
-                        photoDeckPreviewScopeLoaded = loaded.isNotEmpty()
+                        photoDeckPreviewScopeLoaded = true
+                        _photoDeckPreviewReady.value = true
                     }
                 }
             } finally {
@@ -476,34 +561,104 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun loadPhotoDeckPreview(scope: CleaningScope = _photoScope.value) {
-        if (_photoDeck.value.isNotEmpty()) {
+        requestPhotoDeckPreview(scope = scope)
+    }
+
+    fun reloadPhotoDeckPreview(scope: CleaningScope = _photoScope.value) {
+        if (photoCleaningSessionActive) return
+        photoDeckPreviewLoadJob?.cancel()
+        photoDeckPreviewGeneration += 1L
+        photoDeckPreviewScope = null
+        photoDeckPreviewScopeLoaded = false
+        _photoDeckPreviewReady.value = false
+        _photoDeckPreviewPreparing.value = false
+        _photoDeckPreview.value = emptyList()
+        loadPhotoDeckPreview(scope)
+    }
+
+    private fun requestPhotoDeckPreview(
+        scope: CleaningScope = _photoScope.value,
+        allowDuringSession: Boolean = false,
+        promoteToDeckWhenReady: Boolean = false,
+    ) {
+        if (photoCleaningSessionActive && !allowDuringSession) return
+        val requestedScope = ensureRandomSeed(scope.copy(sortOrder = if (scope.sortOrder.isBlank()) "random" else scope.sortOrder))
+        if (_photoDeck.value.isNotEmpty() && samePhotoDeckScope(photoDeckScope, requestedScope)) {
             _photoDeckPreview.value = _photoDeck.value.take(HOME_PREVIEW_DECK_SIZE)
+            photoDeckPreviewScope = requestedScope
+            photoDeckPreviewScopeLoaded = true
+            _photoDeckPreviewReady.value = true
             return
         }
-        val requestedScope = ensureRandomSeed(scope.copy(sortOrder = if (scope.sortOrder.isBlank()) "random" else scope.sortOrder))
-        if (photoDeckPreviewScope == requestedScope && (_photoDeckPreviewPreparing.value || photoDeckPreviewScopeLoaded)) {
-            return
+        if (!samePhotoDeckScope(photoDeckPreviewScope, requestedScope)) {
+            _photoDeckPreview.value = emptyList()
+            photoDeckPreviewScopeLoaded = false
+            _photoDeckPreviewReady.value = false
+        }
+        if (photoDeckPreviewScope == requestedScope) {
+            if (
+                photoDeckPreviewScopeLoaded ||
+                (_photoDeckPreviewPreparing.value && !promoteToDeckWhenReady)
+            ) {
+                if (
+                    promoteToDeckWhenReady &&
+                    _photoDeck.value.isEmpty() &&
+                    _photoDeckPreview.value.isNotEmpty() &&
+                    samePhotoDeckScope(_photoScope.value, requestedScope)
+                ) {
+                    _photoDeck.value = _photoDeckPreview.value.take(HOME_PREVIEW_DECK_SIZE)
+                    photoDeckScope = requestedScope
+                    _photoDeckPreparing.value = false
+                }
+                return
+            }
         }
         _photoScope.value = requestedScope
         photoDeckPreviewScope = requestedScope
         photoDeckPreviewScopeLoaded = false
+        _photoDeckPreviewReady.value = false
         _photoDeckPreviewPreparing.value = true
         photoDeckPreviewLoadJob?.cancel()
         val generation = ++photoDeckPreviewGeneration
         photoDeckPreviewLoadJob = viewModelScope.launch {
             try {
                 val preview = repository
-                    .loadPhotoDeck(requestedScope.copy(batchSize = HOME_PREVIEW_DECK_SIZE))
+                    .loadPhotoDeck(homePhotoPreviewLoadScope(requestedScope))
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
-                if (generation == photoDeckPreviewGeneration && _photoDeck.value.isEmpty()) {
+                    .take(HOME_PREVIEW_DECK_SIZE)
+                if (generation == photoDeckPreviewGeneration) {
                     _photoDeckPreview.value = preview
-                    photoDeckPreviewScopeLoaded = preview.isNotEmpty()
+                    photoDeckPreviewScopeLoaded = true
+                    _photoDeckPreviewReady.value = true
+                    if (
+                        promoteToDeckWhenReady &&
+                        preview.isNotEmpty() &&
+                        _photoDeck.value.isEmpty() &&
+                        samePhotoDeckScope(_photoScope.value, requestedScope)
+                    ) {
+                        _photoDeck.value = preview
+                        photoDeckScope = requestedScope
+                        _photoDeckPreparing.value = false
+                    }
                 }
             } finally {
                 if (generation == photoDeckPreviewGeneration) _photoDeckPreviewPreparing.value = false
             }
         }
+    }
+
+    fun preparePhotoHomeQueue(scope: CleaningScope = _photoScope.value) {
+        photoCleaningSessionActive = false
+        ensurePhotoCleaningQueuePrepared(scope)
+    }
+
+    fun ensurePhotoCleaningQueuePrepared(scope: CleaningScope = _photoScope.value) {
+        val requestedScope = ensureRandomSeed(scope.copy(sortOrder = if (scope.sortOrder.isBlank()) "random" else scope.sortOrder))
+        if (photoDeckLoadJob?.isActive == true) return
+        if (_photoDeckPreparing.value) _photoDeckPreparing.value = false
+        if (_photoDeck.value.isNotEmpty() && samePhotoDeckScope(photoDeckScope, requestedScope)) return
+        loadPhotoDeck(requestedScope, replaceWithEmpty = !samePhotoDeckScope(photoDeckScope, requestedScope))
     }
 
     fun loadPhotoDayMemoryWindow(currentPhoto: PhotoEntity) {
@@ -566,9 +721,10 @@ class KanlemeViewModel @Inject constructor(
         videoDeckPreviewLoadJob = viewModelScope.launch {
             try {
                 val preview = repository
-                    .loadVideoDeck(requestedScope.copy(batchSize = HOME_PREVIEW_DECK_SIZE))
+                    .loadVideoDeck(homeVideoPreviewLoadScope(requestedScope))
                     .withoutLocalVideoExclusions()
                     .distinctBy { it.mediaStoreId }
+                    .take(HOME_PREVIEW_DECK_SIZE)
                 if (generation == videoDeckPreviewGeneration && _videoDeck.value.isEmpty()) {
                     _videoDeckPreview.value = preview
                     videoDeckPreviewScopeLoaded = true
@@ -580,6 +736,7 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun startPhotoCleaningSession() {
+        photoCleaningSessionActive = true
         val base = _photoScope.value
         val session = ensureRandomSeed(base.copy(sortOrder = if (base.sortOrder.isBlank()) "random" else base.sortOrder))
         _photoScope.value = session
@@ -588,15 +745,21 @@ class KanlemeViewModel @Inject constructor(
         pendingPhotoActionMediaIds.clear()
         clearPhotoActionHistory()
         _photoDeck.value = _photoDeck.value.withoutLocalPhotoExclusions()
+        if (_photoDeck.value.isNotEmpty() && !samePhotoDeckScope(photoDeckScope, session)) {
+            _photoDeck.value = emptyList()
+            photoDeckScope = null
+        }
         val previewForSession = _photoDeckPreview.value
             .withoutLocalPhotoExclusions()
             .distinctBy { it.mediaStoreId }
             .take(HOME_PREVIEW_DECK_SIZE)
         val promotedPreview = _photoDeck.value.isEmpty() &&
             previewForSession.isNotEmpty() &&
-            photoDeckPreviewScope == session
+            samePhotoDeckScope(photoDeckPreviewScope, session) &&
+            photoDeckPreviewScopeLoaded
         if (promotedPreview) {
             _photoDeck.value = previewForSession
+            photoDeckScope = session
             _photoDeckPreparing.value = false
         }
         if (_photoDeck.value.isNotEmpty() && !promotedPreview) {
@@ -608,6 +771,11 @@ class KanlemeViewModel @Inject constructor(
         }
         val showPreparing = _photoDeck.value.isEmpty()
         if (showPreparing) _photoDeckPreparing.value = true
+        requestPhotoDeckPreview(
+            scope = session,
+            allowDuringSession = true,
+            promoteToDeckWhenReady = true,
+        )
         val generation = nextPhotoDeckGeneration()
         photoDeckLoadJob = viewModelScope.launch {
             if (session.sortOrder == "random") settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed)
@@ -617,11 +785,17 @@ class KanlemeViewModel @Inject constructor(
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == photoDeckGeneration) {
-                    val nextDeck = if (promotedPreview) mergeVisiblePhotoDeckWithLoaded(loaded) else loaded
+                    val nextDeck = if (_photoDeck.value.isNotEmpty() && samePhotoDeckScope(photoDeckScope, session)) {
+                        mergeVisiblePhotoDeckWithLoaded(loaded)
+                    } else {
+                        loaded
+                    }
                     _photoDeck.value = nextDeck
                     _photoDeckPreview.value = nextDeck.take(HOME_PREVIEW_DECK_SIZE)
+                    photoDeckScope = session
                     photoDeckPreviewScope = session
                     photoDeckPreviewScopeLoaded = true
+                    _photoDeckPreviewReady.value = true
                 }
             } finally {
                 if (generation == photoDeckGeneration) _photoDeckPreparing.value = false
@@ -669,6 +843,7 @@ class KanlemeViewModel @Inject constructor(
         _photoScope.value = session
         _photoDeckPreparing.value = true
         _photoDeck.value = emptyList()
+        photoDeckScope = null
         val generation = nextPhotoDeckGeneration()
         photoDeckLoadJob = viewModelScope.launch {
             settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed)
@@ -677,7 +852,14 @@ class KanlemeViewModel @Inject constructor(
                     .loadPhotoDeck(session.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
-                if (generation == photoDeckGeneration) _photoDeck.value = loaded
+                if (generation == photoDeckGeneration) {
+                    _photoDeck.value = loaded
+                    _photoDeckPreview.value = loaded.take(HOME_PREVIEW_DECK_SIZE)
+                    photoDeckScope = session
+                    photoDeckPreviewScope = session
+                    photoDeckPreviewScopeLoaded = true
+                    _photoDeckPreviewReady.value = true
+                }
             } finally {
                 if (generation == photoDeckGeneration) _photoDeckPreparing.value = false
             }
@@ -711,6 +893,8 @@ class KanlemeViewModel @Inject constructor(
         if (!force && _photoDeck.value.size > PHOTO_PREFETCH_THRESHOLD) return
         if (photoDeckRefilling) return
         val generation = photoDeckGeneration
+        val showPreparing = _photoDeck.value.isEmpty()
+        if (showPreparing) _photoDeckPreparing.value = true
         photoDeckRefilling = true
         try {
             val fresh = repository.loadPhotoDeck(_photoScope.value.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
@@ -719,9 +903,13 @@ class KanlemeViewModel @Inject constructor(
                 .withoutLocalPhotoExclusions()
                 .distinctBy { it.mediaStoreId }
                 .take(CONTINUOUS_PHOTO_DECK_SIZE)
-            if (generation == photoDeckGeneration) _photoDeck.value = merged
+            if (generation == photoDeckGeneration) {
+                _photoDeck.value = merged
+                photoDeckScope = _photoScope.value
+            }
         } finally {
             photoDeckRefilling = false
+            if (showPreparing && generation == photoDeckGeneration) _photoDeckPreparing.value = false
         }
     }
 
@@ -781,7 +969,6 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun setPhotoDateModePreview(mode: String) = viewModelScope.launch {
-        settingsRepository.setPhotoDateMode(mode)
         preparePhotoPreview(_photoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
     }
 
@@ -790,7 +977,14 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun resetPhotoSessionDateMode() {
-        _photoScope.value = _photoScope.value.copy(dateMode = "all", todayInHistory = false)
+        val nextScope = _photoScope.value.copy(dateMode = "all", todayInHistory = false)
+        _photoScope.value = nextScope
+        if (_photoDeck.value.isNotEmpty() && !samePhotoDeckScope(photoDeckScope, nextScope)) {
+            invalidatePhotoDeckLoads()
+            _photoDeck.value = emptyList()
+            _photoDeckPreview.value = emptyList()
+            _photoDeckPreviewReady.value = false
+        }
     }
 
     fun setVideoDateMode(mode: String) = viewModelScope.launch {
@@ -799,7 +993,6 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun setVideoDateModePreview(mode: String) = viewModelScope.launch {
-        settingsRepository.setVideoDateMode(mode)
         prepareVideoPreview(_videoScope.value.copy(dateMode = mode, todayInHistory = mode == "today_history"))
     }
 

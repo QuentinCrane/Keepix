@@ -1,6 +1,7 @@
 package com.futureape.kanleme.data.settings
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -10,6 +11,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -73,63 +75,21 @@ class AppSettingsRepository @Inject constructor(
         val videoShowProgressBar = booleanPreferencesKey("video_show_progress_bar")
         val videoShowShuffleButton = booleanPreferencesKey("video_show_shuffle_button")
         val videoChromeVisible = booleanPreferencesKey("video_chrome_visible")
+        val organizerDateModePreviewFixApplied = booleanPreferencesKey("organizer_date_mode_preview_fix_applied")
     }
 
-    val settings: Flow<AppSettings> = context.kanlemeSettingsDataStore.data.map { p ->
-        AppSettings(
-            deleteMode = p[Keys.deleteMode].toEnum(DeleteMode.PENDING_CONFIRM),
-            photoBatchSize = p[Keys.photoBatchSize] ?: 30,
-            videoBatchSize = p[Keys.videoBatchSize] ?: 20,
-            autoMoveOnKeepFavorite = p[Keys.autoMoveOnKeepFavorite] ?: true,
-            similarDetection = p[Keys.similarDetection] ?: false,
-            swipeSensitivity = p[Keys.swipeSensitivity].toEnum(SwipeSensitivity.STANDARD),
-            gestureDirection = p[Keys.gestureDirection].toEnum(GestureDirection.DEFAULT),
-            quickActionButtons = p[Keys.quickActionButtons] ?: true,
-            swapShareAndUndo = p[Keys.swapShareAndUndo] ?: false,
-            swipeSound = p[Keys.swipeSound] ?: true,
-            videoDefaultMuted = p[Keys.videoDefaultMuted] ?: true,
-            videoDisplayMode = p[Keys.videoDisplayMode].toEnum(VideoDisplayMode.IMMERSIVE_CROP),
-            hapticLevel = p[Keys.hapticLevel].toEnum(HapticLevel.MEDIUM),
-            keepHapticLevel = p[Keys.keepHapticLevel].toEnum(HapticLevel.MEDIUM),
-            deleteHapticLevel = p[Keys.deleteHapticLevel].toEnum(HapticLevel.MEDIUM),
-            favoriteHapticLevel = p[Keys.favoriteHapticLevel].toEnum(HapticLevel.MEDIUM),
-            undoHapticLevel = p[Keys.undoHapticLevel].toEnum(HapticLevel.MEDIUM),
-            themeMode = p[Keys.themeMode].toEnum(ThemeMode.SYSTEM),
-            todayInHistoryEntryMode = sanitizeTodayInHistoryEntryMode(p[Keys.todayInHistoryEntryMode]),
-            accentColor = p[Keys.accentColor] ?: 0xFFC7ECFE,
-            folderDisplay = p[Keys.folderDisplay].toEnum(FolderDisplayMode.SINGLE_LINE),
-            immersiveBackground = p[Keys.immersiveBackground] ?: true,
-            photoCleanMode = p[Keys.photoCleanMode].toEnum(PhotoCleanMode.NORMAL),
-            homeMediaTab = sanitizeTab(p[Keys.homeMediaTab]),
-            photoDateMode = sanitizeDateMode(p[Keys.photoDateMode]),
-            photoMediaType = sanitizePhotoMediaType(p[Keys.photoMediaType]),
-            photoSortOrder = sanitizeSortOrder(p[Keys.photoSortOrder]),
-            photoRandomSeed = p[Keys.photoRandomSeed] ?: 1L,
-            photoFolderPath = p[Keys.photoFolderPath].orEmpty(),
-            videoDateMode = sanitizeDateMode(p[Keys.videoDateMode]),
-            videoSortOrder = sanitizeSortOrder(p[Keys.videoSortOrder]),
-            videoRandomSeed = p[Keys.videoRandomSeed] ?: 1L,
-            videoFolderPath = p[Keys.videoFolderPath].orEmpty(),
-            photoGuideShown = p[Keys.photoGuideShown] ?: false,
-            videoGuideShown = p[Keys.videoGuideShown] ?: false,
-            excludedFolderPaths = p[Keys.excludedFolderPaths] ?: emptySet(),
-            onboardingShown = p[Keys.onboardingShown] ?: false,
-            photoFocusMode = p[Keys.photoFocusMode] ?: false,
-            photoShowTopBar = p[Keys.photoShowTopBar] ?: true,
-            photoShowFilterChips = p[Keys.photoShowFilterChips] ?: true,
-            photoShowFolderChips = p[Keys.photoShowFolderChips] ?: true,
-            photoShowActionRail = p[Keys.photoShowActionRail] ?: true,
-            photoShowInfoBar = p[Keys.photoShowInfoBar] ?: true,
-            photoShowGestureHint = p[Keys.photoShowGestureHint] ?: true,
-            photoShowShuffleButton = p[Keys.photoShowShuffleButton] ?: true,
-            videoShowTopBar = p[Keys.videoShowTopBar] ?: true,
-            videoShowActionRail = p[Keys.videoShowActionRail] ?: true,
-            videoShowInfoPanel = p[Keys.videoShowInfoPanel] ?: true,
-            videoShowFolderChips = p[Keys.videoShowFolderChips] ?: true,
-            videoShowProgressBar = p[Keys.videoShowProgressBar] ?: true,
-            videoShowShuffleButton = p[Keys.videoShowShuffleButton] ?: true,
-            videoChromeVisible = p[Keys.videoChromeVisible] ?: true,
-        )
+    val settings: Flow<AppSettings> = context.kanlemeSettingsDataStore.data.map { it.toAppSettings() }
+
+    suspend fun loadStartupSettings(): AppSettings {
+        val current = context.kanlemeSettingsDataStore.data.first()
+        if (current[Keys.organizerDateModePreviewFixApplied] == true) return current.toAppSettings()
+        context.kanlemeSettingsDataStore.edit { prefs ->
+            // Older builds accidentally persisted organizer preview date ranges.
+            prefs[Keys.organizerDateModePreviewFixApplied] = true
+            prefs[Keys.photoDateMode] = "all"
+            prefs[Keys.videoDateMode] = "all"
+        }
+        return context.kanlemeSettingsDataStore.data.first().toAppSettings()
     }
 
     suspend fun setDeleteMode(value: DeleteMode) = editString(Keys.deleteMode, value.name)
@@ -236,6 +196,62 @@ class AppSettingsRepository @Inject constructor(
         TodayInHistoryEntryMode.MEMORY_PAGE.name -> TodayInHistoryEntryMode.MEMORY_PAGE
         else -> TodayInHistoryEntryMode.MEMORY_PAGE
     }
+
+    private fun Preferences.toAppSettings(): AppSettings =
+        AppSettings(
+            deleteMode = this[Keys.deleteMode].toEnum(DeleteMode.PENDING_CONFIRM),
+            photoBatchSize = this[Keys.photoBatchSize] ?: 30,
+            videoBatchSize = this[Keys.videoBatchSize] ?: 20,
+            autoMoveOnKeepFavorite = this[Keys.autoMoveOnKeepFavorite] ?: true,
+            similarDetection = this[Keys.similarDetection] ?: false,
+            swipeSensitivity = this[Keys.swipeSensitivity].toEnum(SwipeSensitivity.STANDARD),
+            gestureDirection = this[Keys.gestureDirection].toEnum(GestureDirection.DEFAULT),
+            quickActionButtons = this[Keys.quickActionButtons] ?: true,
+            swapShareAndUndo = this[Keys.swapShareAndUndo] ?: false,
+            swipeSound = this[Keys.swipeSound] ?: true,
+            videoDefaultMuted = this[Keys.videoDefaultMuted] ?: true,
+            videoDisplayMode = this[Keys.videoDisplayMode].toEnum(VideoDisplayMode.IMMERSIVE_CROP),
+            hapticLevel = this[Keys.hapticLevel].toEnum(HapticLevel.MEDIUM),
+            keepHapticLevel = this[Keys.keepHapticLevel].toEnum(HapticLevel.MEDIUM),
+            deleteHapticLevel = this[Keys.deleteHapticLevel].toEnum(HapticLevel.MEDIUM),
+            favoriteHapticLevel = this[Keys.favoriteHapticLevel].toEnum(HapticLevel.MEDIUM),
+            undoHapticLevel = this[Keys.undoHapticLevel].toEnum(HapticLevel.MEDIUM),
+            themeMode = this[Keys.themeMode].toEnum(ThemeMode.SYSTEM),
+            todayInHistoryEntryMode = sanitizeTodayInHistoryEntryMode(this[Keys.todayInHistoryEntryMode]),
+            accentColor = this[Keys.accentColor] ?: 0xFFC7ECFE,
+            folderDisplay = this[Keys.folderDisplay].toEnum(FolderDisplayMode.SINGLE_LINE),
+            immersiveBackground = this[Keys.immersiveBackground] ?: true,
+            photoCleanMode = this[Keys.photoCleanMode].toEnum(PhotoCleanMode.NORMAL),
+            homeMediaTab = sanitizeTab(this[Keys.homeMediaTab]),
+            photoDateMode = sanitizeDateMode(this[Keys.photoDateMode]),
+            photoMediaType = sanitizePhotoMediaType(this[Keys.photoMediaType]),
+            photoSortOrder = sanitizeSortOrder(this[Keys.photoSortOrder]),
+            photoRandomSeed = this[Keys.photoRandomSeed] ?: 1L,
+            photoFolderPath = this[Keys.photoFolderPath].orEmpty(),
+            videoDateMode = sanitizeDateMode(this[Keys.videoDateMode]),
+            videoSortOrder = sanitizeSortOrder(this[Keys.videoSortOrder]),
+            videoRandomSeed = this[Keys.videoRandomSeed] ?: 1L,
+            videoFolderPath = this[Keys.videoFolderPath].orEmpty(),
+            photoGuideShown = this[Keys.photoGuideShown] ?: false,
+            videoGuideShown = this[Keys.videoGuideShown] ?: false,
+            excludedFolderPaths = this[Keys.excludedFolderPaths] ?: emptySet(),
+            onboardingShown = this[Keys.onboardingShown] ?: false,
+            photoFocusMode = this[Keys.photoFocusMode] ?: false,
+            photoShowTopBar = this[Keys.photoShowTopBar] ?: true,
+            photoShowFilterChips = this[Keys.photoShowFilterChips] ?: true,
+            photoShowFolderChips = this[Keys.photoShowFolderChips] ?: true,
+            photoShowActionRail = this[Keys.photoShowActionRail] ?: true,
+            photoShowInfoBar = this[Keys.photoShowInfoBar] ?: true,
+            photoShowGestureHint = this[Keys.photoShowGestureHint] ?: true,
+            photoShowShuffleButton = this[Keys.photoShowShuffleButton] ?: true,
+            videoShowTopBar = this[Keys.videoShowTopBar] ?: true,
+            videoShowActionRail = this[Keys.videoShowActionRail] ?: true,
+            videoShowInfoPanel = this[Keys.videoShowInfoPanel] ?: true,
+            videoShowFolderChips = this[Keys.videoShowFolderChips] ?: true,
+            videoShowProgressBar = this[Keys.videoShowProgressBar] ?: true,
+            videoShowShuffleButton = this[Keys.videoShowShuffleButton] ?: true,
+            videoChromeVisible = this[Keys.videoChromeVisible] ?: true,
+        )
 
     private suspend fun editString(key: androidx.datastore.preferences.core.Preferences.Key<String>, value: String) {
         context.kanlemeSettingsDataStore.edit { it[key] = value }

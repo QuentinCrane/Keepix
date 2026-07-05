@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Swipe
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import com.futureape.kanleme.ui.i18n.Text
@@ -74,21 +75,72 @@ fun PhotoStartScreen(
 ) {
     val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val photos by viewModel.photoDeck.collectAsStateWithLifecycle()
+    val photoDeckMatchesCurrentScope by viewModel.photoDeckMatchesCurrentScope.collectAsStateWithLifecycle()
     val photoPreview by viewModel.photoDeckPreview.collectAsStateWithLifecycle()
+    val photoPreviewReady by viewModel.photoDeckPreviewReady.collectAsStateWithLifecycle()
+    val photoDeckPreparing by viewModel.photoDeckPreparing.collectAsStateWithLifecycle()
+    val organizerScopesReady by viewModel.organizerScopesReady.collectAsStateWithLifecycle()
     val scope by viewModel.photoScope.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val photoFolders by viewModel.photoFolders.collectAsStateWithLifecycle()
     val haptics = rememberHapticKit(settings)
     var showAllPhotoExcludedFolders by remember { mutableStateOf(false) }
+    var lastEmptyPhotoPreviewReloadKey by remember { mutableStateOf<Any?>(null) }
+    var lastPhotoQueuePrepareKey by remember { mutableStateOf<Any?>(null) }
 
-    LaunchedEffect(scope.folderPaths, scope.sortOrder, scope.randomSeed, settings.excludedFolderPaths, scope.mediaType, scope.dateMode, photos.isEmpty()) {
-        if (photos.isEmpty()) viewModel.loadPhotoDeckPreview(scope)
+    LaunchedEffect(
+        scope.folderPaths,
+        scope.sortOrder,
+        scope.randomSeed,
+        settings.excludedFolderPaths,
+        scope.mediaType,
+        scope.dateMode,
+        dashboard.photoCount,
+        dashboard.processedPhotoCount,
+        photoDeckMatchesCurrentScope,
+        photos.size,
+        photoDeckPreparing,
+        photoPreviewReady,
+        photoPreview.size,
+        organizerScopesReady,
+    ) {
+        if (!organizerScopesReady) return@LaunchedEffect
+        val prepareKey = scope to (dashboard.photoCount to dashboard.processedPhotoCount)
+        if (
+            dashboard.processedPhotoCount < dashboard.photoCount &&
+            (!photoDeckMatchesCurrentScope || photos.isEmpty()) &&
+            lastPhotoQueuePrepareKey != prepareKey
+        ) {
+            lastPhotoQueuePrepareKey = prepareKey
+            viewModel.preparePhotoHomeQueue(scope)
+        }
+        if (photos.isNotEmpty() && photoDeckMatchesCurrentScope) {
+            lastPhotoQueuePrepareKey = null
+        }
+        val reloadKey = scope to (dashboard.photoCount to dashboard.processedPhotoCount)
+        if (
+            photoPreviewReady &&
+            photoPreview.isEmpty() &&
+            dashboard.processedPhotoCount < dashboard.photoCount &&
+            lastEmptyPhotoPreviewReloadKey != reloadKey
+        ) {
+            lastEmptyPhotoPreviewReloadKey = reloadKey
+            viewModel.reloadPhotoDeckPreview(scope)
+        } else {
+            if (photoPreview.isNotEmpty()) lastEmptyPhotoPreviewReloadKey = null
+            viewModel.loadPhotoDeckPreview(scope)
+        }
     }
-    val previewPhotos = photos.ifEmpty { photoPreview }
+    val scopedPhotos = if (organizerScopesReady && photoDeckMatchesCurrentScope) photos else emptyList()
+    val previewPhotos = if (organizerScopesReady) scopedPhotos.ifEmpty { photoPreview } else emptyList()
+    val preparing = !organizerScopesReady ||
+        photoDeckPreparing ||
+        (scopedPhotos.isEmpty() && photoPreview.isEmpty() && !photoPreviewReady)
 
     KeepixPhotoStartContent(
         photos = previewPhotos,
-        queuedPhotoCount = photos.size,
+        preparing = preparing,
+        queuedPhotoCount = scopedPhotos.size,
         photoCount = dashboard.photoCount,
         processedPhotoCount = dashboard.processedPhotoCount,
         scopeMediaType = scope.mediaType,
@@ -116,6 +168,7 @@ fun PhotoStartScreen(
 @Composable
 private fun KeepixPhotoStartContent(
     photos: List<PhotoEntity>,
+    preparing: Boolean,
     queuedPhotoCount: Int,
     photoCount: Int,
     processedPhotoCount: Int,
@@ -176,6 +229,29 @@ private fun KeepixPhotoStartContent(
                 )
             )
         )
+        if (hero == null && preparing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    CircularProgressIndicator(
+                        color = Color.White.copy(alpha = 0.9f),
+                        strokeWidth = 2.4.dp,
+                    )
+                    Text(
+                        "正在准备整理队列",
+                        color = Color.White.copy(alpha = 0.86f),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+            }
+        }
         AdaptiveCenter(maxWidth = 760.dp) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().statusBarsPadding(),
