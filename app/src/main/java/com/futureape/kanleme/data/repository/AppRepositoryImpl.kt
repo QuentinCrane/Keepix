@@ -265,7 +265,7 @@ class AppRepositoryImpl @Inject constructor(
     override suspend fun loadPhotoDeck(scope: CleaningScope): List<PhotoEntity> = withContext(Dispatchers.IO) {
         val settings = settingsRepository.settings.first()
         val range = rangeFor(scope.dateMode)
-        val requiresPostDateFilter = scope.dateMode.startsWith("multiym:")
+        val monthTokens = monthTokensForDateMode(scope.dateMode)
         val targetLimit = scope.batchSize.takeIf { it > 0 } ?: settings.photoBatchSize
         val randomMode = scope.sortOrder == "random"
         val randomQueryLimit = if (targetLimit <= 24) {
@@ -276,7 +276,6 @@ class AppRepositoryImpl @Inject constructor(
         val queryLimit = if (settings.excludedFolderPaths.isEmpty()) {
             when {
                 randomMode -> randomQueryLimit
-                requiresPostDateFilter -> 5000
                 else -> (targetLimit * 6).coerceAtLeast(120)
             }
         } else {
@@ -286,6 +285,8 @@ class AppRepositoryImpl @Inject constructor(
             folderPath = scope.folderPaths.firstOrNull(),
             startMillis = range?.first,
             endMillis = range?.second,
+            multiMonthEnabled = monthTokens.isNotEmpty(),
+            monthTokens = monthTokens.ifEmpty { listOf("") },
             mediaType = scope.mediaType,
             randomOrder = randomMode,
             randomSeed = scope.randomSeed,
@@ -304,10 +305,10 @@ class AppRepositoryImpl @Inject constructor(
     override suspend fun loadVideoDeck(scope: CleaningScope): List<VideoEntity> = withContext(Dispatchers.IO) {
         val settings = settingsRepository.settings.first()
         val range = rangeFor(scope.dateMode)
-        val requiresPostDateFilter = scope.dateMode.startsWith("multiym:")
+        val monthTokens = monthTokensForDateMode(scope.dateMode)
         val targetLimit = scope.batchSize.takeIf { it > 0 } ?: settings.videoBatchSize
         val queryLimit = if (settings.excludedFolderPaths.isEmpty()) {
-            if (requiresPostDateFilter) 5000 else (targetLimit * 6).coerceAtLeast(120)
+            (targetLimit * 6).coerceAtLeast(120)
         } else {
             5000
         }
@@ -315,6 +316,8 @@ class AppRepositoryImpl @Inject constructor(
             folderPath = scope.folderPaths.firstOrNull(),
             startMillis = range?.first,
             endMillis = range?.second,
+            multiMonthEnabled = monthTokens.isNotEmpty(),
+            monthTokens = monthTokens.ifEmpty { listOf("") },
             randomOrder = scope.sortOrder == "random",
             randomSeed = scope.randomSeed,
             limit = queryLimit,
@@ -515,15 +518,19 @@ class AppRepositoryImpl @Inject constructor(
             SwipeAction.Keep -> {
                 if (actionAllowed && current.processingStatus != ProcessingStatus.KEPT) {
                     photoDao.updateProcessingStatus(current.id, ProcessingStatus.KEPT)
-                    if (current.processingStatus == ProcessingStatus.UNPROCESSED) bumpStats(photoDelta = 1)
+                    if (current.processingStatus == ProcessingStatus.UNPROCESSED) {
+                        bumpStats(photoDelta = 1, sourceRef = operationSourceRef(operationId))
+                    }
                 }
             }
             SwipeAction.Favorite -> {
                 if (actionAllowed && current.processingStatus != ProcessingStatus.FAVORITED) {
                     photoDao.updateProcessingStatus(current.id, ProcessingStatus.FAVORITED)
-                    if (current.processingStatus == ProcessingStatus.UNPROCESSED) {
-                        bumpStats(favoriteDelta = 1, photoDelta = 1)
-                    }
+                    bumpStats(
+                        favoriteDelta = 1,
+                        photoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
+                        sourceRef = operationSourceRef(operationId),
+                    )
                 }
             }
             SwipeAction.Delete -> {
@@ -542,6 +549,7 @@ class AppRepositoryImpl @Inject constructor(
                     bumpStats(
                         photoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
                         deletedSize = current.size,
+                        sourceRef = operationSourceRef(operationId),
                     )
                 }
             }
@@ -564,15 +572,19 @@ class AppRepositoryImpl @Inject constructor(
             SwipeAction.Keep -> {
                 if (actionAllowed && current.processingStatus != ProcessingStatus.KEPT) {
                     videoDao.updateProcessingStatus(current.id, ProcessingStatus.KEPT)
-                    if (current.processingStatus == ProcessingStatus.UNPROCESSED) bumpStats(videoDelta = 1)
+                    if (current.processingStatus == ProcessingStatus.UNPROCESSED) {
+                        bumpStats(videoDelta = 1, sourceRef = operationSourceRef(operationId))
+                    }
                 }
             }
             SwipeAction.Favorite -> {
                 if (actionAllowed && current.processingStatus != ProcessingStatus.FAVORITED) {
                     videoDao.updateProcessingStatus(current.id, ProcessingStatus.FAVORITED)
-                    if (current.processingStatus == ProcessingStatus.UNPROCESSED) {
-                        bumpStats(favoriteDelta = 1, videoDelta = 1)
-                    }
+                    bumpStats(
+                        favoriteDelta = 1,
+                        videoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
+                        sourceRef = operationSourceRef(operationId),
+                    )
                 }
             }
             SwipeAction.Delete -> {
@@ -591,6 +603,7 @@ class AppRepositoryImpl @Inject constructor(
                     bumpStats(
                         videoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
                         deletedSize = current.size,
+                        sourceRef = operationSourceRef(operationId),
                     )
                 }
             }
@@ -724,15 +737,16 @@ class AppRepositoryImpl @Inject constructor(
 
     private suspend fun restoreTrashItemLocally(item: TrashItemEntity) {
         val deleteOperation = operationDao.lastByMediaAndAction(item.mediaId, item.mediaType, SwipeAction.Delete.name)
-        val processingStatus = deleteOperation?.previousProcessingStatus ?: ProcessingStatus.UNPROCESSED
-        val deletionStatus = deleteOperation?.previousDeletionStatus ?: DeletionStatus.NONE
+        if (deleteOperation != null) {
+            undoOperation(deleteOperation, restoreSystemTrash = false, undoDelta = 0)
+            return
+        }
         if (item.mediaType == "photo") {
-            photoDao.restoreStatus(item.mediaId, processingStatus, deletionStatus)
+            photoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
         } else {
-            videoDao.restoreStatus(item.mediaId, processingStatus, deletionStatus)
+            videoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
         }
         trashDao.deleteById(item.id)
-        if (deleteOperation != null) operationDao.markUndone(deleteOperation.id)
     }
 
     private suspend fun markTrashItemDeletedLocally(item: TrashItemEntity) {
@@ -748,8 +762,8 @@ class AppRepositoryImpl @Inject constructor(
         if (result is MediaOperationResult.Failed) throw IllegalStateException(result.reason)
     }
 
-    override suspend fun undoLastAction(): Boolean = withContext(Dispatchers.IO) {
-        val op = operationDao.lastUndoable() ?: return@withContext false
+    override suspend fun undoLastAction(mediaType: String?): Boolean = withContext(Dispatchers.IO) {
+        val op = operationDao.lastUndoable(mediaType) ?: return@withContext false
         undoOperation(op)
         true
     }
@@ -810,15 +824,42 @@ class AppRepositoryImpl @Inject constructor(
         }
     }
 
-    private suspend fun undoOperation(op: OperationHistoryEntity) {
-        if (op.mediaType == "photo") {
-            photoDao.restoreStatus(op.mediaId, op.previousProcessingStatus, op.previousDeletionStatus)
-        } else {
-            videoDao.restoreStatus(op.mediaId, op.previousProcessingStatus, op.previousDeletionStatus)
+    private suspend fun undoOperation(
+        op: OperationHistoryEntity,
+        restoreSystemTrash: Boolean = true,
+        undoDelta: Int = 1,
+    ) {
+        val currentPhoto = if (op.mediaType == "photo") photoDao.byId(op.mediaId) else null
+        val currentVideo = if (op.mediaType == "video") videoDao.byId(op.mediaId) else null
+        val currentDeletionStatus = currentPhoto?.deletionStatus ?: currentVideo?.deletionStatus
+        val currentUri = currentPhoto?.uri ?: currentVideo?.uri
+        if (
+            restoreSystemTrash &&
+            op.action == SwipeAction.Delete.name &&
+            currentDeletionStatus == DeletionStatus.TRASHED &&
+            currentUri != null
+        ) {
+            requireMediaOperation(mediaStoreActions.restoreFromSystemTrash(currentUri))
         }
-        if (op.action == SwipeAction.Delete.name) trashDao.deleteByMedia(op.mediaId, op.mediaType)
-        operationDao.markUndone(op.id)
-        bumpStats(undoDelta = 1)
+
+        val adjustment = statsAdjustmentForUndo(op, currentPhoto?.size ?: currentVideo?.size ?: 0L)
+        db.withTransaction {
+            if (op.mediaType == "photo") {
+                photoDao.restoreStatus(op.mediaId, op.previousProcessingStatus, op.previousDeletionStatus)
+            } else {
+                videoDao.restoreStatus(op.mediaId, op.previousProcessingStatus, op.previousDeletionStatus)
+            }
+            if (op.action == SwipeAction.Delete.name) trashDao.deleteByMedia(op.mediaId, op.mediaType)
+            operationDao.markUndone(op.id)
+            adjustStatsInTransaction(
+                photoDelta = adjustment.photoDelta,
+                videoDelta = adjustment.videoDelta,
+                favoriteDelta = adjustment.favoriteDelta,
+                deletedSize = adjustment.storageDelta,
+                undoDelta = undoDelta,
+                cleanupEventSourceRefToDelete = operationSourceRef(op.id),
+            )
+        }
     }
 
     private suspend fun recordOperation(
@@ -849,21 +890,42 @@ class AppRepositoryImpl @Inject constructor(
         favoriteDelta: Int = 0,
         deletedSize: Long = 0L,
         undoDelta: Int = 0,
+        sourceRef: String? = null,
+    ) {
+        db.withTransaction {
+            adjustStatsInTransaction(
+                photoDelta = photoDelta,
+                videoDelta = videoDelta,
+                favoriteDelta = favoriteDelta,
+                deletedSize = deletedSize,
+                undoDelta = undoDelta,
+                cleanupEventSourceRefToDelete = null,
+                sourceRef = sourceRef,
+            )
+        }
+    }
+
+    private suspend fun adjustStatsInTransaction(
+        photoDelta: Int,
+        videoDelta: Int,
+        favoriteDelta: Int,
+        deletedSize: Long,
+        undoDelta: Int,
+        cleanupEventSourceRefToDelete: String?,
+        sourceRef: String? = null,
     ) {
         val now = System.currentTimeMillis()
-        val current = statsDao.observeUserStats().first() ?: UserStatsEntity()
-        statsDao.upsertUserStats(
-            current.copy(
-                totalPhotosCleared = current.totalPhotosCleared + photoDelta,
-                totalVideosCleared = current.totalVideosCleared + videoDelta,
-                totalStorageFreed = current.totalStorageFreed + deletedSize,
-                totalFavorited = current.totalFavorited + favoriteDelta,
-                totalUndoCount = current.totalUndoCount + undoDelta,
-                lastActiveDate = now,
-                updatedAt = now,
-            )
+        statsDao.insertUserStatsIfAbsent(UserStatsEntity())
+        statsDao.adjustUserStats(
+            photoDelta = photoDelta,
+            videoDelta = videoDelta,
+            storageDelta = deletedSize,
+            favoriteDelta = favoriteDelta,
+            undoDelta = undoDelta,
+            now = now,
         )
-        if (photoDelta > 0 || videoDelta > 0 || deletedSize > 0L) {
+        cleanupEventSourceRefToDelete?.let { statsDao.deleteCleanupEventsBySourceRef(it) }
+        if (photoDelta > 0 || videoDelta > 0 || favoriteDelta > 0 || deletedSize > 0L) {
             statsDao.insertCleanupEvent(
                 CleanupEventEntity(
                     eventId = UUID.randomUUID().toString(),
@@ -874,11 +936,14 @@ class AppRepositoryImpl @Inject constructor(
                     localDate = todayLocalDate(now),
                     occurredAt = now,
                     sourceType = "organizer",
+                    sourceRef = sourceRef,
                     createdAt = now,
                 )
             )
         }
     }
+
+    private fun operationSourceRef(operationId: Long): String = "operation:" + operationId
 
     private fun isExcludedFolder(folderPath: String?, excludedRules: Set<String>): Boolean {
         if (excludedRules.isEmpty()) return false
@@ -1019,12 +1084,23 @@ class AppRepositoryImpl @Inject constructor(
 
     private fun dateModeMatches(timeMillis: Long, mode: String): Boolean {
         if (!mode.startsWith("multiym:")) return true
-        val tokens = mode.removePrefix("multiym:").split(",").filter { it.isNotBlank() }.toSet()
-        if (tokens.isEmpty() || timeMillis <= 0L) return true
+        val tokens = monthTokensForDateMode(mode).toSet()
+        if (tokens.isEmpty()) return true
+        if (timeMillis <= 0L) return false
         val cal = Calendar.getInstance().apply { timeInMillis = timeMillis }
         val token = cal.get(Calendar.YEAR).toString() + "-" + (cal.get(Calendar.MONTH) + 1).toString().padStart(2, '0')
         return token in tokens
     }
+
+    private fun monthTokensForDateMode(mode: String): List<String> =
+        if (mode.startsWith("multiym:")) {
+            mode.removePrefix("multiym:")
+                .split(",")
+                .filter { Regex("""\d{4}-\d{2}""").matches(it) }
+                .distinct()
+        } else {
+            emptyList()
+        }
 
     private fun PhotoEntity.toTrashItem(): TrashItemEntity = TrashItemEntity(
         mediaId = id,
@@ -1128,5 +1204,48 @@ class AppRepositoryImpl @Inject constructor(
                 )
             }
         }
+    }
+}
+
+internal data class StatsAdjustment(
+    val photoDelta: Int = 0,
+    val videoDelta: Int = 0,
+    val favoriteDelta: Int = 0,
+    val storageDelta: Long = 0L,
+)
+
+internal fun statsAdjustmentForUndo(
+    operation: OperationHistoryEntity,
+    mediaSize: Long,
+): StatsAdjustment {
+    val mediaWasFirstProcessed = operation.previousProcessingStatus == ProcessingStatus.UNPROCESSED &&
+        operation.newProcessingStatus != ProcessingStatus.UNPROCESSED
+    val mediaDelta = if (mediaWasFirstProcessed) -1 else 0
+    val isPhoto = operation.mediaType == "photo"
+    val isVideo = operation.mediaType == "video"
+    return when (operation.action) {
+        SwipeAction.Keep.name -> StatsAdjustment(
+            photoDelta = if (isPhoto) mediaDelta else 0,
+            videoDelta = if (isVideo) mediaDelta else 0,
+        )
+        SwipeAction.Favorite.name -> StatsAdjustment(
+            photoDelta = if (isPhoto) mediaDelta else 0,
+            videoDelta = if (isVideo) mediaDelta else 0,
+            favoriteDelta = if (
+                operation.previousProcessingStatus != ProcessingStatus.FAVORITED &&
+                operation.newProcessingStatus == ProcessingStatus.FAVORITED
+            ) -1 else 0,
+        )
+        SwipeAction.Delete.name -> {
+            val deletionWasAdded = operation.previousDeletionStatus == DeletionStatus.NONE &&
+                operation.newDeletionStatus != DeletionStatus.NONE
+            val deletedMediaDelta = if (deletionWasAdded && operation.previousProcessingStatus == ProcessingStatus.UNPROCESSED) -1 else 0
+            StatsAdjustment(
+                photoDelta = if (isPhoto) deletedMediaDelta else 0,
+                videoDelta = if (isVideo) deletedMediaDelta else 0,
+                storageDelta = if (deletionWasAdded && (isPhoto || isVideo)) -mediaSize.coerceAtLeast(0L) else 0L,
+            )
+        }
+        else -> StatsAdjustment()
     }
 }

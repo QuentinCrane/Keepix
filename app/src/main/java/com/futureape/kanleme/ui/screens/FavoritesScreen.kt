@@ -209,7 +209,7 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: ()
                 onOpenDayMemory = { viewModel.loadPhotoDayMemoryWindow(it) },
                 onClearDayMemory = { viewModel.clearPhotoDayMemoryWindow() },
                 onDayMemoryDelete = { target -> viewModel.onPhotoAction(target, SwipeAction.Delete) },
-                onDayMemoryUndo = { viewModel.undoLastAction() },
+                onDayMemoryUndo = { viewModel.undoLastAction("photo") },
                 onDayMemoryApply = { onToday() },
                 onDelete = {
                     viewModel.onPhotoAction(photo, SwipeAction.Delete)

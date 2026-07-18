@@ -75,6 +75,7 @@ interface PhotoDao {
         AND (:folderPath IS NULL OR folder_path = :folderPath)
         AND (:startMillis IS NULL OR date_taken >= :startMillis)
         AND (:endMillis IS NULL OR date_taken < :endMillis)
+        AND (:multiMonthEnabled = 0 OR strftime('%Y-%m', date_taken / 1000, 'unixepoch', 'localtime') IN (:monthTokens))
         AND (:todayOnly = 0 OR strftime('%m-%d', date_taken / 1000, 'unixepoch', 'localtime') = strftime('%m-%d', :now / 1000, 'unixepoch', 'localtime'))
         AND (:mediaType = 'all'
             OR (:mediaType = 'normal' AND is_screenshot = 0 AND is_selfie = 0 AND is_motion_photo = 0 AND is_long_image = 0 AND is_gif = 0 AND is_raw = 0)
@@ -96,6 +97,8 @@ interface PhotoDao {
         folderPath: String?,
         startMillis: Long?,
         endMillis: Long?,
+        multiMonthEnabled: Boolean,
+        monthTokens: List<String>,
         mediaType: String,
         randomOrder: Boolean,
         randomSeed: Long,
@@ -225,6 +228,7 @@ interface VideoDao {
         AND (:folderPath IS NULL OR folder_path = :folderPath)
         AND (:startMillis IS NULL OR date_taken >= :startMillis)
         AND (:endMillis IS NULL OR date_taken < :endMillis)
+        AND (:multiMonthEnabled = 0 OR strftime('%Y-%m', date_taken / 1000, 'unixepoch', 'localtime') IN (:monthTokens))
         ORDER BY CASE WHEN :randomOrder = 1 THEN ABS((
             ((media_store_id % 2147483647) * ((:randomSeed % 1000003) + 1009))
             + (((date_taken / 1000) % 2147483647) * ((:randomSeed % 65537) + 257))
@@ -237,6 +241,8 @@ interface VideoDao {
         folderPath: String?,
         startMillis: Long?,
         endMillis: Long?,
+        multiMonthEnabled: Boolean,
+        monthTokens: List<String>,
         randomOrder: Boolean,
         randomSeed: Long,
         limit: Int,
@@ -338,13 +344,13 @@ interface OperationDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: OperationHistoryEntity): Long
 
-    @Query("SELECT * FROM operation_history WHERE is_undone = 0 ORDER BY created_at DESC LIMIT 1")
-    suspend fun lastUndoable(): OperationHistoryEntity?
+    @Query("SELECT * FROM operation_history WHERE is_undone = 0 AND (:mediaType IS NULL OR media_type = :mediaType) ORDER BY created_at DESC, id DESC LIMIT 1")
+    suspend fun lastUndoable(mediaType: String?): OperationHistoryEntity?
 
     @Query("SELECT * FROM operation_history WHERE id = :id AND is_undone = 0 LIMIT 1")
     suspend fun undoableById(id: Long): OperationHistoryEntity?
 
-    @Query("SELECT * FROM operation_history WHERE media_id = :mediaId AND media_type = :mediaType AND action = :action ORDER BY created_at DESC LIMIT 1")
+    @Query("SELECT * FROM operation_history WHERE media_id = :mediaId AND media_type = :mediaType AND action = :action AND is_undone = 0 ORDER BY created_at DESC, id DESC LIMIT 1")
     suspend fun lastByMediaAndAction(mediaId: Long, mediaType: String, action: String): OperationHistoryEntity?
 
     @Query("UPDATE operation_history SET is_undone = 1 WHERE id = :id")
@@ -359,8 +365,34 @@ interface StatsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertUserStats(stats: UserStatsEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertUserStatsIfAbsent(stats: UserStatsEntity): Long
+
+    @Query("""
+        UPDATE user_stats SET
+            total_photos_cleared = MAX(0, total_photos_cleared + :photoDelta),
+            total_videos_cleared = MAX(0, total_videos_cleared + :videoDelta),
+            total_storage_freed = MAX(0, total_storage_freed + :storageDelta),
+            total_favorited = MAX(0, total_favorited + :favoriteDelta),
+            total_undo_count = MAX(0, total_undo_count + :undoDelta),
+            last_active_date = :now,
+            updated_at = :now
+        WHERE id = 1
+    """)
+    suspend fun adjustUserStats(
+        photoDelta: Int,
+        videoDelta: Int,
+        storageDelta: Long,
+        favoriteDelta: Int,
+        undoDelta: Int,
+        now: Long,
+    )
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCleanupEvent(event: CleanupEventEntity)
+
+    @Query("DELETE FROM cleanup_events WHERE source_ref = :sourceRef")
+    suspend fun deleteCleanupEventsBySourceRef(sourceRef: String)
 
     @Query("SELECT CAST(COALESCE(SUM(photo_count), 0) AS INTEGER) FROM cleanup_events WHERE local_date = :localDate")
     fun observeTodayPhotoCount(localDate: String): Flow<Int>

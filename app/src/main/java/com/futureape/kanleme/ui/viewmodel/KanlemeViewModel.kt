@@ -20,6 +20,7 @@ import com.futureape.kanleme.data.settings.GestureDirection
 import com.futureape.kanleme.data.settings.HapticLevel
 import com.futureape.kanleme.data.settings.PhotoCleanMode
 import com.futureape.kanleme.data.settings.SwipeSensitivity
+import com.futureape.kanleme.data.settings.SwipeSoundStyle
 import com.futureape.kanleme.data.settings.ThemeMode
 import com.futureape.kanleme.data.settings.TodayInHistoryEntryMode
 import com.futureape.kanleme.data.settings.VideoDisplayMode
@@ -40,6 +41,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -1168,16 +1170,24 @@ class KanlemeViewModel @Inject constructor(
         invalidateVideoDeckLoads()
         val pendingKeepOperation = removePendingVideoKeep(video)
         _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == video.mediaStoreId }
-        if (pendingKeepOperation != null && action == SwipeAction.Keep) {
-            runCatching { pendingKeepOperation.await() }
-                .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_video_action_failed) }
-        } else {
-            pendingKeepOperation?.let { runCatching { it.await() } }
-            repository.handleVideoAction(video, action)
+        try {
+            if (pendingKeepOperation != null && action == SwipeAction.Keep) {
+                pendingKeepOperation.await()
+            } else {
+                pendingKeepOperation?.await()
+                repository.handleVideoAction(video, action)
+            }
+            if (pendingKeepOperation == null || action != SwipeAction.Keep) _videoSessionActionCount.value += 1
+            _lastVideoAction.value = action
+            refillVideoDeckIfNeeded()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (throwable: Throwable) {
+            handledVideoActionMediaIds -= video.mediaStoreId
+            invalidateVideoDeckLoads()
+            loadVideoDeck()
+            _message.value = throwable.message?.let(::dynamicUiText) ?: uiText(R.string.message_video_action_failed)
         }
-        if (pendingKeepOperation == null) _videoSessionActionCount.value += 1
-        _lastVideoAction.value = action
-        refillVideoDeckIfNeeded()
     }
 
     fun markVideoPendingKeep(video: VideoEntity) {
@@ -1252,7 +1262,7 @@ class KanlemeViewModel @Inject constructor(
             return mediaStoreId
         }
         viewModelScope.launch {
-            runCatching { repository.undoLastAction() }
+            runCatching { repository.undoLastAction("video") }
                 .onSuccess { ok ->
                     if (ok) {
                         handledVideoActionMediaIds.clear()
@@ -1471,23 +1481,27 @@ class KanlemeViewModel @Inject constructor(
         }
     }
 
-    fun undoLastAction() = viewModelScope.launch {
-        runCatching { repository.undoLastAction() }
+    fun undoLastAction(mediaType: String? = null) = viewModelScope.launch {
+        runCatching { repository.undoLastAction(mediaType) }
             .onSuccess { ok ->
                 if (ok) {
-                    pendingPhotoActionMediaIds.clear()
-                    handledPhotoActionMediaIds.clear()
-                    clearPhotoActionHistory()
-                    handledVideoActionMediaIds.clear()
-                    clearPendingVideoKeeps()
-                    invalidatePhotoDeckLoads()
-                    invalidateVideoDeckLoads()
+                    if (mediaType == null || mediaType == "photo") {
+                        pendingPhotoActionMediaIds.clear()
+                        handledPhotoActionMediaIds.clear()
+                        clearPhotoActionHistory()
+                        invalidatePhotoDeckLoads()
+                        loadPhotoDeck()
+                    }
+                    if (mediaType == null || mediaType == "video") {
+                        handledVideoActionMediaIds.clear()
+                        clearPendingVideoKeeps()
+                        invalidateVideoDeckLoads()
+                        loadVideoDeck()
+                    }
                 }
                 _message.value = if (ok) uiText(R.string.message_undo_success) else uiText(R.string.message_undo_empty)
             }
             .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
-        loadPhotoDeck()
-        loadVideoDeck()
     }
 
     fun undoPhotoCleaningAction() {
@@ -1546,6 +1560,7 @@ class KanlemeViewModel @Inject constructor(
     fun setQuickActionButtons(value: Boolean) = viewModelScope.launch { settingsRepository.setQuickActionButtons(value) }
     fun setSwapShareAndUndo(value: Boolean) = viewModelScope.launch { settingsRepository.setSwapShareAndUndo(value) }
     fun setSwipeSound(value: Boolean) = viewModelScope.launch { settingsRepository.setSwipeSound(value) }
+    fun setSwipeSoundStyle(value: SwipeSoundStyle) = viewModelScope.launch { settingsRepository.setSwipeSoundStyle(value) }
     fun setVideoDefaultMuted(value: Boolean) = viewModelScope.launch { settingsRepository.setVideoDefaultMuted(value) }
 
     fun cycleVideoDisplayMode() = viewModelScope.launch {

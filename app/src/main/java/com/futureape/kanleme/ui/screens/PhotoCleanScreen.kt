@@ -64,6 +64,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -100,11 +101,12 @@ import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.EmptyState
-import com.futureape.kanleme.ui.util.rememberHapticKit
+import com.futureape.kanleme.ui.util.PhotoSwipeSoundPlayer
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.photoImageRequest
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
+import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.util.sharePhoto
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import com.futureape.kanleme.ui.i18n.Text
@@ -136,8 +138,14 @@ fun PhotoCleanScreen(
     val sessionActionCount by viewModel.photoSessionActionCount.collectAsStateWithLifecycle()
     val lastPhotoAction by viewModel.lastPhotoAction.collectAsStateWithLifecycle()
     val undoAnimation by viewModel.photoUndoAnimation.collectAsStateWithLifecycle()
-    val haptics = rememberHapticKit(settings)
     val context = LocalContext.current
+    val haptics = rememberHapticKit(settings)
+    val swipeSoundPlayer = remember(context, settings.swipeSound, settings.swipeSoundStyle) {
+        PhotoSwipeSoundPlayer(context, settings.swipeSound, settings.swipeSoundStyle)
+    }
+    DisposableEffect(swipeSoundPlayer) {
+        onDispose { swipeSoundPlayer.release() }
+    }
     val chromeVisible = !settings.photoFocusMode
     var showGuide by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -452,6 +460,7 @@ fun PhotoCleanScreen(
                 },
                 onTopCardPositioned = { rect -> updateGuideTarget(PhotoGuideTarget.PhotoCard, rect) },
                 onUndoAnimationConsumed = { sequence -> viewModel.clearPhotoUndoAnimation(sequence) },
+                onActionCommitted = swipeSoundPlayer::play,
                 onAction = { photo, action, _, _, targetX, targetY -> perform(photo, action, targetX, targetY) },
                 onShare = { haptics.tick(); sharePhoto(context, currentPhoto) },
                 onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },

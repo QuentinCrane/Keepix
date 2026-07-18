@@ -16,6 +16,7 @@ data class AppSettings(
     val quickActionButtons: Boolean = true,
     val swapShareAndUndo: Boolean = false,
     val swipeSound: Boolean = true,
+    val swipeSoundStyle: SwipeSoundStyle = SwipeSoundStyle.SOFT_BREEZE,
     val videoDefaultMuted: Boolean = true,
     val videoDisplayMode: VideoDisplayMode = VideoDisplayMode.IMMERSIVE_CROP,
     val hapticLevel: HapticLevel = HapticLevel.MEDIUM,
@@ -90,6 +91,12 @@ enum class HapticLevel(@StringRes val labelRes: Int) {
     LIGHT(R.string.haptic_level_light),
     MEDIUM(R.string.haptic_level_medium),
     STRONG(R.string.haptic_level_strong),
+}
+
+enum class SwipeSoundStyle(@StringRes val labelRes: Int, @StringRes val descriptionRes: Int) {
+    SOFT_BREEZE(R.string.swipe_sound_soft_breeze, R.string.swipe_sound_soft_breeze_desc),
+    LOW_TAP(R.string.swipe_sound_low_tap, R.string.swipe_sound_low_tap_desc),
+    ORIGINAL_WHOOSH(R.string.swipe_sound_original_whoosh, R.string.swipe_sound_original_whoosh_desc),
 }
 
 enum class ThemeMode(@StringRes val labelRes: Int) {

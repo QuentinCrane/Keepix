@@ -103,6 +103,7 @@ import com.futureape.kanleme.data.settings.GestureDirection
 import com.futureape.kanleme.data.settings.HapticLevel
 import com.futureape.kanleme.data.settings.PhotoCleanMode
 import com.futureape.kanleme.data.settings.SwipeSensitivity
+import com.futureape.kanleme.data.settings.SwipeSoundStyle
 import com.futureape.kanleme.data.settings.ThemeMode
 import com.futureape.kanleme.data.settings.TodayInHistoryEntryMode
 import com.futureape.kanleme.data.settings.VideoDisplayMode
@@ -320,7 +321,7 @@ private fun SettingsPageContent(
                 SettingsGroup(listOf<@Composable () -> Unit>(
                     { SettingsRow(Icons.Rounded.Layers, "整理方式", "范围、排序、批次数量、删除模式", color = Color(0xFF86A7FF), showIcon = false, onClick = { goTo(SettingsPage.ORGANIZE) }) },
                     { SettingsRow(Icons.Rounded.Visibility, "整理页面显示", cleaningDisplaySummary(settings), color = Color(0xFF86A7FF), showIcon = false, onClick = { goTo(SettingsPage.CLEANING_DISPLAY) }) },
-                    { SettingsRow(Icons.Rounded.TouchApp, "操作体验", stringResource(settings.swipeSensitivity.labelRes) + " · " + stringResource(settings.gestureDirection.labelRes), color = Color(0xFFD44C84), showIcon = false, onClick = { goTo(SettingsPage.EXPERIENCE) }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, "操作体验", stringResource(settings.swipeSensitivity.labelRes) + " · " + stringResource(settings.gestureDirection.labelRes) + " · 音效" + if (settings.swipeSound) "已开" else "已关", color = Color(0xFFD44C84), showIcon = false, onClick = { goTo(SettingsPage.EXPERIENCE) }) },
                     { SettingsSwitchRow(Icons.Rounded.Vibration, "震动反馈", stringResource(settings.hapticLevel.labelRes), checked = settings.hapticLevel != HapticLevel.OFF, onCheckedChange = { onTick(); viewModel.setHapticLevel(if (it) HapticLevel.MEDIUM else HapticLevel.OFF) }, color = Color(0xFF86A7FF), showIcon = false) },
                     { SettingsSwitchRow(Icons.Rounded.Visibility, "照片光效", if (settings.photoShowGestureHint) "删除和收藏时显示光效" else "已关闭", checked = settings.photoShowGestureHint, onCheckedChange = { onTick(); viewModel.setPhotoShowGestureHint(it) }, color = Color(0xFF86A7FF), showIcon = false) },
                     { SettingsSwitchRow(Icons.Rounded.Movie, "视频进度条", if (settings.videoShowProgressBar) "细条" else "隐藏", checked = settings.videoShowProgressBar, onCheckedChange = { onTick(); viewModel.setVideoShowProgressBar(it) }, color = Color(0xFFB884FF), showIcon = false) },
@@ -463,7 +464,8 @@ private fun SettingsPageContent(
                 SettingsGroup(listOf<@Composable () -> Unit>(
                     { SettingsSegmentedRow(Icons.Rounded.Tune, "滑动灵敏度", stringResource(settings.swipeSensitivity.labelRes), swipeSensitivityOptions(), settings.swipeSensitivity.name, color = Color(0xFFD44C84), onSelected = { onTick(); viewModel.setSwipeSensitivity(SwipeSensitivity.valueOf(it)) }) },
                     { SettingsSegmentedRow(Icons.Rounded.TouchApp, "手势方向", stringResource(settings.gestureDirection.labelRes), gestureDirectionOptions(), settings.gestureDirection.name, color = Color(0xFFD44C84), onSelected = { onTick(); viewModel.setGestureDirection(GestureDirection.valueOf(it)) }) },
-                    { SettingsSwitchRow(Icons.Rounded.MusicNote, "滑动音效", if (settings.swipeSound) "已开启" else "已关闭", checked = settings.swipeSound, onCheckedChange = { onTick(); viewModel.setSwipeSound(it) }, color = Color(0xFFE8A93B)) },
+                    { SettingsSwitchRow(Icons.Rounded.MusicNote, "照片划走音效", if (settings.swipeSound) "已开启 · " + stringResource(settings.swipeSoundStyle.labelRes) else "已关闭 · 可在下方选择音效", checked = settings.swipeSound, onCheckedChange = { onTick(); viewModel.setSwipeSound(it) }, color = Color(0xFFE8A93B)) },
+                    { SettingsSegmentedRow(Icons.Rounded.MusicNote, "音效风格", stringResource(settings.swipeSoundStyle.descriptionRes), swipeSoundStyleOptions(), settings.swipeSoundStyle.name, color = Color(0xFFE8A93B), onSelected = { onTick(); viewModel.setSwipeSoundStyle(SwipeSoundStyle.valueOf(it)) }) },
                     { SettingsSwitchRow(Icons.Rounded.MusicNote, "打开视频默认静音", "进入视频整理时默认静音，点侧边栏音量按钮可恢复声音", checked = settings.videoDefaultMuted, onCheckedChange = { onTick(); viewModel.setVideoDefaultMuted(it) }, color = Color(0xFFE8A93B)) },
                     { SettingsSegmentedRow(Icons.Rounded.AspectRatio, "视频显示比例", stringResource(settings.videoDisplayMode.labelRes), videoDisplayModeOptions(), settings.videoDisplayMode.name, color = Color(0xFF5E8DB4), onSelected = { onTick(); viewModel.setVideoDisplayMode(VideoDisplayMode.valueOf(it)) }) },
                     { SettingsSegmentedRow(Icons.Rounded.Vibration, "默认震动强度", stringResource(settings.hapticLevel.labelRes), hapticLevelOptions(), settings.hapticLevel.name, color = Color(0xFF55A6C8), onSelected = { onSuccess(); viewModel.setHapticLevel(HapticLevel.valueOf(it)) }) },
@@ -580,6 +582,9 @@ private fun videoDisplayModeOptions(): List<Pair<String, String>> = VideoDisplay
 
 @Composable
 private fun hapticLevelOptions(): List<Pair<String, String>> = HapticLevel.entries.map { it.name to stringResource(it.labelRes) }
+
+@Composable
+private fun swipeSoundStyleOptions(): List<Pair<String, String>> = SwipeSoundStyle.entries.map { it.name to stringResource(it.labelRes) }
 
 @Composable
 private fun photoCleanModeOptions(): List<Pair<String, String>> = PhotoCleanMode.entries.map { it.name to stringResource(it.labelRes) }

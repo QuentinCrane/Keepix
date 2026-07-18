@@ -7,6 +7,9 @@
 !.gitignore
 !.gitattributes
 
+# Local-only build notes.
+PACKAGING_LOCAL.md
+
 # Public project metadata.
 !README.md
 !README.zh-CN.md

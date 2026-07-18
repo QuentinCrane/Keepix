@@ -46,7 +46,7 @@ class MediaStoreScanner @Inject constructor(
             mediaLabel = context.getString(R.string.media_label_photo),
         )?.use { cursor ->
             val idCol = cursor.require(MediaStore.Images.Media._ID)
-            while (cursor.moveToNext()) {
+            while (cursor.moveToNext() && (limit == null || limit <= 0 || result.size < limit)) {
                 val id = cursor.getLong(idCol)
                 val relativePath = cursor.string(MediaStore.Images.Media.RELATIVE_PATH)
                 val displayName = cursor.string(MediaStore.Images.Media.DISPLAY_NAME)?.ifBlank { "IMG_" + id } ?: "IMG_" + id
@@ -127,7 +127,7 @@ class MediaStoreScanner @Inject constructor(
             mediaLabel = context.getString(R.string.media_label_video),
         )?.use { cursor ->
             val idCol = cursor.require(MediaStore.Video.Media._ID)
-            while (cursor.moveToNext()) {
+            while (cursor.moveToNext() && (limit == null || limit <= 0 || result.size < limit)) {
                 val id = cursor.getLong(idCol)
                 val relativePath = cursor.string(MediaStore.Video.Media.RELATIVE_PATH)
                 val displayName = cursor.string(MediaStore.Video.Media.DISPLAY_NAME)?.ifBlank { "VID_" + id } ?: "VID_" + id
@@ -179,10 +179,12 @@ class MediaStoreScanner @Inject constructor(
             throw MediaStoreAccessException(context.getString(R.string.media_error_read_permission, mediaLabel), security)
         } catch (_: IllegalArgumentException) {
             // Some OEM MediaStore providers are picky about Bundle sort columns.
-            // Fallback to a simple SQL sort order, without embedding LIMIT in the SQL string.
+            // Fallback to a simple SQL query while still excluding unfinished and trashed rows.
             val sortOrder = sortColumn + " DESC"
+            val selection = MediaStore.MediaColumns.IS_PENDING + " = 0 AND " +
+                MediaStore.MediaColumns.IS_TRASHED + " = 0"
             try {
-                resolver.query(collection, projection, null, null, sortOrder)
+                resolver.query(collection, projection, selection, null, sortOrder)
             } catch (security: SecurityException) {
                 throw MediaStoreAccessException(context.getString(R.string.media_error_read_permission, mediaLabel), security)
             }

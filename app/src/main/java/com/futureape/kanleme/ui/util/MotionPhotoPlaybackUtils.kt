@@ -118,13 +118,16 @@ private fun copyRangeFromUri(
 ): File? = runCatching {
     target.parentFile?.mkdirs()
     val temp = File(target.parentFile, target.name + ".tmp")
-    context.contentResolver.openInputStream(sourceUri)?.use { input ->
+    if (temp.exists() && !temp.delete()) return@runCatching null
+    val inputStream = context.contentResolver.openInputStream(sourceUri) ?: return@runCatching null
+    inputStream.use { input ->
         skipFully(input, start)
         FileOutputStream(temp).use { output ->
             val buffer = ByteArray(64 * 1024)
             var remaining = byteCount
             while (remaining > 0L) {
-                val read = input.read(buffer, 0, buffer.size.coerceAtMost(remaining.toInt()))
+                val requested = minOf(buffer.size.toLong(), remaining).toInt()
+                val read = input.read(buffer, 0, requested)
                 if (read <= 0) break
                 output.write(buffer, 0, read)
                 remaining -= read
@@ -135,9 +138,15 @@ private fun copyRangeFromUri(
         temp.delete()
         null
     } else {
-        if (target.exists()) target.delete()
-        temp.renameTo(target)
-        target.takeIf { it.exists() }
+        if (target.exists() && !target.delete()) {
+            temp.delete()
+            null
+        } else if (temp.renameTo(target)) {
+            target
+        } else {
+            temp.delete()
+            null
+        }
     }
 }.getOrNull()
 

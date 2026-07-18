@@ -27,7 +27,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        handleShortcutIntent(intent)
+        // A configuration change recreates the Activity with the original shortcut Intent.
+        // Replaying it would unexpectedly navigate away from the restored destination.
+        if (savedInstanceState == null) handleShortcutIntent(intent)
         setContent {
             val viewModel: KanlemeViewModel = hiltViewModel()
             val settings = viewModel.settings.collectAsStateWithLifecycle().value

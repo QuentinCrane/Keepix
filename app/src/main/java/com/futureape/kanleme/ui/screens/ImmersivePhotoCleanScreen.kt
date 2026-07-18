@@ -152,6 +152,7 @@ internal fun ImmersivePhotoCleanContent(
     onOpenDayMemory: () -> Unit,
     onTopCardPositioned: (Rect) -> Unit,
     onUndoAnimationConsumed: (Long) -> Unit,
+    onActionCommitted: (SwipeAction) -> Unit = {},
     onAction: (PhotoEntity, SwipeAction, Float, Float, Float, Float) -> Unit,
     onShare: () -> Unit,
     onUndo: () -> Unit,
@@ -279,6 +280,7 @@ internal fun ImmersivePhotoCleanContent(
                     onPinchToMemory = null,
                     undoAnimation = undoAnimation,
                     onUndoAnimationConsumed = onUndoAnimationConsumed,
+                    onActionCommitted = onActionCommitted,
                     onAction = onAction,
                 )
 

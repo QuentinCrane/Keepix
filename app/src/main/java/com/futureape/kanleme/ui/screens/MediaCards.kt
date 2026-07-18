@@ -63,6 +63,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -327,6 +328,7 @@ fun PhotoDeckStage(
     onPinchToMemory: (() -> Unit)? = null,
     undoAnimation: PhotoUndoAnimation? = null,
     onUndoAnimationConsumed: (Long) -> Unit = {},
+    onActionCommitted: (SwipeAction) -> Unit = {},
     onAction: (PhotoEntity, SwipeAction, Float, Float, Float, Float) -> Unit,
 ) {
     val top = photos.firstOrNull() ?: return
@@ -432,6 +434,7 @@ fun PhotoDeckStage(
             onPinchToMemory = onPinchToMemory,
             undoAnimation = undoAnimation?.takeIf { it.mediaStoreId == top.mediaStoreId },
             onUndoAnimationConsumed = onUndoAnimationConsumed,
+            onActionCommitted = onActionCommitted,
             onDeckPromotionChanged = { value ->
                 if (value <= 0f) {
                     deckPromotion.animateTo(
@@ -476,6 +479,7 @@ fun SwipePhotoCard(
     onPinchToMemory: (() -> Unit)? = null,
     undoAnimation: PhotoUndoAnimation? = null,
     onUndoAnimationConsumed: (Long) -> Unit = {},
+    onActionCommitted: (SwipeAction) -> Unit = {},
     onDeckPromotionChanged: suspend (Float) -> Unit = {},
     onAction: (SwipeAction, Float, Float, Float, Float) -> Unit,
     modifier: Modifier = Modifier,
@@ -787,6 +791,7 @@ fun SwipePhotoCard(
                                         SwipeAction.Keep -> offsetY.value
                                     }
                                     actionCommitted = true
+                                    onActionCommitted(action)
                                     activeHint = null
                                     onSwipeFeedbackChanged(PhotoSwipeFeedback())
                                     lastZone = ""
@@ -956,10 +961,11 @@ fun InlineMotionPhotoPlayer(
             prepare()
         }
     }
-    DisposableEffect(player, onEnded) {
+    val currentOnEnded by rememberUpdatedState(onEnded)
+    DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playOnce && playbackState == Player.STATE_ENDED) onEnded()
+                if (playOnce && playbackState == Player.STATE_ENDED) currentOnEnded()
             }
         }
         player.addListener(listener)

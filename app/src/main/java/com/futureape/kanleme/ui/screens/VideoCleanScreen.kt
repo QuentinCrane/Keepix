@@ -72,6 +72,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -561,6 +562,8 @@ private fun VideoReelPage(
     var playbackFailed by remember(video.id) { mutableStateOf(false) }
     var lastTapMillis by remember(video.id) { mutableStateOf(0L) }
     var actionOffsetY by remember(video.id) { mutableStateOf(0f) }
+    val currentPlaybackUris by rememberUpdatedState(playbackUris)
+    val currentPlaybackUriIndex by rememberUpdatedState(playbackUriIndex)
 
     LaunchedEffect(player, playbackUri) {
         if (player != null && playbackUri != Uri.EMPTY) {
@@ -573,11 +576,11 @@ private fun VideoReelPage(
         player?.playWhenReady = isCurrent && shouldPlay
         player?.volume = 1f
     }
-    DisposableEffect(player, playbackUris, playbackUriIndex) {
+    DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                if (playbackUriIndex < playbackUris.lastIndex) {
-                    playbackUriIndex += 1
+                if (currentPlaybackUriIndex < currentPlaybackUris.lastIndex) {
+                    playbackUriIndex = currentPlaybackUriIndex + 1
                 } else {
                     playbackFailed = true
                     player?.playWhenReady = false

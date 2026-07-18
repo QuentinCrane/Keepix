@@ -578,7 +578,7 @@ object UiTextLocalizer {
         "删除模式" to "Delete mode",
         "移动到文件夹时" to "When moving to a folder",
         "相似照片检测" to "Similar photo detection",
-        "滑动音效" to "Swipe sound",
+        "照片划走音效" to "Photo swipe sound",
         "打开视频默认静音" to "Mute videos by default",
         "沉浸背景" to "Immersive background",
         "媒体库维护" to "Media library maintenance",

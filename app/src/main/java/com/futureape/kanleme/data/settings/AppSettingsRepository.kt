@@ -33,6 +33,7 @@ class AppSettingsRepository @Inject constructor(
         val quickActionButtons = booleanPreferencesKey("quick_action_buttons")
         val swapShareAndUndo = booleanPreferencesKey("swap_share_and_undo")
         val swipeSound = booleanPreferencesKey("swipe_sound")
+        val swipeSoundStyle = stringPreferencesKey("swipe_sound_style")
         val videoDefaultMuted = booleanPreferencesKey("video_default_muted")
         val videoDisplayMode = stringPreferencesKey("video_display_mode")
         val hapticLevel = stringPreferencesKey("haptic_level")
@@ -102,6 +103,7 @@ class AppSettingsRepository @Inject constructor(
     suspend fun setQuickActionButtons(value: Boolean) = editBoolean(Keys.quickActionButtons, value)
     suspend fun setSwapShareAndUndo(value: Boolean) = editBoolean(Keys.swapShareAndUndo, value)
     suspend fun setSwipeSound(value: Boolean) = editBoolean(Keys.swipeSound, value)
+    suspend fun setSwipeSoundStyle(value: SwipeSoundStyle) = editString(Keys.swipeSoundStyle, value.name)
     suspend fun setVideoDefaultMuted(value: Boolean) = editBoolean(Keys.videoDefaultMuted, value)
     suspend fun setVideoDisplayMode(value: VideoDisplayMode) = editString(Keys.videoDisplayMode, value.name)
     suspend fun setHapticLevel(value: HapticLevel) = editString(Keys.hapticLevel, value.name)
@@ -209,6 +211,7 @@ class AppSettingsRepository @Inject constructor(
             quickActionButtons = this[Keys.quickActionButtons] ?: true,
             swapShareAndUndo = this[Keys.swapShareAndUndo] ?: false,
             swipeSound = this[Keys.swipeSound] ?: true,
+            swipeSoundStyle = this[Keys.swipeSoundStyle].toEnum(SwipeSoundStyle.SOFT_BREEZE),
             videoDefaultMuted = this[Keys.videoDefaultMuted] ?: true,
             videoDisplayMode = this[Keys.videoDisplayMode].toEnum(VideoDisplayMode.IMMERSIVE_CROP),
             hapticLevel = this[Keys.hapticLevel].toEnum(HapticLevel.MEDIUM),

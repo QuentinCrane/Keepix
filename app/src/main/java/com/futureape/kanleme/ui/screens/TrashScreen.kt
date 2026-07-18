@@ -269,7 +269,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                 onOpenDayMemory = { viewModel.loadPhotoDayMemoryWindow(it) },
                 onClearDayMemory = { viewModel.clearPhotoDayMemoryWindow() },
                 onDayMemoryDelete = { target -> viewModel.onPhotoAction(target, SwipeAction.Delete) },
-                onDayMemoryUndo = { viewModel.undoLastAction() },
+                onDayMemoryUndo = { viewModel.undoLastAction("photo") },
                 onDayMemoryApply = { onToday() },
                 onRestore = { target ->
                     viewModel.restoreTrash(target.id)

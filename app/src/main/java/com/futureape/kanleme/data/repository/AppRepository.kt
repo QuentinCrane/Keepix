@@ -129,7 +129,7 @@ interface AppRepository {
     suspend fun permanentlyDeleteTrashItem(trashId: Long)
     suspend fun permanentlyDeleteAllTrash()
     suspend fun restoreAllTrash()
-    suspend fun undoLastAction(): Boolean
+    suspend fun undoLastAction(mediaType: String? = null): Boolean
     suspend fun undoOperation(operationId: Long): Boolean
     suspend fun buildAnnualReport(year: Int): AnnualReport
     suspend fun buildAchievements(): List<AchievementUi>

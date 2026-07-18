@@ -57,6 +57,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -538,10 +539,11 @@ private fun MotionPhotoVideoPlayer(
             prepare()
         }
     }
-    DisposableEffect(player, onClose) {
+    val currentOnClose by rememberUpdatedState(onClose)
+    DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) onClose()
+                if (playbackState == Player.STATE_ENDED) currentOnClose()
             }
         }
         player.addListener(listener)
