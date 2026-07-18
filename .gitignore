@@ -101,16 +101,3 @@ website/assets/images/screenshots/*
 !website/assets/images/screenshots/*.webp
 !website/details/
 !website/details/*.html
-
-# Public helper scripts.
-!scripts/
-scripts/*
-!scripts/windows/
-!scripts/windows/*.bat
-
-# Root Windows helper scripts.
-!build_debug.bat
-!build_release.bat
-!compile_debug_apk.bat
-!一键编译Debug.bat
-!一键编译Release.bat
