@@ -32,8 +32,8 @@
 | `todayInHistoryEntryMode` | `MEMORY_PAGE` | `today_in_history_entry_mode` / `setTodayInHistoryEntryMode` | 收藏/往年今日入口 | ACTIVE | 两种入口都能到达且返回正确 |
 | `accentColor` | `0xFFC7ECFE` | `accent_color` / `setAccentColor` | `MainActivity` / 主题色 | ACTIVE | 重启后主题色保持 |
 | `folderDisplay` | `SINGLE_LINE` | `folder_display` / `setFolderDisplay` | 文件夹显示组件 | ACTIVE | 长文件夹名在两种模式都可读 |
-| `immersiveBackground` | `true` | `immersive_background` / `setImmersiveBackground` | 当前未找到整理页真实消费者 | STORAGE_ONLY | C04 决策前不承诺效果 |
-| `photoCleanMode` | `NORMAL` | `photo_clean_mode` / `setPhotoCleanMode` | 当前仅设置页展示/切换 | STORAGE_ONLY | C04 决策保留或删除 |
+| `immersiveBackground` | `true` | `immersive_background` / `setImmersiveBackground` | 照片整理页模糊背景图层 | ACTIVE | 开关背景图层，不改变卡片和手势 |
+| `photoCleanMode` | `NORMAL` | `photo_clean_mode` / `setPhotoCleanMode` | 照片整理页视觉/诊断/预取策略 | ACTIVE | 三种模式都有可观察结果且不改变动作语义 |
 | `homeMediaTab` | `photo` | `home_media_tab` / `setHomeMediaTab` | 首页照片/视频页签与时间轴 | ACTIVE | 切换后首页和时间轴一致 |
 | `photoDateMode` | `all` | `photo_date_mode` / `setPhotoDateMode` | 照片 `CleaningScope` | ACTIVE | 范围筛选和重启保持 |
 | `photoMediaType` | `all` | `photo_media_type` / `setPhotoMediaType` | 照片类型筛选 | ACTIVE | 类型筛选不串视频 |
@@ -66,4 +66,4 @@
 
 ## 当前结论
 
-消费缺口集中在沉浸背景和照片清理模式。照片真实页显示开关、快捷动作按钮与分享/撤销交换已由 C02/C03 接通；视频文件夹按钮已由 C03 接通，后续 C04 继续按表逐组接通或做删除决策，不把设置页预览截图单独作为功能完成证据。
+照片与视频整理页的设置消费缺口已闭合；C04 的具体视觉与模式决策记录在 `docs/photo_clean_modes.md`。后续 C05 继续澄清连续 Deck 的“每批数量”语义，不把设置页预览截图单独作为功能完成证据。

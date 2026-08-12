@@ -46,9 +46,10 @@
     <string name="photo_clean_mode_normal">Normal</string>
     <string name="photo_clean_mode_normal_desc">Recommended for daily use. No extra logging and no changes to the cleaning flow</string>
     <string name="photo_clean_mode_diagnostic">Diagnostic</string>
-    <string name="photo_clean_mode_diagnostic_desc">Keep the original cleaning flow while recording more details for troubleshooting</string>
+    <string name="photo_clean_mode_diagnostic_desc">Keep the original cleaning flow and show queue and progress diagnostics on the cleaning page</string>
     <string name="photo_clean_mode_performance">Performance</string>
-    <string name="photo_clean_mode_performance_desc">Temporarily reduce effects to lower stutter and check whether motion is involved</string>
+    <string name="photo_clean_mode_performance_desc">Disable the immersive background and entry motion to reduce stutter; cleaning and undo stay unchanged</string>
+    <string name="photo_diagnostic_hud">Diagnostic · Preview %1$d · Current %2$d · Remaining %3$d · Progress %4$d%%</string>
 
     <string name="message_library_synced">Synced %1$d photos and %2$d videos</string>
     <string name="message_library_sync_failed">Media library sync failed. Check photo permissions</string>

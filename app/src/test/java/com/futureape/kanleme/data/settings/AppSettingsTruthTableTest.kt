@@ -36,8 +36,8 @@ private val truthEntries = listOf(
     TruthEntry("todayInHistoryEntryMode", "today_in_history_entry_mode", ConsumerStatus.ACTIVE),
     TruthEntry("accentColor", "accent_color", ConsumerStatus.ACTIVE),
     TruthEntry("folderDisplay", "folder_display", ConsumerStatus.ACTIVE),
-    TruthEntry("immersiveBackground", "immersive_background", ConsumerStatus.STORAGE_ONLY),
-    TruthEntry("photoCleanMode", "photo_clean_mode", ConsumerStatus.STORAGE_ONLY),
+    TruthEntry("immersiveBackground", "immersive_background", ConsumerStatus.ACTIVE),
+    TruthEntry("photoCleanMode", "photo_clean_mode", ConsumerStatus.ACTIVE),
     TruthEntry("homeMediaTab", "home_media_tab", ConsumerStatus.ACTIVE),
     TruthEntry("photoDateMode", "photo_date_mode", ConsumerStatus.ACTIVE),
     TruthEntry("photoMediaType", "photo_media_type", ConsumerStatus.ACTIVE),
@@ -53,13 +53,13 @@ private val truthEntries = listOf(
     TruthEntry("excludedFolderPaths", "excluded_folder_paths", ConsumerStatus.ACTIVE),
     TruthEntry("onboardingShown", "onboarding_shown", ConsumerStatus.ACTIVE),
     TruthEntry("photoFocusMode", "photo_focus_mode", ConsumerStatus.ACTIVE),
-    TruthEntry("photoShowTopBar", "photo_show_top_bar", ConsumerStatus.PREVIEW_ONLY),
-    TruthEntry("photoShowFilterChips", "photo_show_filter_chips", ConsumerStatus.PREVIEW_ONLY),
-    TruthEntry("photoShowFolderChips", "photo_show_folder_chips", ConsumerStatus.PREVIEW_ONLY),
-    TruthEntry("photoShowActionRail", "photo_show_action_rail", ConsumerStatus.STORAGE_ONLY),
-    TruthEntry("photoShowInfoBar", "photo_show_info_bar", ConsumerStatus.PREVIEW_ONLY),
-    TruthEntry("photoShowGestureHint", "photo_show_gesture_hint", ConsumerStatus.PREVIEW_ONLY),
-    TruthEntry("photoShowShuffleButton", "photo_show_shuffle_button", ConsumerStatus.PREVIEW_ONLY),
+    TruthEntry("photoShowTopBar", "photo_show_top_bar", ConsumerStatus.ACTIVE),
+    TruthEntry("photoShowFilterChips", "photo_show_filter_chips", ConsumerStatus.ACTIVE),
+    TruthEntry("photoShowFolderChips", "photo_show_folder_chips", ConsumerStatus.ACTIVE),
+    TruthEntry("photoShowActionRail", "photo_show_action_rail", ConsumerStatus.ACTIVE),
+    TruthEntry("photoShowInfoBar", "photo_show_info_bar", ConsumerStatus.ACTIVE),
+    TruthEntry("photoShowGestureHint", "photo_show_gesture_hint", ConsumerStatus.ACTIVE),
+    TruthEntry("photoShowShuffleButton", "photo_show_shuffle_button", ConsumerStatus.ACTIVE),
     TruthEntry("videoShowTopBar", "video_show_top_bar", ConsumerStatus.ACTIVE),
     TruthEntry("videoShowActionRail", "video_show_action_rail", ConsumerStatus.ACTIVE),
     TruthEntry("videoShowInfoPanel", "video_show_info_panel", ConsumerStatus.ACTIVE),
@@ -83,14 +83,14 @@ class AppSettingsTruthTableTest {
     }
 
     @Test
-    fun knownUnimplementedPreferencesRemainExplicitlyMarked() {
+    fun pendingPreferenceStatusRemainsExplicitlyMarked() {
         val byField = truthEntries.associateBy { it.fieldName }
 
         assertEquals(ConsumerStatus.ACTIVE, byField.getValue("quickActionButtons").status)
         assertEquals(ConsumerStatus.ACTIVE, byField.getValue("swapShareAndUndo").status)
-        assertEquals(ConsumerStatus.STORAGE_ONLY, byField.getValue("immersiveBackground").status)
-        assertEquals(ConsumerStatus.STORAGE_ONLY, byField.getValue("photoCleanMode").status)
-        assertTrue(byField.getValue("photoShowTopBar").status == ConsumerStatus.PREVIEW_ONLY)
+        assertEquals(ConsumerStatus.ACTIVE, byField.getValue("immersiveBackground").status)
+        assertEquals(ConsumerStatus.ACTIVE, byField.getValue("photoCleanMode").status)
+        assertTrue(byField.getValue("photoShowTopBar").status == ConsumerStatus.ACTIVE)
         assertEquals(ConsumerStatus.ACTIVE, byField.getValue("videoShowFolderChips").status)
     }
 }

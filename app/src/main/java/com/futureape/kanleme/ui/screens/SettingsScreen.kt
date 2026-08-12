@@ -481,7 +481,7 @@ private fun SettingsPageContent(
                     { SettingsSegmentedRow(Icons.Rounded.Palette, "主题模式", stringResource(settings.themeMode.labelRes), themeModeOptions(), settings.themeMode.name, onSelected = { onTick(); viewModel.setThemeMode(ThemeMode.valueOf(it)) }) },
                     { SettingsColorRow(Icons.Rounded.ColorLens, "主题色", "选择应用高亮色", accentColorOptions(), settings.accentColor, onSelected = { onTick(); viewModel.setAccentColor(it) }) },
                     { SettingsSegmentedRow(Icons.Rounded.Folder, "文件夹显示", stringResource(settings.folderDisplay.labelRes), folderDisplayOptions(), settings.folderDisplay.name, onSelected = { onTick(); viewModel.setFolderDisplay(FolderDisplayMode.valueOf(it)) }) },
-                    { SettingsSwitchRow(Icons.Rounded.Palette, "沉浸背景", "整理时以前一张照片的模糊效果作为背景", checked = settings.immersiveBackground, onCheckedChange = { onTick(); viewModel.setImmersiveBackground(it) }) },
+                    { SettingsSwitchRow(Icons.Rounded.Palette, "沉浸背景", "整理时以当前照片的模糊效果作为背景；流畅优先会自动关闭", checked = settings.immersiveBackground, onCheckedChange = { onTick(); viewModel.setImmersiveBackground(it) }) },
                 ))
             }
 

@@ -46,9 +46,10 @@
     <string name="photo_clean_mode_normal">正常使用</string>
     <string name="photo_clean_mode_normal_desc">日常使用建議，不額外記錄，也不改變整理方式</string>
     <string name="photo_clean_mode_diagnostic">協助排查</string>
-    <string name="photo_clean_mode_diagnostic_desc">保留原本整理體驗，同時記錄更多資訊，方便定位問題</string>
+    <string name="photo_clean_mode_diagnostic_desc">保留原本整理體驗，並在整理頁顯示佇列與進度診斷資訊</string>
     <string name="photo_clean_mode_performance">流暢優先</string>
-    <string name="photo_clean_mode_performance_desc">暫時關閉部分效果，減少卡頓，也方便判斷問題是否和動效有關</string>
+    <string name="photo_clean_mode_performance_desc">關閉沉浸背景與進場動效，減少卡頓；滑動、撤銷與佇列邏輯不變</string>
+    <string name="photo_diagnostic_hud">診斷 · 預覽 %1$d · 目前 %2$d · 剩餘 %3$d · 進度 %4$d%%</string>
 
     <string name="message_library_synced">已同步 %1$d 張照片、%2$d 部影片</string>
     <string name="message_library_sync_failed">媒體庫同步失敗，請檢查相簿權限</string>

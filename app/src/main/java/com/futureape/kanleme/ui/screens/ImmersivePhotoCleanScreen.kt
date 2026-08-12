@@ -173,37 +173,40 @@ internal fun ImmersivePhotoCleanContent(
 ) {
     val context = LocalContext.current
     val focusMode = settings.photoFocusMode
+    val runtimePolicy = settings.toPhotoCleanRuntimePolicy()
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
     val enterScale by animateFloatAsState(
-        targetValue = if (entered) 1f else 0.96f,
+        targetValue = if (!runtimePolicy.animateEntry || entered) 1f else 0.96f,
         animationSpec = tween(360, easing = FastOutSlowInEasing),
         label = "photo_clean_enter_scale",
     )
     val enterOffsetY by animateFloatAsState(
-        targetValue = if (entered) 0f else 30f,
+        targetValue = if (!runtimePolicy.animateEntry || entered) 0f else 30f,
         animationSpec = tween(360, easing = FastOutSlowInEasing),
         label = "photo_clean_enter_y",
     )
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        Crossfade(
-            targetState = currentPhoto,
-            animationSpec = tween(durationMillis = 520),
-            label = "keepix_photo_background",
-        ) { photo ->
-            AsyncImage(
-                model = photoImageRequest(context, photo, "clean_background", 1080, 1440),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(30.dp)
-                    .graphicsLayer {
-                        scaleX = 1.10f
-                        scaleY = 1.10f
-                        alpha = 0.70f
-                    },
-                contentScale = ContentScale.Crop,
-            )
+        if (runtimePolicy.showImmersiveBackground) {
+            Crossfade(
+                targetState = currentPhoto,
+                animationSpec = tween(durationMillis = 520),
+                label = "keepix_photo_background",
+            ) { photo ->
+                AsyncImage(
+                    model = photoImageRequest(context, photo, "clean_background", 1080, 1440),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(30.dp)
+                        .graphicsLayer {
+                            scaleX = 1.10f
+                            scaleY = 1.10f
+                            alpha = 0.70f
+                        },
+                    contentScale = ContentScale.Crop,
+                )
+            }
         }
         Box(
             Modifier.fillMaxSize().background(
@@ -277,6 +280,19 @@ internal fun ImmersivePhotoCleanContent(
                             onClick = onToggleFocus,
                         )
                     }
+                }
+
+                if (runtimePolicy.showDiagnostics) {
+                    PhotoDiagnosticHud(
+                        previewCount = photos.size,
+                        currentMediaId = currentPhoto.mediaStoreId,
+                        remaining = remaining,
+                        progressPercent = progressPercent,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 74.dp)
+                            .zIndex(5f),
+                    )
                 }
 
                 PhotoDeckStage(
@@ -401,6 +417,36 @@ internal fun ImmersivePhotoCleanContent(
         if (displayOptions.showGestureHint) {
             PhotoEdgeGlow(feedback = photoSwipeFeedback)
         }
+    }
+}
+
+@Composable
+private fun PhotoDiagnosticHud(
+    previewCount: Int,
+    currentMediaId: Long,
+    remaining: Int,
+    progressPercent: Int,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = Color.Black.copy(alpha = 0.56f),
+        border = BorderStroke(1.dp, Color(0xFF8CB8FF).copy(alpha = 0.62f)),
+    ) {
+        Text(
+            text = stringResource(
+                R.string.photo_diagnostic_hud,
+                previewCount,
+                currentMediaId,
+                remaining,
+                progressPercent,
+            ),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.90f),
+            maxLines = 1,
+        )
     }
 }
 

@@ -141,6 +141,7 @@ fun PhotoCleanScreen(
     val context = LocalContext.current
     val haptics = rememberHapticKit(settings)
     val displayOptions = settings.toPhotoCleanDisplayOptions()
+    val runtimePolicy = settings.toPhotoCleanRuntimePolicy()
     val photoMediaFilterTypes = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long")
     val photoMediaFilters = listOf(
         "全部" to typeStats.all.toString(),
@@ -283,9 +284,9 @@ fun PhotoCleanScreen(
         kotlinx.coroutines.delay(420)
         emptyStateVisible = true
     }
-    LaunchedEffect(deck, settings.photoGuideShown) {
+    LaunchedEffect(deck, settings.photoGuideShown, runtimePolicy.prefetchCount) {
         showGuide = false
-        deck.take(3).forEach { photo ->
+        deck.take(runtimePolicy.prefetchCount).forEach { photo ->
             context.imageLoader.enqueue(
                 photoImageRequest(context, photo, "clean_prefetch", 1280, 1280)
             )
