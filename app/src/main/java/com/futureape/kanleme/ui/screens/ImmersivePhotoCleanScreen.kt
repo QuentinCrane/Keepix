@@ -231,9 +231,11 @@ internal fun ImmersivePhotoCleanContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        KeepixProgressBar(progress = progressPercent / 100f)
+                        if (displayOptions.showTopBar) {
+                            KeepixProgressBar(progress = progressPercent / 100f)
+                        }
                         AnimatedVisibility(
-                            visible = !focusMode,
+                            visible = !focusMode && displayOptions.showFilterChips,
                             enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { -it / 3 },
                             exit = fadeOut(tween(140)) + slideOutVertically(tween(180)) { -it / 4 },
                         ) {
@@ -304,11 +306,14 @@ internal fun ImmersivePhotoCleanContent(
                             contentDescription = null,
                             onClick = onShare,
                         )
-                        KeepixBottomInfoBar(
-                            photo = currentPhoto,
-                            modifier = Modifier.weight(1f),
-                            onClick = onFolderClick,
-                        )
+                        if (displayOptions.showInfoBar) {
+                            KeepixBottomInfoBar(
+                                photo = currentPhoto,
+                                showFolder = displayOptions.showFolderChips,
+                                modifier = Modifier.weight(1f),
+                                onClick = onFolderClick,
+                            )
+                        }
                         KeepixRoundButton(
                             icon = Icons.AutoMirrored.Rounded.Undo,
                             contentDescription = null,
@@ -1107,11 +1112,16 @@ internal fun KeepixRoundButton(
 }
 
 @Composable
-private fun KeepixBottomInfoBar(photo: PhotoEntity, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun KeepixBottomInfoBar(
+    photo: PhotoEntity,
+    showFolder: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val place = photo.locationName?.takeIf { it.isNotBlank() } ?: photo.folderName.ifBlank { "本地相册" }
+    val clickModifier = if (showFolder) Modifier.clickable(onClick = onClick) else Modifier
     Surface(
-        onClick = onClick,
-        modifier = modifier.height(66.dp),
+        modifier = modifier.height(66.dp).then(clickModifier),
         shape = RoundedCornerShape(999.dp),
         color = Color(0xFF151515).copy(alpha = 0.82f),
         contentColor = Color.White,
@@ -1128,13 +1138,15 @@ private fun KeepixBottomInfoBar(photo: PhotoEntity, modifier: Modifier = Modifie
                 color = Color.White,
                 maxLines = 1,
             )
-            Text(
-                place,
-                style = MaterialTheme.typography.titleSmall,
-                color = Color.White.copy(alpha = 0.68f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (showFolder) {
+                Text(
+                    place,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White.copy(alpha = 0.68f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
