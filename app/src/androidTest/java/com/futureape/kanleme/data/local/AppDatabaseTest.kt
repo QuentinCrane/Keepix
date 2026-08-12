@@ -14,6 +14,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.Calendar
 
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -38,20 +39,7 @@ class AppDatabaseTest {
 
     @Test
     fun schemaCreatesAndPhotoDaoReadsWrites() = runBlocking {
-        val photo = PhotoEntity(
-            mediaStoreId = 42L,
-            uri = "content://media/external/images/media/42",
-            displayName = "sample.jpg",
-            size = 1024L,
-            dateTaken = 1_700_000_000_000L,
-            dateAdded = 1_700_000_000L,
-            dateModified = 1_700_000_000L,
-            folderPath = "Pictures/Keepix",
-            folderName = "Keepix",
-            mimeType = "image/jpeg",
-            width = 1200,
-            height = 900,
-        )
+        val photo = photo(mediaStoreId = 42L, displayName = "sample.jpg")
 
         database.photoDao().upsertAll(listOf(photo))
         val stored = database.photoDao().byMediaStoreIds(listOf(42L)).single()
@@ -60,4 +48,86 @@ class AppDatabaseTest {
         assertEquals(1, database.photoDao().observeCount().first())
         assertEquals(KEPT, database.photoDao().byId(stored.id)?.processingStatus)
     }
+
+    @Test
+    fun randomQueueOrderIsStableWhenRefreshedWithTheSameSeed() = runBlocking {
+        database.photoDao().upsertAll(
+            (0 until 12).map { index ->
+                photo(
+                    mediaStoreId = 100L + index,
+                    displayName = "queue-$index.jpg",
+                    dateTaken = 1_700_000_000_000L - index * 86_400_000L,
+                    folderPath = if (index % 2 == 0) "Pictures/A" else "Pictures/B",
+                )
+            },
+        )
+
+        suspend fun load() = database.photoDao().nextFilteredBatch(
+            folderPath = null,
+            startMillis = null,
+            endMillis = null,
+            multiMonthEnabled = false,
+            monthTokens = listOf(""),
+            mediaType = "all",
+            randomOrder = true,
+            randomSeed = 9_876L,
+            todayOnly = false,
+            limit = 12,
+        )
+
+        val firstOrder = load().map { it.mediaStoreId }
+        val refreshedOrder = load().map { it.mediaStoreId }
+
+        assertEquals(12, firstOrder.size)
+        assertEquals(firstOrder, refreshedOrder)
+    }
+
+    @Test
+    fun todayInHistoryOnlyMatchesTheSameMonthAndDayFromAnotherYear() = runBlocking {
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 12)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val previousYear = (today.clone() as Calendar).apply { add(Calendar.YEAR, -1) }
+        val currentYearPhoto = photo(
+            mediaStoreId = 201L,
+            displayName = "current-year.jpg",
+            dateTaken = today.timeInMillis,
+        )
+        val previousYearPhoto = photo(
+            mediaStoreId = 202L,
+            displayName = "previous-year.jpg",
+            dateTaken = previousYear.timeInMillis,
+        )
+        database.photoDao().upsertAll(listOf(currentYearPhoto, previousYearPhoto))
+
+        val memories = database.photoDao().observeTodayInHistory(
+            now = today.timeInMillis,
+            limit = 10,
+        ).first()
+
+        assertEquals(listOf("previous-year.jpg"), memories.map { it.displayName })
+    }
+
+    private fun photo(
+        mediaStoreId: Long,
+        displayName: String,
+        dateTaken: Long = 1_700_000_000_000L,
+        folderPath: String = "Pictures/Keepix",
+    ) = PhotoEntity(
+        mediaStoreId = mediaStoreId,
+        uri = "content://media/external/images/media/" + mediaStoreId,
+        displayName = displayName,
+        size = 1024L,
+        dateTaken = dateTaken,
+        dateAdded = 1_700_000_000L,
+        dateModified = 1_700_000_000L,
+        folderPath = folderPath,
+        folderName = folderPath.substringAfterLast('/'),
+        mimeType = "image/jpeg",
+        width = 1200,
+        height = 900,
+    )
 }
