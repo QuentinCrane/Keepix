@@ -4,7 +4,9 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -23,7 +25,13 @@ import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun PhotoCompareScreen(uris: List<Uri>, onBack: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(top = 36.dp, start = 18.dp, end = 18.dp)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(top = 12.dp, start = 18.dp, end = 18.dp),
+    ) {
         ScreenHeader("照片对比", "从系统分享菜单进入，适合 2-4 张图快速比较", onBack)
         if (uris.isEmpty()) {
             EmptyState("没有收到图片", stringResource(R.string.photo_compare_empty_message), "返回", onBack)
