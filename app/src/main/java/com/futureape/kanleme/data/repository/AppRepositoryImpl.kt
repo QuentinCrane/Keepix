@@ -11,6 +11,8 @@ import com.futureape.kanleme.data.local.SimilarGroupEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.UserStatsEntity
 import com.futureape.kanleme.data.local.VideoEntity
+import com.futureape.kanleme.data.media.MediaAuthorizationResult
+import com.futureape.kanleme.data.media.MediaOperationKind
 import com.futureape.kanleme.data.media.MediaOperationResult
 import com.futureape.kanleme.data.media.MediaStoreActions
 import com.futureape.kanleme.data.media.MediaStoreScanner
@@ -503,16 +505,30 @@ class AppRepositoryImpl @Inject constructor(
         photos.ifEmpty { listOf(currentPhoto) }
     }
 
-    override suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction): Long = withContext(Dispatchers.IO) {
+    override suspend fun handlePhotoAction(
+        photo: PhotoEntity,
+        action: SwipeAction,
+        systemTrashAuthorized: Boolean,
+    ): Long = withContext(Dispatchers.IO) {
         val current = photoDao.byId(photo.id) ?: photo
         val actionAllowed = current.deletionStatus == DeletionStatus.NONE
+        val settings = if (action == SwipeAction.Delete) settingsRepository.settings.first() else null
+        val systemTrashRequested = action == SwipeAction.Delete &&
+            (settings?.deleteMode == DeleteMode.SYSTEM_TRASH || systemTrashAuthorized)
+        if (systemTrashRequested && !systemTrashAuthorized) {
+            throw IllegalStateException("系统回收站操作需要先完成用户确认")
+        }
         val targetProcessing = when (action) {
             SwipeAction.Keep -> ProcessingStatus.KEPT
             SwipeAction.Favorite -> ProcessingStatus.FAVORITED
             SwipeAction.Delete -> current.processingStatus
         }
         val newProcessing = if (actionAllowed) targetProcessing else current.processingStatus
-        val newDeletion = if (action == SwipeAction.Delete && actionAllowed) DeletionStatus.PENDING else current.deletionStatus
+        val newDeletion = if (action == SwipeAction.Delete && actionAllowed) {
+            if (systemTrashRequested) DeletionStatus.TRASHED else DeletionStatus.PENDING
+        } else {
+            current.deletionStatus
+        }
         val operationId = recordOperation(current.id, "photo", current.processingStatus, current.deletionStatus, newProcessing, newDeletion, action.name)
         when (action) {
             SwipeAction.Keep -> {
@@ -535,15 +551,10 @@ class AppRepositoryImpl @Inject constructor(
             }
             SwipeAction.Delete -> {
                 if (actionAllowed) {
-                    val settings = settingsRepository.settings.first()
-                    if (settings.deleteMode == DeleteMode.SYSTEM_TRASH) {
-                        when (mediaStoreActions.moveMediaToSystemTrash(current.uri)) {
-                            MediaOperationResult.Success -> photoDao.updateDeletionStatus(listOf(current.id), DeletionStatus.TRASHED)
-                            is MediaOperationResult.Failed -> photoDao.updateDeletionStatus(listOf(current.id), DeletionStatus.PENDING)
-                        }
-                    } else {
-                        photoDao.updateDeletionStatus(listOf(current.id), DeletionStatus.PENDING)
-                    }
+                    photoDao.updateDeletionStatus(
+                        listOf(current.id),
+                        if (systemTrashRequested) DeletionStatus.TRASHED else DeletionStatus.PENDING,
+                    )
                     trashDao.deleteByMedia(current.id, "photo")
                     trashDao.insert(current.toTrashItem())
                     bumpStats(
@@ -557,16 +568,30 @@ class AppRepositoryImpl @Inject constructor(
         operationId
     }
 
-    override suspend fun handleVideoAction(video: VideoEntity, action: SwipeAction): Long = withContext(Dispatchers.IO) {
+    override suspend fun handleVideoAction(
+        video: VideoEntity,
+        action: SwipeAction,
+        systemTrashAuthorized: Boolean,
+    ): Long = withContext(Dispatchers.IO) {
         val current = videoDao.byId(video.id) ?: video
         val actionAllowed = current.deletionStatus == DeletionStatus.NONE
+        val settings = if (action == SwipeAction.Delete) settingsRepository.settings.first() else null
+        val systemTrashRequested = action == SwipeAction.Delete &&
+            (settings?.deleteMode == DeleteMode.SYSTEM_TRASH || systemTrashAuthorized)
+        if (systemTrashRequested && !systemTrashAuthorized) {
+            throw IllegalStateException("系统回收站操作需要先完成用户确认")
+        }
         val targetProcessing = when (action) {
             SwipeAction.Keep -> ProcessingStatus.KEPT
             SwipeAction.Favorite -> ProcessingStatus.FAVORITED
             SwipeAction.Delete -> current.processingStatus
         }
         val newProcessing = if (actionAllowed) targetProcessing else current.processingStatus
-        val newDeletion = if (action == SwipeAction.Delete && actionAllowed) DeletionStatus.PENDING else current.deletionStatus
+        val newDeletion = if (action == SwipeAction.Delete && actionAllowed) {
+            if (systemTrashRequested) DeletionStatus.TRASHED else DeletionStatus.PENDING
+        } else {
+            current.deletionStatus
+        }
         val operationId = recordOperation(current.id, "video", current.processingStatus, current.deletionStatus, newProcessing, newDeletion, action.name)
         when (action) {
             SwipeAction.Keep -> {
@@ -589,15 +614,10 @@ class AppRepositoryImpl @Inject constructor(
             }
             SwipeAction.Delete -> {
                 if (actionAllowed) {
-                    val settings = settingsRepository.settings.first()
-                    if (settings.deleteMode == DeleteMode.SYSTEM_TRASH) {
-                        when (mediaStoreActions.moveMediaToSystemTrash(current.uri)) {
-                            MediaOperationResult.Success -> videoDao.updateDeletionStatus(listOf(current.id), DeletionStatus.TRASHED)
-                            is MediaOperationResult.Failed -> videoDao.updateDeletionStatus(listOf(current.id), DeletionStatus.PENDING)
-                        }
-                    } else {
-                        videoDao.updateDeletionStatus(listOf(current.id), DeletionStatus.PENDING)
-                    }
+                    videoDao.updateDeletionStatus(
+                        listOf(current.id),
+                        if (systemTrashRequested) DeletionStatus.TRASHED else DeletionStatus.PENDING,
+                    )
                     trashDao.deleteByMedia(current.id, "video")
                     trashDao.insert(current.toTrashItem())
                     bumpStats(
@@ -610,6 +630,44 @@ class AppRepositoryImpl @Inject constructor(
         }
         operationId
     }
+
+    override suspend fun createMediaAuthorizationRequest(
+        kind: MediaOperationKind,
+        mediaUris: Collection<String>,
+        isTrashed: Boolean,
+    ): MediaAuthorizationResult = withContext(Dispatchers.IO) {
+        when (kind) {
+            MediaOperationKind.WRITE -> mediaStoreActions.createWriteAuthorizationRequest(mediaUris)
+            MediaOperationKind.TRASH,
+            MediaOperationKind.RESTORE,
+            -> mediaStoreActions.createTrashAuthorizationRequest(
+                mediaUris = mediaUris,
+                isTrashed = kind == MediaOperationKind.TRASH || isTrashed,
+            )
+            MediaOperationKind.PERMANENT_DELETE -> mediaStoreActions.createDeleteAuthorizationRequest(mediaUris)
+        }
+    }
+
+    override suspend fun prepareTrashRestore(trashIds: Collection<Long>): TrashRestoreAuthorizationPlan =
+        withContext(Dispatchers.IO) {
+            val items = trashIds.distinct().mapNotNull { trashDao.byId(it) }
+            val systemTrashItems = items.filter { isTrashItemInSystemTrash(it) }
+            val systemTrashIds = systemTrashItems.map { it.id }.toSet()
+            val localOnlyIds = items.filterNot { it.id in systemTrashIds }.map { it.id }
+            val authorization = if (systemTrashItems.isEmpty()) {
+                MediaAuthorizationResult.Completed
+            } else {
+                createMediaAuthorizationRequest(
+                    kind = MediaOperationKind.RESTORE,
+                    mediaUris = systemTrashItems.map { it.uri },
+                )
+            }
+            TrashRestoreAuthorizationPlan(
+                localOnlyTrashIds = localOnlyIds,
+                systemTrashIds = systemTrashItems.map { it.id },
+                authorization = authorization,
+            )
+        }
 
     override suspend fun movePhotoToFolder(photo: PhotoEntity, targetRelativePath: String): MovePhotoResult = withContext(Dispatchers.IO) {
         val normalizedPath = MediaStoreActions.normalizeRelativePath(targetRelativePath)
@@ -704,10 +762,15 @@ class AppRepositoryImpl @Inject constructor(
     override suspend fun restoreTrashItem(trashId: Long) = withContext(Dispatchers.IO) {
         val item = trashDao.byId(trashId) ?: return@withContext
         if (isTrashItemInSystemTrash(item)) {
-            requireMediaOperation(mediaStoreActions.restoreFromSystemTrash(item.uri))
+            throw IllegalStateException("系统媒体恢复需要先完成用户确认")
         }
         restoreTrashItemLocally(item)
     }
+
+    override suspend fun restoreTrashItemsAfterSystemAuthorization(trashIds: Collection<Long>) =
+        withContext(Dispatchers.IO) {
+            trashIds.distinct().mapNotNull { trashDao.byId(it) }.forEach { restoreTrashItemLocally(it) }
+        }
 
     override suspend fun markTrashItemDeleted(trashId: Long) = withContext(Dispatchers.IO) {
         val item = trashDao.byId(trashId) ?: return@withContext
@@ -727,6 +790,41 @@ class AppRepositoryImpl @Inject constructor(
     override suspend fun restoreAllTrash() = withContext(Dispatchers.IO) {
         observeTrash().first().forEach { restoreTrashItem(it.id) }
     }
+
+    override suspend fun createUndoAuthorizationRequest(mediaType: String?): MediaAuthorizationResult =
+        withContext(Dispatchers.IO) {
+            val operation = operationDao.lastUndoable(mediaType) ?: return@withContext MediaAuthorizationResult.Completed
+            val currentPhoto = if (operation.mediaType == "photo") photoDao.byId(operation.mediaId) else null
+            val currentVideo = if (operation.mediaType == "video") videoDao.byId(operation.mediaId) else null
+            val currentDeletionStatus = currentPhoto?.deletionStatus ?: currentVideo?.deletionStatus
+            val currentUri = currentPhoto?.uri ?: currentVideo?.uri
+            if (
+                operation.action != SwipeAction.Delete.name ||
+                currentDeletionStatus != DeletionStatus.TRASHED ||
+                currentUri.isNullOrBlank()
+            ) {
+                MediaAuthorizationResult.Completed
+            } else {
+                createMediaAuthorizationRequest(
+                    kind = MediaOperationKind.RESTORE,
+                    mediaUris = listOf(currentUri),
+                )
+            }
+        }
+
+    override suspend fun undoLastActionAfterSystemAuthorization(mediaType: String?): Boolean =
+        withContext(Dispatchers.IO) {
+            val operation = operationDao.lastUndoable(mediaType) ?: return@withContext false
+            undoOperation(operation, restoreSystemTrash = false)
+            true
+        }
+
+    override suspend fun undoOperationAfterSystemAuthorization(operationId: Long): Boolean =
+        withContext(Dispatchers.IO) {
+            val operation = operationDao.undoableById(operationId) ?: return@withContext false
+            undoOperation(operation, restoreSystemTrash = false)
+            true
+        }
 
     private suspend fun isTrashItemInSystemTrash(item: TrashItemEntity): Boolean =
         if (item.mediaType == "photo") {
@@ -839,7 +937,7 @@ class AppRepositoryImpl @Inject constructor(
             currentDeletionStatus == DeletionStatus.TRASHED &&
             currentUri != null
         ) {
-            requireMediaOperation(mediaStoreActions.restoreFromSystemTrash(currentUri))
+            throw IllegalStateException("系统媒体恢复需要先完成用户确认")
         }
 
         val adjustment = statsAdjustmentForUndo(op, currentPhoto?.size ?: currentVideo?.size ?: 0L)

@@ -67,46 +67,6 @@ class MediaStoreActions @Inject constructor(
         }
     }
 
-    fun moveMediaToSystemTrash(mediaUri: String): MediaOperationResult {
-        val uri = runCatching { Uri.parse(mediaUri) }.getOrNull()
-            ?: return MediaOperationResult.Failed(context.getString(R.string.media_error_invalid_uri))
-        return try {
-            val rows = resolver.update(
-                uri,
-                ContentValues().apply { put(MediaStore.MediaColumns.IS_TRASHED, 1) },
-                null,
-                null,
-            )
-            if (rows > 0) {
-                MediaOperationResult.Success
-            } else {
-                MediaOperationResult.Failed(context.getString(R.string.media_error_trash_no_rows))
-            }
-        } catch (security: SecurityException) {
-            MediaOperationResult.Failed(context.getString(R.string.media_error_trash_security))
-        } catch (throwable: Throwable) {
-            MediaOperationResult.Failed(throwable.message ?: context.getString(R.string.media_error_trash_failed))
-        }
-    }
-
-    fun restoreFromSystemTrash(mediaUri: String): MediaOperationResult {
-        val uri = runCatching { Uri.parse(mediaUri) }.getOrNull()
-            ?: return MediaOperationResult.Failed(context.getString(R.string.media_error_invalid_uri))
-        return try {
-            val rows = resolver.update(
-                uri,
-                ContentValues().apply { put(MediaStore.MediaColumns.IS_TRASHED, 0) },
-                null,
-                null,
-            )
-            if (rows > 0) MediaOperationResult.Success else MediaOperationResult.Failed(context.getString(R.string.media_error_restore_no_rows))
-        } catch (security: SecurityException) {
-            MediaOperationResult.Failed(context.getString(R.string.media_error_restore_security))
-        } catch (throwable: Throwable) {
-            MediaOperationResult.Failed(throwable.message ?: context.getString(R.string.media_error_restore_failed))
-        }
-    }
-
     fun permanentlyDeleteMedia(mediaUri: String): MediaOperationResult {
         val uri = runCatching { Uri.parse(mediaUri) }.getOrNull()
             ?: return MediaOperationResult.Failed(context.getString(R.string.media_error_invalid_uri))

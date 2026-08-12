@@ -244,7 +244,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
         ) {
             TrashBottomBar(
                 items = visibleTrashItems,
-                onRestoreAll = { visibleTrashItems.forEach { viewModel.restoreTrash(it.id) } },
+                onRestoreAll = { viewModel.restoreTrashItems(visibleTrashItems) },
                 onDeleteAll = {
                     val targets = visibleTrashItems.filterNot { it.id in deletingTrashIds }
                     requestSystemDeleteAuthorization(targets) {

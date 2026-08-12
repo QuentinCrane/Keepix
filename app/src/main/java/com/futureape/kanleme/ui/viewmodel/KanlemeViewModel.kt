@@ -5,6 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.VideoEntity
+import com.futureape.kanleme.data.media.MediaAuthorizationResult
+import com.futureape.kanleme.data.media.MediaOperationKind
+import com.futureape.kanleme.data.media.MediaOperationRequest
+import com.futureape.kanleme.data.media.MediaOperationTracker
 import com.futureape.kanleme.data.repository.AppRepository
 import com.futureape.kanleme.data.repository.CleaningScope
 import com.futureape.kanleme.data.repository.DashboardStats
@@ -75,6 +79,38 @@ private data class PhotoSessionAction(
     val affectsDeck: Boolean = true,
 )
 
+sealed interface PendingMediaAuthorizationTarget {
+    data class RestoreTrash(
+        val ids: List<Long>,
+        val items: List<TrashItemEntity>,
+        val remainingItems: List<TrashItemEntity> = emptyList(),
+    ) : PendingMediaAuthorizationTarget
+
+    data class PhotoSystemTrash(
+        val photo: PhotoEntity,
+        val exitTargetX: Float,
+        val exitTargetY: Float,
+        val affectsDeck: Boolean = true,
+    ) : PendingMediaAuthorizationTarget
+
+    data class VideoSystemTrash(
+        val video: VideoEntity,
+    ) : PendingMediaAuthorizationTarget
+
+    data class UndoOperation(
+        val operationId: Long,
+    ) : PendingMediaAuthorizationTarget
+
+    data class UndoLastAction(
+        val mediaType: String?,
+    ) : PendingMediaAuthorizationTarget
+}
+
+data class PendingMediaAuthorization(
+    val request: MediaOperationRequest,
+    val target: PendingMediaAuthorizationTarget,
+)
+
 @HiltViewModel
 class KanlemeViewModel @Inject constructor(
     private val repository: AppRepository,
@@ -86,6 +122,7 @@ class KanlemeViewModel @Inject constructor(
         const val PHOTO_PREFETCH_THRESHOLD = 120
         const val VIDEO_PREFETCH_THRESHOLD = 80
         const val HOME_PREVIEW_DECK_SIZE = 3
+        const val MAX_MEDIA_AUTHORIZATION_BATCH = 100
     }
     private val _settingsLoaded = MutableStateFlow(false)
     val settingsLoaded = _settingsLoaded.asStateFlow()
@@ -201,6 +238,9 @@ class KanlemeViewModel @Inject constructor(
 
     private val _message = MutableStateFlow<UiText?>(null)
     val message = _message.asStateFlow()
+    private val _pendingMediaAuthorization = MutableStateFlow<PendingMediaAuthorization?>(null)
+    val pendingMediaAuthorization = _pendingMediaAuthorization.asStateFlow()
+    private val mediaOperationTracker = MediaOperationTracker()
     private val _mediaLibraryRefreshing = MutableStateFlow(false)
     val mediaLibraryRefreshing = _mediaLibraryRefreshing.asStateFlow()
 
@@ -311,6 +351,191 @@ class KanlemeViewModel @Inject constructor(
 
     fun showMessage(message: String) {
         _message.value = dynamicUiText(message)
+    }
+
+    private suspend fun requestMediaAuthorization(
+        kind: MediaOperationKind,
+        mediaUris: Collection<String>,
+        isTrashed: Boolean,
+        target: PendingMediaAuthorizationTarget,
+    ) {
+        if (_pendingMediaAuthorization.value != null) {
+            _message.value = uiText(R.string.message_media_authorization_in_progress)
+            return
+        }
+        val result = runCatching {
+            repository.createMediaAuthorizationRequest(kind, mediaUris, isTrashed)
+        }.getOrElse { throwable ->
+            MediaAuthorizationResult.Failed(throwable.message ?: "系统媒体授权请求失败")
+        }
+        when (result) {
+            MediaAuthorizationResult.Completed -> completeMediaAuthorization(target)
+            is MediaAuthorizationResult.NeedsUserConsent -> {
+                if (mediaOperationTracker.register(result.request.operationId)) {
+                    _pendingMediaAuthorization.value = PendingMediaAuthorization(result.request, target)
+                } else {
+                    _message.value = uiText(R.string.message_media_authorization_failed)
+                }
+            }
+            is MediaAuthorizationResult.Cancelled -> {
+                _message.value = uiText(R.string.message_media_authorization_cancelled)
+            }
+            is MediaAuthorizationResult.PartialFailure -> {
+                _message.value = uiText(R.string.message_media_authorization_partial)
+            }
+            is MediaAuthorizationResult.Failed -> {
+                _message.value = dynamicUiText(result.reason)
+            }
+        }
+    }
+
+    fun onMediaAuthorizationResult(approved: Boolean) {
+        val pending = _pendingMediaAuthorization.value ?: return
+        if (!mediaOperationTracker.consume(pending.request.operationId)) return
+        _pendingMediaAuthorization.value = null
+        if (!approved) {
+            resetAfterMediaAuthorizationCancelled(pending.target)
+            _message.value = uiText(R.string.message_media_authorization_cancelled)
+            return
+        }
+        viewModelScope.launch {
+            runCatching { completeMediaAuthorization(pending.target) }
+                .onFailure { throwable ->
+                    resetAfterMediaAuthorizationCancelled(pending.target)
+                    _message.value = throwable.message?.let(::dynamicUiText)
+                        ?: uiText(R.string.message_media_authorization_failed)
+                }
+        }
+    }
+
+    fun onMediaAuthorizationLaunchFailed() {
+        val pending = _pendingMediaAuthorization.value ?: return
+        if (!mediaOperationTracker.consume(pending.request.operationId)) return
+        _pendingMediaAuthorization.value = null
+        resetAfterMediaAuthorizationCancelled(pending.target)
+        _message.value = uiText(R.string.message_media_authorization_failed)
+    }
+
+    private suspend fun completeMediaAuthorization(target: PendingMediaAuthorizationTarget) {
+        when (target) {
+            is PendingMediaAuthorizationTarget.RestoreTrash -> {
+                repository.restoreTrashItemsAfterSystemAuthorization(target.ids)
+                restoreTrashItemsToDeck(target.items)
+                if (target.remainingItems.isNotEmpty()) {
+                    restoreTrashItems(target.remainingItems)
+                } else {
+                    _message.value = if (target.ids.size > 1) {
+                        uiText(R.string.message_trash_all_restored)
+                    } else {
+                        uiText(R.string.message_restore_success)
+                    }
+                }
+            }
+            is PendingMediaAuthorizationTarget.PhotoSystemTrash -> {
+                commitPhotoSystemTrash(target)
+            }
+            is PendingMediaAuthorizationTarget.VideoSystemTrash -> {
+                onVideoAction(target.video, SwipeAction.Delete, systemTrashAuthorized = true)
+            }
+            is PendingMediaAuthorizationTarget.UndoOperation -> {
+                if (!repository.undoOperationAfterSystemAuthorization(target.operationId)) {
+                    throw IllegalStateException("撤销操作已失效")
+                }
+            }
+            is PendingMediaAuthorizationTarget.UndoLastAction -> {
+                val ok = repository.undoLastActionAfterSystemAuthorization(target.mediaType)
+                applyUndoLastActionResult(target.mediaType, ok)
+            }
+        }
+    }
+
+    private fun resetAfterMediaAuthorizationCancelled(target: PendingMediaAuthorizationTarget) {
+        when (target) {
+            is PendingMediaAuthorizationTarget.RestoreTrash -> Unit
+            is PendingMediaAuthorizationTarget.PhotoSystemTrash -> {
+                _photoUndoAnimation.value = PhotoUndoAnimation(
+                    mediaStoreId = target.photo.mediaStoreId,
+                    action = SwipeAction.Delete,
+                    fromX = target.exitTargetX,
+                    fromY = target.exitTargetY,
+                )
+            }
+            is PendingMediaAuthorizationTarget.VideoSystemTrash -> {
+                invalidateVideoDeckLoads()
+                loadVideoDeck()
+            }
+            is PendingMediaAuthorizationTarget.UndoOperation,
+            is PendingMediaAuthorizationTarget.UndoLastAction,
+            -> Unit
+        }
+    }
+
+    private fun commitPhotoSystemTrash(target: PendingMediaAuthorizationTarget.PhotoSystemTrash) {
+        if (target.affectsDeck) {
+            if (!applyOptimisticPhotoAction(target.photo, SwipeAction.Delete)) return
+            val operationId = persistPhotoAction(target.photo) {
+                repository.handlePhotoAction(target.photo, SwipeAction.Delete, systemTrashAuthorized = true)
+            }
+            rememberPhotoSessionAction(
+                photo = target.photo,
+                action = SwipeAction.Delete,
+                operationId = operationId,
+                exitTargetX = target.exitTargetX,
+                exitTargetY = target.exitTargetY,
+            )
+            return
+        }
+
+        val operationId = viewModelScope.async {
+            repository.handlePhotoAction(target.photo, SwipeAction.Delete, systemTrashAuthorized = true)
+        }
+        rememberPhotoSessionAction(
+            photo = target.photo,
+            action = SwipeAction.Delete,
+            operationId = operationId,
+            exitTargetX = target.exitTargetX,
+            exitTargetY = target.exitTargetY,
+            affectsDeck = false,
+        )
+        viewModelScope.launch {
+            runCatching { operationId.await() }
+                .onSuccess { _message.value = uiText(R.string.message_system_trash_success) }
+                .onFailure { throwable ->
+                    dropLastPhotoSessionAction(target.photo.mediaStoreId)
+                    _message.value = throwable.message?.let(::dynamicUiText)
+                        ?: uiText(R.string.message_media_authorization_failed)
+                }
+        }
+    }
+
+    private fun requestSystemTrashForPhoto(
+        photo: PhotoEntity,
+        exitTargetX: Float,
+        exitTargetY: Float,
+        affectsDeck: Boolean = true,
+    ) {
+        viewModelScope.launch {
+            requestMediaAuthorization(
+                kind = MediaOperationKind.TRASH,
+                mediaUris = listOf(photo.uri),
+                isTrashed = true,
+                target = PendingMediaAuthorizationTarget.PhotoSystemTrash(
+                    photo = photo,
+                    exitTargetX = exitTargetX,
+                    exitTargetY = exitTargetY,
+                    affectsDeck = affectsDeck,
+                ),
+            )
+        }
+    }
+
+    private suspend fun requestSystemTrashForVideo(video: VideoEntity) {
+        requestMediaAuthorization(
+            kind = MediaOperationKind.TRASH,
+            mediaUris = listOf(video.uri),
+            isTrashed = true,
+            target = PendingMediaAuthorizationTarget.VideoSystemTrash(video),
+        )
     }
 
     private fun nextRandomSeed(): Long {
@@ -480,7 +705,16 @@ class KanlemeViewModel @Inject constructor(
             try {
                 runCatching {
                     val operationId = snapshot.operationId.await()
-                    snapshot.undoPersistedAction(operationId)
+                    if (snapshot.action == SwipeAction.Delete && settings.value.deleteMode == DeleteMode.SYSTEM_TRASH) {
+                        requestMediaAuthorization(
+                            kind = MediaOperationKind.RESTORE,
+                            mediaUris = listOf(snapshot.photo.uri),
+                            isTrashed = false,
+                            target = PendingMediaAuthorizationTarget.UndoOperation(operationId),
+                        )
+                    } else {
+                        snapshot.undoPersistedAction(operationId)
+                    }
                 }
                     .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
             } finally {
@@ -1120,14 +1354,45 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun onPhotoAction(photo: PhotoEntity, action: SwipeAction, exitTargetX: Float, exitTargetY: Float) {
+        onPhotoAction(photo, action, exitTargetX, exitTargetY, systemTrashAuthorized = false)
+    }
+
+    private fun onPhotoAction(
+        photo: PhotoEntity,
+        action: SwipeAction,
+        exitTargetX: Float,
+        exitTargetY: Float,
+        systemTrashAuthorized: Boolean,
+    ) {
+        if (action == SwipeAction.Delete &&
+            settings.value.deleteMode == DeleteMode.SYSTEM_TRASH &&
+            !systemTrashAuthorized
+        ) {
+            requestSystemTrashForPhoto(photo, exitTargetX, exitTargetY)
+            return
+        }
         if (!applyOptimisticPhotoAction(photo, action)) return
         val operationId = persistPhotoAction(photo) {
-            repository.handlePhotoAction(photo, action)
+            repository.handlePhotoAction(photo, action, systemTrashAuthorized)
         }
         rememberPhotoSessionAction(photo, action, operationId, exitTargetX, exitTargetY)
     }
 
     fun markPhotoForTrashOutsideCleaning(photo: PhotoEntity) = viewModelScope.launch {
+        if (settings.value.deleteMode == DeleteMode.SYSTEM_TRASH) {
+            requestMediaAuthorization(
+                kind = MediaOperationKind.TRASH,
+                mediaUris = listOf(photo.uri),
+                isTrashed = true,
+                target = PendingMediaAuthorizationTarget.PhotoSystemTrash(
+                    photo = photo,
+                    exitTargetX = 0f,
+                    exitTargetY = -920f,
+                    affectsDeck = false,
+                ),
+            )
+            return@launch
+        }
         val operationId = viewModelScope.async { repository.handlePhotoAction(photo, SwipeAction.Delete) }
         rememberPhotoSessionAction(
             photo = photo,
@@ -1154,6 +1419,10 @@ class KanlemeViewModel @Inject constructor(
         exitTargetX: Float,
         exitTargetY: Float,
     ) {
+        if (action == SwipeAction.Delete && settings.value.deleteMode == DeleteMode.SYSTEM_TRASH) {
+            requestSystemTrashForPhoto(photo, exitTargetX, exitTargetY)
+            return
+        }
         if (!applyOptimisticPhotoAction(photo, action)) return
         val operationId = persistPhotoAction(photo) {
             val s = settingsRepository.settings.first()
@@ -1165,7 +1434,18 @@ class KanlemeViewModel @Inject constructor(
         rememberPhotoSessionAction(photo, action, operationId, exitTargetX, exitTargetY)
     }
 
-    fun onVideoAction(video: VideoEntity, action: SwipeAction) = viewModelScope.launch {
+    fun onVideoAction(
+        video: VideoEntity,
+        action: SwipeAction,
+        systemTrashAuthorized: Boolean = false,
+    ) = viewModelScope.launch {
+        if (action == SwipeAction.Delete &&
+            settings.value.deleteMode == DeleteMode.SYSTEM_TRASH &&
+            !systemTrashAuthorized
+        ) {
+            requestSystemTrashForVideo(video)
+            return@launch
+        }
         handledVideoActionMediaIds += video.mediaStoreId
         invalidateVideoDeckLoads()
         val pendingKeepOperation = removePendingVideoKeep(video)
@@ -1175,7 +1455,7 @@ class KanlemeViewModel @Inject constructor(
                 pendingKeepOperation.await()
             } else {
                 pendingKeepOperation?.await()
-                repository.handleVideoAction(video, action)
+                repository.handleVideoAction(video, action, systemTrashAuthorized)
             }
             if (pendingKeepOperation == null || action != SwipeAction.Keep) _videoSessionActionCount.value += 1
             _lastVideoAction.value = action
@@ -1261,21 +1541,7 @@ class KanlemeViewModel @Inject constructor(
             _message.value = uiText(R.string.message_back_to_previous_video)
             return mediaStoreId
         }
-        viewModelScope.launch {
-            runCatching { repository.undoLastAction("video") }
-                .onSuccess { ok ->
-                    if (ok) {
-                        handledVideoActionMediaIds.clear()
-                        invalidateVideoDeckLoads()
-                        _videoSessionActionCount.value = (_videoSessionActionCount.value - 1).coerceAtLeast(0)
-                        _message.value = uiText(R.string.message_video_undo_success)
-                        loadVideoDeck()
-                    } else {
-                        _message.value = uiText(R.string.message_video_undo_empty)
-                    }
-                }
-                .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
-        }
+        undoLastAction("video")
         return null
     }
 
@@ -1409,14 +1675,60 @@ class KanlemeViewModel @Inject constructor(
         seedSimilarGroups(limit = nextLimit)
     }
 
-    fun restoreTrash(id: Long) = viewModelScope.launch {
-        val item = trashItems.value.firstOrNull { it.id == id }
-        runCatching { repository.restoreTrashItem(id) }
-            .onSuccess {
-                item?.let { restoreTrashItemsToDeck(listOf(it)) }
-                _message.value = uiText(R.string.message_restore_success)
+    fun restoreTrash(id: Long) {
+        trashItems.value.firstOrNull { it.id == id }?.let { restoreTrashItems(listOf(it)) }
+    }
+
+    fun restoreTrashItems(items: List<TrashItemEntity>): Job = viewModelScope.launch {
+        val distinctItems = items.distinctBy { it.id }
+        if (distinctItems.isEmpty()) return@launch
+        val currentBatch = distinctItems.take(MAX_MEDIA_AUTHORIZATION_BATCH)
+        val remainingItems = distinctItems.drop(MAX_MEDIA_AUTHORIZATION_BATCH)
+        runCatching { repository.prepareTrashRestore(currentBatch.map { it.id }) }
+            .onSuccess { plan ->
+                when (val authorization = plan.authorization) {
+                    MediaAuthorizationResult.Completed -> {
+                        currentBatch.forEach { repository.restoreTrashItem(it.id) }
+                        restoreTrashItemsToDeck(currentBatch)
+                        if (remainingItems.isNotEmpty()) {
+                            restoreTrashItems(remainingItems)
+                        } else {
+                            _message.value = if (currentBatch.size > 1) {
+                                uiText(R.string.message_trash_all_restored)
+                            } else {
+                                uiText(R.string.message_restore_success)
+                            }
+                        }
+                    }
+                    is MediaAuthorizationResult.NeedsUserConsent -> {
+                        if (mediaOperationTracker.register(authorization.request.operationId)) {
+                            _pendingMediaAuthorization.value = PendingMediaAuthorization(
+                                request = authorization.request,
+                                target = PendingMediaAuthorizationTarget.RestoreTrash(
+                                    ids = currentBatch.map { it.id },
+                                    items = currentBatch,
+                                    remainingItems = remainingItems,
+                                ),
+                            )
+                        } else {
+                            _message.value = uiText(R.string.message_media_authorization_failed)
+                        }
+                    }
+                    is MediaAuthorizationResult.Cancelled -> {
+                        _message.value = uiText(R.string.message_media_authorization_cancelled)
+                    }
+                    is MediaAuthorizationResult.PartialFailure -> {
+                        _message.value = uiText(R.string.message_media_authorization_partial)
+                    }
+                    is MediaAuthorizationResult.Failed -> {
+                        _message.value = dynamicUiText(authorization.reason)
+                    }
+                }
             }
-            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_restore_failed) }
+            .onFailure { throwable ->
+                _message.value = throwable.message?.let(::dynamicUiText)
+                    ?: uiText(R.string.message_restore_failed)
+            }
     }
 
     fun confirmTrashDeleted(id: Long) = confirmTrashDeleted(listOf(id))
@@ -1446,14 +1758,8 @@ class KanlemeViewModel @Inject constructor(
             .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_batch_delete_failed) }
     }
 
-    fun restoreAllTrash() = viewModelScope.launch {
-        val items = trashItems.value
-        runCatching { repository.restoreAllTrash() }
-            .onSuccess {
-                restoreTrashItemsToDeck(items)
-                _message.value = uiText(R.string.message_trash_all_restored)
-            }
-            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_batch_restore_failed) }
+    fun restoreAllTrash() {
+        restoreTrashItems(trashItems.value)
     }
 
     private fun restoreTrashItemsToDeck(items: List<TrashItemEntity>) {
@@ -1482,26 +1788,50 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun undoLastAction(mediaType: String? = null) = viewModelScope.launch {
-        runCatching { repository.undoLastAction(mediaType) }
-            .onSuccess { ok ->
-                if (ok) {
-                    if (mediaType == null || mediaType == "photo") {
-                        pendingPhotoActionMediaIds.clear()
-                        handledPhotoActionMediaIds.clear()
-                        clearPhotoActionHistory()
-                        invalidatePhotoDeckLoads()
-                        loadPhotoDeck()
-                    }
-                    if (mediaType == null || mediaType == "video") {
-                        handledVideoActionMediaIds.clear()
-                        clearPendingVideoKeeps()
-                        invalidateVideoDeckLoads()
-                        loadVideoDeck()
-                    }
-                }
-                _message.value = if (ok) uiText(R.string.message_undo_success) else uiText(R.string.message_undo_empty)
+        val authorization = runCatching { repository.createUndoAuthorizationRequest(mediaType) }
+            .getOrElse { throwable ->
+                _message.value = throwable.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed)
+                return@launch
             }
-            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
+        when (authorization) {
+            MediaAuthorizationResult.Completed -> {
+                runCatching { repository.undoLastAction(mediaType) }
+                    .onSuccess { ok -> applyUndoLastActionResult(mediaType, ok) }
+                    .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_undo_failed) }
+            }
+            is MediaAuthorizationResult.NeedsUserConsent -> {
+                if (mediaOperationTracker.register(authorization.request.operationId)) {
+                    _pendingMediaAuthorization.value = PendingMediaAuthorization(
+                        request = authorization.request,
+                        target = PendingMediaAuthorizationTarget.UndoLastAction(mediaType),
+                    )
+                } else {
+                    _message.value = uiText(R.string.message_media_authorization_failed)
+                }
+            }
+            is MediaAuthorizationResult.Cancelled -> _message.value = uiText(R.string.message_media_authorization_cancelled)
+            is MediaAuthorizationResult.PartialFailure -> _message.value = uiText(R.string.message_media_authorization_partial)
+            is MediaAuthorizationResult.Failed -> _message.value = dynamicUiText(authorization.reason)
+        }
+    }
+
+    private fun applyUndoLastActionResult(mediaType: String?, ok: Boolean) {
+        if (ok) {
+            if (mediaType == null || mediaType == "photo") {
+                pendingPhotoActionMediaIds.clear()
+                handledPhotoActionMediaIds.clear()
+                clearPhotoActionHistory()
+                invalidatePhotoDeckLoads()
+                loadPhotoDeck()
+            }
+            if (mediaType == null || mediaType == "video") {
+                handledVideoActionMediaIds.clear()
+                clearPendingVideoKeeps()
+                invalidateVideoDeckLoads()
+                loadVideoDeck()
+            }
+        }
+        _message.value = if (ok) uiText(R.string.message_undo_success) else uiText(R.string.message_undo_empty)
     }
 
     fun undoPhotoCleaningAction() {

@@ -1,5 +1,9 @@
 package com.futureape.kanleme.ui.navigation
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -78,6 +82,12 @@ import kotlinx.coroutines.delay
 fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewModel: KanlemeViewModel = hiltViewModel()) {
     val navController = rememberNavController()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val pendingMediaAuthorization by viewModel.pendingMediaAuthorization.collectAsStateWithLifecycle()
+    val mediaAuthorizationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        viewModel.onMediaAuthorizationResult(result.resultCode == Activity.RESULT_OK)
+    }
     val messageText = message?.asString()
     var visibleMessage by remember { mutableStateOf<String?>(null) }
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -100,6 +110,17 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
         }
     }
     val transitionBackdrop = Color.Black
+
+    LaunchedEffect(pendingMediaAuthorization?.request?.operationId) {
+        val pending = pendingMediaAuthorization ?: return@LaunchedEffect
+        runCatching {
+            mediaAuthorizationLauncher.launch(
+                IntentSenderRequest.Builder(pending.request.intentSender).build(),
+            )
+        }.onFailure {
+            viewModel.onMediaAuthorizationLaunchFailed()
+        }
+    }
 
     LaunchedEffect(initialShortcutTarget, shortcutNonce) {
         when (initialShortcutTarget) {

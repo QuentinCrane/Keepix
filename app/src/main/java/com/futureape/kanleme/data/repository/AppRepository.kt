@@ -5,6 +5,8 @@ import com.futureape.kanleme.data.local.SimilarGroupEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.UserStatsEntity
 import com.futureape.kanleme.data.local.VideoEntity
+import com.futureape.kanleme.data.media.MediaAuthorizationResult
+import com.futureape.kanleme.data.media.MediaOperationKind
 import kotlinx.coroutines.flow.Flow
 
 // Scope recovered from APK business keys and expanded to match the public feature docs.
@@ -93,6 +95,12 @@ data class MovePhotoResult(
     val message: String,
 )
 
+data class TrashRestoreAuthorizationPlan(
+    val localOnlyTrashIds: List<Long>,
+    val systemTrashIds: List<Long>,
+    val authorization: MediaAuthorizationResult,
+)
+
 interface AppRepository {
     fun observeDashboard(): Flow<DashboardStats>
     fun observePhotoTypeStats(): Flow<PhotoTypeStats>
@@ -115,8 +123,14 @@ interface AppRepository {
     suspend fun loadPhotoDeck(scope: CleaningScope): List<PhotoEntity>
     suspend fun loadVideoDeck(scope: CleaningScope): List<VideoEntity>
     suspend fun loadPhotoMemoryWindow(currentPhoto: PhotoEntity, dayCount: Int = 7, limit: Int = 420): List<PhotoEntity>
-    suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction): Long
-    suspend fun handleVideoAction(video: VideoEntity, action: SwipeAction): Long
+    suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction, systemTrashAuthorized: Boolean = false): Long
+    suspend fun handleVideoAction(video: VideoEntity, action: SwipeAction, systemTrashAuthorized: Boolean = false): Long
+    suspend fun createMediaAuthorizationRequest(
+        kind: MediaOperationKind,
+        mediaUris: Collection<String>,
+        isTrashed: Boolean = false,
+    ): MediaAuthorizationResult
+    suspend fun prepareTrashRestore(trashIds: Collection<Long>): TrashRestoreAuthorizationPlan
     suspend fun movePhotoToFolder(photo: PhotoEntity, targetRelativePath: String): MovePhotoResult
     suspend fun moveVideoToFolder(video: VideoEntity, targetRelativePath: String): MovePhotoResult
     suspend fun generateSimilarGroups(
@@ -125,10 +139,14 @@ interface AppRepository {
     ): Int
     suspend fun similarGroupDetail(groupId: String): SimilarGroupDetail?
     suspend fun restoreTrashItem(trashId: Long)
+    suspend fun restoreTrashItemsAfterSystemAuthorization(trashIds: Collection<Long>)
     suspend fun markTrashItemDeleted(trashId: Long)
     suspend fun permanentlyDeleteTrashItem(trashId: Long)
     suspend fun permanentlyDeleteAllTrash()
     suspend fun restoreAllTrash()
+    suspend fun createUndoAuthorizationRequest(mediaType: String? = null): MediaAuthorizationResult
+    suspend fun undoLastActionAfterSystemAuthorization(mediaType: String? = null): Boolean
+    suspend fun undoOperationAfterSystemAuthorization(operationId: Long): Boolean
     suspend fun undoLastAction(mediaType: String? = null): Boolean
     suspend fun undoOperation(operationId: Long): Boolean
     suspend fun buildAnnualReport(year: Int): AnnualReport

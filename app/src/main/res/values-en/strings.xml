@@ -64,6 +64,11 @@
     <string name="message_batch_delete_failed">Batch delete failed</string>
     <string name="message_trash_all_restored">All trash items restored</string>
     <string name="message_batch_restore_failed">Batch restore failed</string>
+    <string name="message_media_authorization_in_progress">A system authorization request is already in progress</string>
+    <string name="message_media_authorization_cancelled">System media authorization cancelled. Nothing changed</string>
+    <string name="message_media_authorization_failed">Could not start system media authorization</string>
+    <string name="message_media_authorization_partial">Some media did not complete authorization. Try again later</string>
+    <string name="message_system_trash_success">Moved to system trash</string>
     <string name="message_undo_success">Last action undone</string>
     <string name="message_undo_empty">Nothing to undo</string>
     <string name="message_photo_back_success">Back to the previous photo</string>
