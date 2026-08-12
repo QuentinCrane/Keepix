@@ -317,7 +317,7 @@ fun VideoCleanScreen(
         }
 
         androidx.compose.animation.AnimatedVisibility(
-            visible = videoChromeVisible && (settings.videoShowTopBar || settings.videoShowShuffleButton),
+            visible = videoChromeVisible && (settings.videoShowTopBar || settings.videoShowFolderChips || settings.videoShowShuffleButton),
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter),
@@ -328,6 +328,7 @@ fun VideoCleanScreen(
                     deletedSizeBytes = dashboard.pendingDeleteBytes,
                     displayMode = settings.videoDisplayMode,
                     dateMode = scope.dateMode,
+                    showFolderChips = settings.videoShowFolderChips,
                     showShuffle = settings.videoShowShuffleButton,
                     onToggleDisplayMode = { haptics.tick(); viewModel.toggleVideoDisplayModeQuick() },
                     onDateClick = { haptics.tick(); showDatePicker = true },
@@ -440,6 +441,7 @@ private fun VideoOrganizerTopRow(
     deletedSizeBytes: Long,
     displayMode: VideoDisplayMode,
     dateMode: String,
+    showFolderChips: Boolean,
     showShuffle: Boolean,
     onToggleDisplayMode: () -> Unit,
     onDateClick: () -> Unit,
@@ -466,11 +468,13 @@ private fun VideoOrganizerTopRow(
             emphasized = dateMode != "all",
             onClick = onDateClick,
         )
-        VideoTopPill(
-            label = "指定归档",
-            icon = Icons.Rounded.Folder,
-            onClick = onFolderClick,
-        )
+        if (showFolderChips) {
+            VideoTopPill(
+                label = "指定归档",
+                icon = Icons.Rounded.Folder,
+                onClick = onFolderClick,
+            )
+        }
         OrganizerProgressPill(
             progressPercent = progressPercent,
             remainingCount = remainingCount,

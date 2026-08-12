@@ -352,6 +352,7 @@ private fun SettingsPageContent(
                     onToggleVideoTopBar = { onTick(); viewModel.setVideoShowTopBar(!settings.videoShowTopBar) },
                     onToggleVideoActionRail = { onTick(); viewModel.setVideoShowActionRail(!settings.videoShowActionRail) },
                     onToggleVideoInfoPanel = { onTick(); viewModel.setVideoShowInfoPanel(!settings.videoShowInfoPanel) },
+                    onToggleVideoFolderChips = { onTick(); viewModel.setVideoShowFolderChips(!settings.videoShowFolderChips) },
                     onToggleVideoProgressBar = { onTick(); viewModel.setVideoShowProgressBar(!settings.videoShowProgressBar) },
                     onToggleVideoShuffleButton = { onTick(); viewModel.setVideoShowShuffleButton(!settings.videoShowShuffleButton) },
                 )
@@ -1304,6 +1305,7 @@ private fun OrganizerDisplayCustomizer(
     onToggleVideoTopBar: () -> Unit,
     onToggleVideoActionRail: () -> Unit,
     onToggleVideoInfoPanel: () -> Unit,
+    onToggleVideoFolderChips: () -> Unit,
     onToggleVideoProgressBar: () -> Unit,
     onToggleVideoShuffleButton: () -> Unit,
 ) {
@@ -1341,6 +1343,7 @@ private fun OrganizerDisplayCustomizer(
                         onToggleTopBar = onToggleVideoTopBar,
                         onToggleActionRail = onToggleVideoActionRail,
                         onToggleInfoPanel = onToggleVideoInfoPanel,
+                        onToggleFolderChips = onToggleVideoFolderChips,
                         onToggleProgressBar = onToggleVideoProgressBar,
                         onToggleShuffleButton = onToggleVideoShuffleButton,
                     )
@@ -1366,6 +1369,7 @@ private fun OrganizerDisplayCustomizer(
                     ComponentToggleItem("顶部进度", settings.videoShowTopBar, onToggleVideoTopBar),
                     ComponentToggleItem("右侧操作栏", settings.videoShowActionRail, onToggleVideoActionRail),
                     ComponentToggleItem("底部信息", settings.videoShowInfoPanel, onToggleVideoInfoPanel),
+                    ComponentToggleItem("文件夹按钮", settings.videoShowFolderChips, onToggleVideoFolderChips),
                     ComponentToggleItem("进度条", settings.videoShowProgressBar, onToggleVideoProgressBar),
                     ComponentToggleItem("重新随机按钮", settings.videoShowShuffleButton, onToggleVideoShuffleButton),
                 ),
@@ -1528,6 +1532,7 @@ private fun VideoOrganizerMockPreview(
     onToggleTopBar: () -> Unit,
     onToggleActionRail: () -> Unit,
     onToggleInfoPanel: () -> Unit,
+    onToggleFolderChips: () -> Unit,
     onToggleProgressBar: () -> Unit,
     onToggleShuffleButton: () -> Unit,
 ) {
@@ -1550,6 +1555,8 @@ private fun VideoOrganizerMockPreview(
         ) {
             if (settings.videoShowTopBar) PreviewDarkComponentBlock("顶部进度", "12/600 · 待删 3", onToggleTopBar, Modifier.weight(1f))
             else PreviewDarkHiddenBlock("顶部进度已隐藏", onToggleTopBar, Modifier.weight(1f))
+            if (settings.videoShowFolderChips) PreviewDarkComponentBlock("文件夹", "指定归档", onToggleFolderChips, Modifier.width(104.dp))
+            else PreviewDarkHiddenBlock("文件夹", onToggleFolderChips, Modifier.width(104.dp))
             if (settings.videoShowShuffleButton) PreviewDarkComponentBlock("重新随机", "第一行", onToggleShuffleButton, Modifier.width(116.dp))
             else PreviewDarkHiddenBlock("随机按钮", onToggleShuffleButton, Modifier.width(116.dp))
         }

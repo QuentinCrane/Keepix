@@ -63,7 +63,7 @@ private val truthEntries = listOf(
     TruthEntry("videoShowTopBar", "video_show_top_bar", ConsumerStatus.ACTIVE),
     TruthEntry("videoShowActionRail", "video_show_action_rail", ConsumerStatus.ACTIVE),
     TruthEntry("videoShowInfoPanel", "video_show_info_panel", ConsumerStatus.ACTIVE),
-    TruthEntry("videoShowFolderChips", "video_show_folder_chips", ConsumerStatus.STORAGE_ONLY),
+    TruthEntry("videoShowFolderChips", "video_show_folder_chips", ConsumerStatus.ACTIVE),
     TruthEntry("videoShowProgressBar", "video_show_progress_bar", ConsumerStatus.ACTIVE),
     TruthEntry("videoShowShuffleButton", "video_show_shuffle_button", ConsumerStatus.ACTIVE),
     TruthEntry("videoChromeVisible", "video_chrome_visible", ConsumerStatus.ACTIVE),
@@ -91,6 +91,6 @@ class AppSettingsTruthTableTest {
         assertEquals(ConsumerStatus.STORAGE_ONLY, byField.getValue("immersiveBackground").status)
         assertEquals(ConsumerStatus.STORAGE_ONLY, byField.getValue("photoCleanMode").status)
         assertTrue(byField.getValue("photoShowTopBar").status == ConsumerStatus.PREVIEW_ONLY)
-        assertEquals(ConsumerStatus.STORAGE_ONLY, byField.getValue("videoShowFolderChips").status)
+        assertEquals(ConsumerStatus.ACTIVE, byField.getValue("videoShowFolderChips").status)
     }
 }

@@ -59,11 +59,11 @@
 | `videoShowTopBar` | `true` | `video_show_top_bar` / `setVideoShowTopBar` | 视频 chrome 可见性 | ACTIVE | 关闭后仍有可发现控制入口 |
 | `videoShowActionRail` | `true` | `video_show_action_rail` / `setVideoShowActionRail` | 视频右侧操作栏 | ACTIVE | 隐藏后保留等价手势/菜单 |
 | `videoShowInfoPanel` | `true` | `video_show_info_panel` / `setVideoShowInfoPanel` | 视频底部信息面板 | ACTIVE | 关闭后进度条仍按设置显示 |
-| `videoShowFolderChips` | `true` | `video_show_folder_chips` / `setVideoShowFolderChips` | 当前未找到视频真实消费者 | STORAGE_ONLY | C03 决定接通或移除 |
+| `videoShowFolderChips` | `true` | `video_show_folder_chips` / `setVideoShowFolderChips` | 视频整理页顶部“指定归档”文件夹按钮 | ACTIVE | 关闭后隐藏按钮，队列和手势不变 |
 | `videoShowProgressBar` | `true` | `video_show_progress_bar` / `setVideoShowProgressBar` | 视频底部进度条 | ACTIVE | 横向拖动和隐藏状态一致 |
 | `videoShowShuffleButton` | `true` | `video_show_shuffle_button` / `setVideoShowShuffleButton` | 视频顶部随机按钮 | ACTIVE | 点击只改变顺序，不改变动作身份 |
 | `videoChromeVisible` | `true` | `video_chrome_visible` / `setVideoChromeVisible` | 视频播放器 chrome 总开关 | ACTIVE | 播放器生命周期和控制入口不丢失 |
 
 ## 当前结论
 
-消费缺口集中在快捷操作交换、沉浸背景、照片清理模式和视频文件夹 chips。照片真实页显示开关已由 C02 接通；后续 C03～C04 继续按表逐组接通或做删除决策，不把设置页预览截图单独作为功能完成证据。
+消费缺口集中在快捷操作交换、沉浸背景和照片清理模式。照片真实页显示开关已由 C02 接通；视频文件夹按钮已由 C03 接通，后续 C03～C04 继续按表逐组接通或做删除决策，不把设置页预览截图单独作为功能完成证据。
