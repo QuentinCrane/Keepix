@@ -669,7 +669,12 @@ class AppRepositoryImpl @Inject constructor(
             )
         }
 
-    override suspend fun movePhotoToFolder(photo: PhotoEntity, targetRelativePath: String): MovePhotoResult = withContext(Dispatchers.IO) {
+    override suspend fun movePhotoToFolder(
+        photo: PhotoEntity,
+        targetRelativePath: String,
+        writeAuthorized: Boolean,
+    ): MovePhotoResult = withContext(Dispatchers.IO) {
+        if (!writeAuthorized) return@withContext MovePhotoResult(false, "移动媒体需要先完成系统写入授权")
         val normalizedPath = MediaStoreActions.normalizeRelativePath(targetRelativePath)
         when (val result = mediaStoreActions.moveMediaToFolder(photo.uri, normalizedPath)) {
             MediaOperationResult.Success -> {
@@ -684,7 +689,12 @@ class AppRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun moveVideoToFolder(video: VideoEntity, targetRelativePath: String): MovePhotoResult = withContext(Dispatchers.IO) {
+    override suspend fun moveVideoToFolder(
+        video: VideoEntity,
+        targetRelativePath: String,
+        writeAuthorized: Boolean,
+    ): MovePhotoResult = withContext(Dispatchers.IO) {
+        if (!writeAuthorized) return@withContext MovePhotoResult(false, "移动媒体需要先完成系统写入授权")
         val normalizedPath = MediaStoreActions.normalizeRelativePath(targetRelativePath)
         when (val result = mediaStoreActions.moveMediaToFolder(video.uri, normalizedPath)) {
             MediaOperationResult.Success -> {

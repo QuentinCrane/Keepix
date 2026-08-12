@@ -131,8 +131,16 @@ interface AppRepository {
         isTrashed: Boolean = false,
     ): MediaAuthorizationResult
     suspend fun prepareTrashRestore(trashIds: Collection<Long>): TrashRestoreAuthorizationPlan
-    suspend fun movePhotoToFolder(photo: PhotoEntity, targetRelativePath: String): MovePhotoResult
-    suspend fun moveVideoToFolder(video: VideoEntity, targetRelativePath: String): MovePhotoResult
+    suspend fun movePhotoToFolder(
+        photo: PhotoEntity,
+        targetRelativePath: String,
+        writeAuthorized: Boolean = false,
+    ): MovePhotoResult
+    suspend fun moveVideoToFolder(
+        video: VideoEntity,
+        targetRelativePath: String,
+        writeAuthorized: Boolean = false,
+    ): MovePhotoResult
     suspend fun generateSimilarGroups(
         limit: Int = 1200,
         onProgress: (processed: Int, total: Int, stage: String) -> Unit = { _, _, _ -> },

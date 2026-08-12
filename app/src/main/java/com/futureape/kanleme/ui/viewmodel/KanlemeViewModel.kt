@@ -104,6 +104,37 @@ sealed interface PendingMediaAuthorizationTarget {
     data class UndoLastAction(
         val mediaType: String?,
     ) : PendingMediaAuthorizationTarget
+
+    data class PhotoMove(
+        val photo: PhotoEntity,
+        val targetRelativePath: String,
+    ) : PendingMediaAuthorizationTarget
+
+    data class VideoMove(
+        val video: VideoEntity,
+        val targetRelativePath: String,
+    ) : PendingMediaAuthorizationTarget
+
+    data class PhotoArchive(
+        val photo: PhotoEntity,
+        val targetRelativePath: String,
+        val originalRelativePath: String,
+    ) : PendingMediaAuthorizationTarget
+
+    data class VideoArchive(
+        val video: VideoEntity,
+        val targetRelativePath: String,
+        val originalRelativePath: String,
+    ) : PendingMediaAuthorizationTarget
+
+    data class PhotoActionWithMove(
+        val photo: PhotoEntity,
+        val action: SwipeAction,
+        val targetRelativePath: String,
+        val originalRelativePath: String,
+        val exitTargetX: Float,
+        val exitTargetY: Float,
+    ) : PendingMediaAuthorizationTarget
 }
 
 data class PendingMediaAuthorization(
@@ -446,6 +477,19 @@ class KanlemeViewModel @Inject constructor(
                 val ok = repository.undoLastActionAfterSystemAuthorization(target.mediaType)
                 applyUndoLastActionResult(target.mediaType, ok)
             }
+            is PendingMediaAuthorizationTarget.PhotoMove -> {
+                val result = repository.movePhotoToFolder(target.photo, target.targetRelativePath, writeAuthorized = true)
+                if (!result.success) error(result.message)
+                _message.value = dynamicUiText(result.message)
+            }
+            is PendingMediaAuthorizationTarget.VideoMove -> {
+                val result = repository.moveVideoToFolder(target.video, target.targetRelativePath, writeAuthorized = true)
+                if (!result.success) error(result.message)
+                _message.value = dynamicUiText(result.message)
+            }
+            is PendingMediaAuthorizationTarget.PhotoArchive -> commitPhotoArchive(target)
+            is PendingMediaAuthorizationTarget.VideoArchive -> commitVideoArchive(target)
+            is PendingMediaAuthorizationTarget.PhotoActionWithMove -> commitPhotoActionWithMove(target)
         }
     }
 
@@ -466,6 +510,11 @@ class KanlemeViewModel @Inject constructor(
             }
             is PendingMediaAuthorizationTarget.UndoOperation,
             is PendingMediaAuthorizationTarget.UndoLastAction,
+            is PendingMediaAuthorizationTarget.PhotoMove,
+            is PendingMediaAuthorizationTarget.VideoMove,
+            is PendingMediaAuthorizationTarget.PhotoArchive,
+            is PendingMediaAuthorizationTarget.VideoArchive,
+            is PendingMediaAuthorizationTarget.PhotoActionWithMove,
             -> Unit
         }
     }
@@ -508,6 +557,137 @@ class KanlemeViewModel @Inject constructor(
         }
     }
 
+    private fun commitPhotoActionWithMove(target: PendingMediaAuthorizationTarget.PhotoActionWithMove) {
+        if (!applyOptimisticPhotoAction(target.photo, target.action)) return
+        val operationId = persistPhotoAction(target.photo) {
+            val result = repository.movePhotoToFolder(
+                target.photo,
+                target.targetRelativePath,
+                writeAuthorized = true,
+            )
+            if (!result.success) error(result.message)
+            try {
+                repository.handlePhotoAction(target.photo, target.action)
+            } catch (throwable: Throwable) {
+                runCatching {
+                    repository.movePhotoToFolder(
+                        target.photo,
+                        target.originalRelativePath,
+                        writeAuthorized = true,
+                    )
+                }
+                throw throwable
+            }
+        }
+        rememberPhotoSessionAction(
+            photo = target.photo,
+            action = target.action,
+            operationId = operationId,
+            exitTargetX = target.exitTargetX,
+            exitTargetY = target.exitTargetY,
+            undoPersistedAction = { id ->
+                repository.undoOperation(id)
+                requestMediaAuthorization(
+                    kind = MediaOperationKind.WRITE,
+                    mediaUris = listOf(target.photo.uri),
+                    isTrashed = false,
+                    target = PendingMediaAuthorizationTarget.PhotoMove(
+                        photo = target.photo,
+                        targetRelativePath = target.originalRelativePath,
+                    ),
+                )
+            },
+        )
+    }
+
+    private suspend fun commitPhotoArchive(target: PendingMediaAuthorizationTarget.PhotoArchive) {
+        handledPhotoActionMediaIds += target.photo.mediaStoreId
+        invalidatePhotoDeckLoads()
+        val result = repository.movePhotoToFolder(
+            target.photo,
+            target.targetRelativePath,
+            writeAuthorized = true,
+        )
+        if (!result.success) {
+            handledPhotoActionMediaIds -= target.photo.mediaStoreId
+            error(result.message)
+        }
+        val operationId = try {
+            repository.handlePhotoAction(target.photo, SwipeAction.Keep)
+        } catch (throwable: Throwable) {
+            runCatching {
+                repository.movePhotoToFolder(
+                    target.photo,
+                    target.originalRelativePath,
+                    writeAuthorized = true,
+                )
+            }
+            handledPhotoActionMediaIds -= target.photo.mediaStoreId
+            throw throwable
+        }
+        _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == target.photo.mediaStoreId }
+        _photoSessionActionCount.value += 1
+        _lastPhotoAction.value = SwipeAction.Keep
+        rememberPhotoSessionAction(
+            photo = target.photo,
+            action = SwipeAction.Keep,
+            operationId = CompletableDeferred(operationId),
+            exitTargetX = 980f,
+            exitTargetY = 0f,
+            undoPersistedAction = { id ->
+                repository.undoOperation(id)
+                requestMediaAuthorization(
+                    kind = MediaOperationKind.WRITE,
+                    mediaUris = listOf(target.photo.uri),
+                    isTrashed = false,
+                    target = PendingMediaAuthorizationTarget.PhotoMove(
+                        photo = target.photo,
+                        targetRelativePath = target.originalRelativePath,
+                    ),
+                )
+            },
+        )
+        _message.value = dynamicUiText(result.message)
+        refillPhotoDeckIfNeeded()
+    }
+
+    private suspend fun commitVideoArchive(target: PendingMediaAuthorizationTarget.VideoArchive) {
+        handledVideoActionMediaIds += target.video.mediaStoreId
+        invalidateVideoDeckLoads()
+        val pendingKeepOperation = removePendingVideoKeep(target.video)
+        val result = repository.moveVideoToFolder(
+            target.video,
+            target.targetRelativePath,
+            writeAuthorized = true,
+        )
+        if (!result.success) {
+            handledVideoActionMediaIds -= target.video.mediaStoreId
+            error(result.message)
+        }
+        try {
+            if (pendingKeepOperation != null) {
+                pendingKeepOperation.await()
+            } else {
+                repository.handleVideoAction(target.video, SwipeAction.Keep)
+            }
+        } catch (throwable: Throwable) {
+            runCatching {
+                repository.moveVideoToFolder(
+                    target.video,
+                    target.originalRelativePath,
+                    writeAuthorized = true,
+                )
+            }
+            handledVideoActionMediaIds -= target.video.mediaStoreId
+            throw throwable
+        }
+        _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == target.video.mediaStoreId }
+        if (pendingKeepOperation == null) _videoSessionActionCount.value += 1
+        _lastVideoAction.value = SwipeAction.Keep
+        _message.value = dynamicUiText(result.message)
+        refillVideoDeckIfNeeded()
+    }
+
     private fun requestSystemTrashForPhoto(
         photo: PhotoEntity,
         exitTargetX: Float,
@@ -536,6 +716,30 @@ class KanlemeViewModel @Inject constructor(
             isTrashed = true,
             target = PendingMediaAuthorizationTarget.VideoSystemTrash(video),
         )
+    }
+
+    private fun requestMediaAuthorizationForPhotoActionWithMove(
+        photo: PhotoEntity,
+        action: SwipeAction,
+        targetRelativePath: String,
+        exitTargetX: Float,
+        exitTargetY: Float,
+    ) {
+        viewModelScope.launch {
+            requestMediaAuthorization(
+                kind = MediaOperationKind.WRITE,
+                mediaUris = listOf(photo.uri),
+                isTrashed = false,
+            target = PendingMediaAuthorizationTarget.PhotoActionWithMove(
+                    photo = photo,
+                    action = action,
+                    targetRelativePath = targetRelativePath,
+                    originalRelativePath = photo.relativePath ?: photo.folderPath,
+                    exitTargetX = exitTargetX,
+                    exitTargetY = exitTargetY,
+                ),
+            )
+        }
     }
 
     private fun nextRandomSeed(): Long {
@@ -1423,12 +1627,22 @@ class KanlemeViewModel @Inject constructor(
             requestSystemTrashForPhoto(photo, exitTargetX, exitTargetY)
             return
         }
+        if (
+            targetRelativePath != null &&
+            settings.value.autoMoveOnKeepFavorite &&
+            action in setOf(SwipeAction.Keep, SwipeAction.Favorite)
+        ) {
+            requestMediaAuthorizationForPhotoActionWithMove(
+                photo = photo,
+                action = action,
+                targetRelativePath = targetRelativePath,
+                exitTargetX = exitTargetX,
+                exitTargetY = exitTargetY,
+            )
+            return
+        }
         if (!applyOptimisticPhotoAction(photo, action)) return
         val operationId = persistPhotoAction(photo) {
-            val s = settingsRepository.settings.first()
-            if (targetRelativePath != null && s.autoMoveOnKeepFavorite && action in setOf(SwipeAction.Keep, SwipeAction.Favorite)) {
-                repository.movePhotoToFolder(photo, targetRelativePath)
-            }
             repository.handlePhotoAction(photo, action)
         }
         rememberPhotoSessionAction(photo, action, operationId, exitTargetX, exitTargetY)
@@ -1546,65 +1760,47 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun movePhotoToFolder(photo: PhotoEntity, relativePath: String) = viewModelScope.launch {
-        runCatching { repository.movePhotoToFolder(photo, relativePath) }
-            .onSuccess { _message.value = dynamicUiText(it.message) }
-            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_move_folder_failed) }
+        requestMediaAuthorization(
+            kind = MediaOperationKind.WRITE,
+            mediaUris = listOf(photo.uri),
+            isTrashed = false,
+            target = PendingMediaAuthorizationTarget.PhotoMove(photo, relativePath),
+        )
+    }
+
+    fun moveVideoToFolder(video: VideoEntity, relativePath: String) = viewModelScope.launch {
+        requestMediaAuthorization(
+            kind = MediaOperationKind.WRITE,
+            mediaUris = listOf(video.uri),
+            isTrashed = false,
+            target = PendingMediaAuthorizationTarget.VideoMove(video, relativePath),
+        )
     }
 
     fun archivePhotoToFolder(photo: PhotoEntity, relativePath: String) = viewModelScope.launch {
-        handledPhotoActionMediaIds += photo.mediaStoreId
-        invalidatePhotoDeckLoads()
-        runCatching {
-            val result = repository.movePhotoToFolder(photo, relativePath)
-            if (!result.success) error(result.message)
-            val operationId = repository.handlePhotoAction(photo, SwipeAction.Keep)
-            result.message to operationId
-        }.onSuccess { (message, operationId) ->
-            _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == photo.mediaStoreId }
-            _photoSessionActionCount.value += 1
-            _lastPhotoAction.value = SwipeAction.Keep
-            rememberPhotoSessionAction(
+        requestMediaAuthorization(
+            kind = MediaOperationKind.WRITE,
+            mediaUris = listOf(photo.uri),
+            isTrashed = false,
+            target = PendingMediaAuthorizationTarget.PhotoArchive(
                 photo = photo,
-                action = SwipeAction.Keep,
-                operationId = CompletableDeferred(operationId),
-                exitTargetX = 980f,
-                exitTargetY = 0f,
-                undoPersistedAction = { id ->
-                    repository.undoOperation(id)
-                    repository.movePhotoToFolder(photo, photo.relativePath ?: photo.folderPath)
-                },
-            )
-            _message.value = dynamicUiText(message)
-            refillPhotoDeckIfNeeded()
-        }.onFailure {
-            handledPhotoActionMediaIds -= photo.mediaStoreId
-            _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_archive_failed)
-        }
+                targetRelativePath = relativePath,
+                originalRelativePath = photo.relativePath ?: photo.folderPath,
+            ),
+        )
     }
 
     fun archiveVideoToFolder(video: VideoEntity, relativePath: String) = viewModelScope.launch {
-        handledVideoActionMediaIds += video.mediaStoreId
-        invalidateVideoDeckLoads()
-        runCatching {
-            val pendingKeepOperation = removePendingVideoKeep(video)
-            val result = repository.moveVideoToFolder(video, relativePath)
-            if (!result.success) error(result.message)
-            if (pendingKeepOperation != null) {
-                pendingKeepOperation.await()
-            } else {
-                repository.handleVideoAction(video, SwipeAction.Keep)
-            }
-            result.message to pendingKeepOperation
-        }.onSuccess { (message, pendingKeepOperation) ->
-            _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == video.mediaStoreId }
-            if (pendingKeepOperation == null) _videoSessionActionCount.value += 1
-            _lastVideoAction.value = SwipeAction.Keep
-            _message.value = dynamicUiText(message)
-            refillVideoDeckIfNeeded()
-        }.onFailure {
-            handledVideoActionMediaIds -= video.mediaStoreId
-            _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_archive_failed)
-        }
+        requestMediaAuthorization(
+            kind = MediaOperationKind.WRITE,
+            mediaUris = listOf(video.uri),
+            isTrashed = false,
+            target = PendingMediaAuthorizationTarget.VideoArchive(
+                video = video,
+                targetRelativePath = relativePath,
+                originalRelativePath = video.folderPath,
+            ),
+        )
     }
 
     fun seedSimilarGroups(limit: Int = 3600) {

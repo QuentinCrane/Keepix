@@ -79,7 +79,7 @@
     <string name="media_error_invalid_uri">媒體地址無效</string>
     <string name="media_error_authorization_failed">系統媒體授權請求失敗</string>
     <string name="media_error_move_no_rows">系統沒有移動該媒體，可能需要先授予完整相簿權限</string>
-    <string name="media_error_move_security">系統要求單獨授權修改這個媒體檔案。目前版本已保留介面位置，後續可接入 MediaStore 寫入授權彈窗</string>
+    <string name="media_error_move_security">系統仍拒絕修改這個媒體檔案，請確認媒體權限或稍後重試</string>
     <string name="media_error_move_folder_failed">移動資料夾失敗</string>
     <string name="media_error_trash_no_rows">系統沒有移動到垃圾桶，可能需要針對該媒體單獨授權</string>
     <string name="media_error_trash_security">系統要求單獨授權修改該媒體。請先使用待刪確認模式，或後續接入 MediaStore 寫入授權彈窗</string>

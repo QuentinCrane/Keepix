@@ -79,7 +79,7 @@
     <string name="media_error_invalid_uri">Invalid media address</string>
     <string name="media_error_authorization_failed">The system media authorization request failed</string>
     <string name="media_error_move_no_rows">The system did not move this media item. Full photo access may be required</string>
-    <string name="media_error_move_security">The system requires separate permission to modify this media item. The write authorization flow can be added later</string>
+    <string name="media_error_move_security">The system still refused to modify this media item. Check media access or try again later</string>
     <string name="media_error_move_folder_failed">Move to folder failed</string>
     <string name="media_error_trash_no_rows">The system did not move this item to trash. Separate authorization may be required</string>
     <string name="media_error_trash_security">The system requires separate permission to modify this item. Use pending delete for now, or add the MediaStore write authorization flow later</string>
