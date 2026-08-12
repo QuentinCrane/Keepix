@@ -9,6 +9,12 @@
     <string name="delete_mode_pending_confirm_desc">Put items in the pending-delete list first, then review them before taking action</string>
     <string name="delete_mode_system_trash">System trash</string>
     <string name="delete_mode_system_trash_desc">Try moving items to system trash without extra restrictions</string>
+    <string name="swipe_sound_soft_breeze">Soft breeze</string>
+    <string name="swipe_sound_soft_breeze_desc">A gentle recorded swipe sound, recommended by default</string>
+    <string name="swipe_sound_low_tap">Short glide</string>
+    <string name="swipe_sound_low_tap_desc">A short recorded swipe sound with a crisper response</string>
+    <string name="swipe_sound_original_whoosh">Descending glide</string>
+    <string name="swipe_sound_original_whoosh_desc">A recorded high-to-low swipe sound designed to stay comfortable</string>
     <string name="swipe_sensitivity_gentle">Responsive</string>
     <string name="swipe_sensitivity_standard">Standard</string>
     <string name="swipe_sensitivity_stable">Steadier</string>

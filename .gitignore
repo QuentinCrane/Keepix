@@ -29,6 +29,7 @@ PACKAGING_LOCAL.md
 # Android app module.
 !app/
 app/*
+!app/proguard-rules.pro
 !app/build.gradle.kts
 !app/src/
 !app/src/**
@@ -57,6 +58,7 @@ docs/*
 !docs/technical_overview.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md
+!docs/全面审计_功能完善_性能优化实施规划.md
 !docs/en/
 docs/en/*
 !docs/en/*.md

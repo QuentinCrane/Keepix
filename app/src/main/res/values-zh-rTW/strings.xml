@@ -9,6 +9,12 @@
     <string name="delete_mode_pending_confirm_desc">先放入待刪清單，確認後再處理</string>
     <string name="delete_mode_system_trash">系統垃圾桶</string>
     <string name="delete_mode_system_trash_desc">嘗試移入系統垃圾桶，不額外限制</string>
+    <string name="swipe_sound_soft_breeze">柔和滑過</string>
+    <string name="swipe_sound_soft_breeze_desc">預設推薦的輕柔滑動聲</string>
+    <string name="swipe_sound_low_tap">短促滑過</string>
+    <string name="swipe_sound_low_tap_desc">較短促、回饋更俐落的滑動聲</string>
+    <string name="swipe_sound_original_whoosh">下降滑過</string>
+    <string name="swipe_sound_original_whoosh_desc">由高到低的滑動聲，聽感較不刺耳</string>
     <string name="swipe_sensitivity_gentle">靈敏</string>
     <string name="swipe_sensitivity_standard">標準</string>
     <string name="swipe_sensitivity_stable">穩一點</string>
