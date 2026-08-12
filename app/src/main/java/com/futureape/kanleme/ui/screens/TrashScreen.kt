@@ -1,12 +1,7 @@
 package com.futureape.kanleme.ui.screens
 
-import android.app.Activity
 import android.net.Uri
-import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -67,7 +62,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,7 +96,6 @@ import com.futureape.kanleme.ui.util.trashImageRequest
 import com.futureape.kanleme.ui.util.trashThumbnailImageRequest
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import com.futureape.kanleme.ui.i18n.Text
 
@@ -114,48 +107,6 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
     val dayMemoryPhotos by viewModel.photoDayMemoryWindow.collectAsStateWithLifecycle()
     var previewItem by remember { mutableStateOf<TrashItemEntity?>(null) }
     var selectedMediaType by remember { mutableStateOf("photo") }
-    val context = LocalContext.current
-    var deletingTrashIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    val trashAnimationScope = rememberCoroutineScope()
-    var pendingDeleteAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    val systemDeleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) pendingDeleteAction?.invoke()
-        pendingDeleteAction = null
-    }
-
-    fun deleteTrashItemWithAnimation(target: TrashItemEntity) {
-        if (target.id in deletingTrashIds) return
-        deletingTrashIds = deletingTrashIds + target.id
-        if (previewItem?.id == target.id) previewItem = null
-        trashAnimationScope.launch {
-            delay(240)
-            viewModel.confirmTrashDeleted(target.id)
-            deletingTrashIds = deletingTrashIds - target.id
-        }
-    }
-
-    fun requestSystemDeleteAuthorization(targets: List<TrashItemEntity>, onConfirmed: () -> Unit) {
-        if (targets.isEmpty()) return
-        val uris = targets.mapNotNull { item -> runCatching { Uri.parse(item.uri) }.getOrNull() }
-        if (uris.isEmpty()) {
-            viewModel.showMessage("媒体地址无效，无法调起系统删除确认")
-            return
-        }
-        runCatching {
-            pendingDeleteAction = onConfirmed
-            val request = MediaStore.createDeleteRequest(context.contentResolver, uris)
-            systemDeleteLauncher.launch(IntentSenderRequest.Builder(request.intentSender).build())
-        }.onFailure {
-            pendingDeleteAction = null
-            viewModel.showMessage("无法调起系统删除确认，请稍后再试")
-        }
-    }
-
-    LaunchedEffect(trashItems) {
-        val activeIds = trashItems.map { it.id }.toSet()
-        deletingTrashIds = deletingTrashIds.filter { it in activeIds }.toSet()
-    }
-
     val photoTrashItems = trashItems.filter { it.mediaType != "video" }
     val videoTrashItems = trashItems.filter { it.mediaType == "video" }
     val visibleTrashItems = if (selectedMediaType == "video") videoTrashItems else photoTrashItems
@@ -213,7 +164,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                         ) {
                             items(typedItems, key = { it.id }) { item ->
                                 AnimatedVisibility(
-                                    visible = item.id !in deletingTrashIds,
+                                        visible = true,
                                     enter = fadeIn(tween(90, easing = FastOutSlowInEasing)),
                                     exit = fadeOut(tween(160, easing = FastOutSlowInEasing)) +
                                         scaleOut(tween(240, easing = FastOutSlowInEasing), targetScale = 0.72f),
@@ -221,11 +172,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                                     TrashGridTile(
                                         item = item,
                                         onPreview = { previewItem = item },
-                                        onDelete = {
-                                            requestSystemDeleteAuthorization(listOf(item)) {
-                                                deleteTrashItemWithAnimation(item)
-                                            }
-                                        },
+                                        onDelete = { viewModel.requestPermanentDelete(listOf(item)) },
                                     )
                                 }
                             }
@@ -245,16 +192,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
             TrashBottomBar(
                 items = visibleTrashItems,
                 onRestoreAll = { viewModel.restoreTrashItems(visibleTrashItems) },
-                onDeleteAll = {
-                    val targets = visibleTrashItems.filterNot { it.id in deletingTrashIds }
-                    requestSystemDeleteAuthorization(targets) {
-                        if (targets.size == 1) {
-                            deleteTrashItemWithAnimation(targets.first())
-                        } else {
-                            viewModel.confirmTrashDeleted(targets.map { it.id })
-                        }
-                    }
-                },
+                onDeleteAll = { viewModel.requestPermanentDelete(visibleTrashItems) },
             )
         }
 
@@ -276,9 +214,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                     previewItem = null
                 },
                 onDelete = { target ->
-                    requestSystemDeleteAuthorization(listOf(target)) {
-                        deleteTrashItemWithAnimation(target)
-                    }
+                    viewModel.requestPermanentDelete(listOf(target))
                 },
             )
         }

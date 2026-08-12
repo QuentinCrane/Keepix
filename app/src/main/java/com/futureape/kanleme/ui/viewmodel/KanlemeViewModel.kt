@@ -105,6 +105,10 @@ sealed interface PendingMediaAuthorizationTarget {
         val mediaType: String?,
     ) : PendingMediaAuthorizationTarget
 
+    data class PermanentDelete(
+        val ids: List<Long>,
+    ) : PendingMediaAuthorizationTarget
+
     data class PhotoMove(
         val photo: PhotoEntity,
         val targetRelativePath: String,
@@ -477,6 +481,27 @@ class KanlemeViewModel @Inject constructor(
                 val ok = repository.undoLastActionAfterSystemAuthorization(target.mediaType)
                 applyUndoLastActionResult(target.mediaType, ok)
             }
+            is PendingMediaAuthorizationTarget.PermanentDelete -> {
+                val finalization = repository.finalizePermanentDelete(target.ids)
+                when (finalization.result) {
+                    MediaAuthorizationResult.Completed -> {
+                        _message.value = if (finalization.deletedTrashIds.size > 1) {
+                            uiText(R.string.message_trash_all_processed)
+                        } else {
+                            uiText(R.string.message_permanent_delete_success)
+                        }
+                    }
+                    is MediaAuthorizationResult.PartialFailure -> {
+                        _message.value = uiText(R.string.message_media_authorization_partial)
+                    }
+                    is MediaAuthorizationResult.Failed -> {
+                        _message.value = dynamicUiText(finalization.result.reason)
+                    }
+                    is MediaAuthorizationResult.NeedsUserConsent,
+                    is MediaAuthorizationResult.Cancelled,
+                    -> _message.value = uiText(R.string.message_media_authorization_failed)
+                }
+            }
             is PendingMediaAuthorizationTarget.PhotoMove -> {
                 val result = repository.movePhotoToFolder(target.photo, target.targetRelativePath, writeAuthorized = true)
                 if (!result.success) error(result.message)
@@ -510,6 +535,7 @@ class KanlemeViewModel @Inject constructor(
             }
             is PendingMediaAuthorizationTarget.UndoOperation,
             is PendingMediaAuthorizationTarget.UndoLastAction,
+            is PendingMediaAuthorizationTarget.PermanentDelete,
             is PendingMediaAuthorizationTarget.PhotoMove,
             is PendingMediaAuthorizationTarget.VideoMove,
             is PendingMediaAuthorizationTarget.PhotoArchive,
@@ -1927,31 +1953,15 @@ class KanlemeViewModel @Inject constructor(
             }
     }
 
-    fun confirmTrashDeleted(id: Long) = confirmTrashDeleted(listOf(id))
-
-    fun confirmTrashDeleted(ids: List<Long>) = viewModelScope.launch {
-        val distinctIds = ids.distinct()
-        runCatching { distinctIds.forEach { repository.markTrashItemDeleted(it) } }
-            .onSuccess {
-                _message.value = if (distinctIds.size > 1) {
-                    uiText(R.string.message_trash_all_processed)
-                } else {
-                    uiText(R.string.message_permanent_delete_success)
-                }
-            }
-            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_permanent_delete_failed) }
-    }
-
-    fun permanentlyDeleteTrash(id: Long) = viewModelScope.launch {
-        runCatching { repository.permanentlyDeleteTrashItem(id) }
-            .onSuccess { _message.value = uiText(R.string.message_permanent_delete_success) }
-            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_permanent_delete_failed) }
-    }
-
-    fun permanentlyDeleteAllTrash() = viewModelScope.launch {
-        runCatching { repository.permanentlyDeleteAllTrash() }
-            .onSuccess { _message.value = uiText(R.string.message_trash_all_processed) }
-            .onFailure { _message.value = it.message?.let(::dynamicUiText) ?: uiText(R.string.message_batch_delete_failed) }
+    fun requestPermanentDelete(items: List<TrashItemEntity>) = viewModelScope.launch {
+        val distinctItems = items.distinctBy { it.id }
+        if (distinctItems.isEmpty()) return@launch
+        requestMediaAuthorization(
+            kind = MediaOperationKind.PERMANENT_DELETE,
+            mediaUris = distinctItems.map { it.uri },
+            isTrashed = false,
+            target = PendingMediaAuthorizationTarget.PermanentDelete(distinctItems.map { it.id }),
+        )
     }
 
     fun restoreAllTrash() {

@@ -101,6 +101,12 @@ data class TrashRestoreAuthorizationPlan(
     val authorization: MediaAuthorizationResult,
 )
 
+data class PermanentDeleteFinalization(
+    val deletedTrashIds: List<Long>,
+    val failedTrashIds: List<Long>,
+    val result: MediaAuthorizationResult,
+)
+
 interface AppRepository {
     fun observeDashboard(): Flow<DashboardStats>
     fun observePhotoTypeStats(): Flow<PhotoTypeStats>
@@ -148,9 +154,7 @@ interface AppRepository {
     suspend fun similarGroupDetail(groupId: String): SimilarGroupDetail?
     suspend fun restoreTrashItem(trashId: Long)
     suspend fun restoreTrashItemsAfterSystemAuthorization(trashIds: Collection<Long>)
-    suspend fun markTrashItemDeleted(trashId: Long)
-    suspend fun permanentlyDeleteTrashItem(trashId: Long)
-    suspend fun permanentlyDeleteAllTrash()
+    suspend fun finalizePermanentDelete(trashIds: Collection<Long>): PermanentDeleteFinalization
     suspend fun restoreAllTrash()
     suspend fun createUndoAuthorizationRequest(mediaType: String? = null): MediaAuthorizationResult
     suspend fun undoLastActionAfterSystemAuthorization(mediaType: String? = null): Boolean

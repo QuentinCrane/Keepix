@@ -41,6 +41,44 @@ class MediaStoreActions @Inject constructor(
             MediaStore.createDeleteRequest(resolver, uris)
         }
 
+    fun verifyMediaDeleted(mediaUris: Collection<String>): MediaAuthorizationResult {
+        val uris = mediaUris.mapNotNull { rawUri ->
+            runCatching { Uri.parse(rawUri) }.getOrNull()
+        }.distinct()
+        if (uris.isEmpty() || uris.any { it.scheme != "content" || it.authority.isNullOrBlank() }) {
+            return MediaAuthorizationResult.Failed(context.getString(R.string.media_error_invalid_uri))
+        }
+
+        val deletedUris = mutableListOf<Uri>()
+        val stillPresentUris = mutableListOf<Uri>()
+        uris.forEach { uri ->
+            try {
+                resolver.query(
+                    uri,
+                    arrayOf(MediaStore.MediaColumns._ID),
+                    null,
+                    null,
+                    null,
+                ).use { cursor ->
+                    if (cursor?.moveToFirst() == true) stillPresentUris += uri else deletedUris += uri
+                }
+            } catch (_: SecurityException) {
+                stillPresentUris += uri
+            } catch (_: Throwable) {
+                stillPresentUris += uri
+            }
+        }
+        return if (stillPresentUris.isEmpty()) {
+            MediaAuthorizationResult.Completed
+        } else {
+            MediaAuthorizationResult.PartialFailure(
+                operationId = "delete-verification-${UUID.randomUUID()}",
+                succeededUris = deletedUris,
+                failedUris = stillPresentUris,
+            )
+        }
+    }
+
     fun moveImageToFolder(mediaUri: String, targetRelativePath: String): MediaOperationResult {
         return moveMediaToFolder(mediaUri, targetRelativePath)
     }
@@ -64,19 +102,6 @@ class MediaStoreActions @Inject constructor(
             MediaOperationResult.Failed(context.getString(R.string.media_error_move_security))
         } catch (throwable: Throwable) {
             MediaOperationResult.Failed(throwable.message ?: context.getString(R.string.media_error_move_folder_failed))
-        }
-    }
-
-    fun permanentlyDeleteMedia(mediaUri: String): MediaOperationResult {
-        val uri = runCatching { Uri.parse(mediaUri) }.getOrNull()
-            ?: return MediaOperationResult.Failed(context.getString(R.string.media_error_invalid_uri))
-        return try {
-            val rows = resolver.delete(uri, null, null)
-            if (rows > 0) MediaOperationResult.Success else MediaOperationResult.Failed(context.getString(R.string.media_error_delete_no_rows))
-        } catch (security: SecurityException) {
-            MediaOperationResult.Failed(context.getString(R.string.media_error_delete_security))
-        } catch (throwable: Throwable) {
-            MediaOperationResult.Failed(throwable.message ?: context.getString(R.string.media_error_delete_failed))
         }
     }
 

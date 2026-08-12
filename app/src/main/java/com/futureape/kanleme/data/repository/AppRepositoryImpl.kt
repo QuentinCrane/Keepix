@@ -782,24 +782,54 @@ class AppRepositoryImpl @Inject constructor(
             trashIds.distinct().mapNotNull { trashDao.byId(it) }.forEach { restoreTrashItemLocally(it) }
         }
 
-    override suspend fun markTrashItemDeleted(trashId: Long) = withContext(Dispatchers.IO) {
-        val item = trashDao.byId(trashId) ?: return@withContext
-        markTrashItemDeletedLocally(item)
-    }
-
-    override suspend fun permanentlyDeleteTrashItem(trashId: Long) = withContext(Dispatchers.IO) {
-        val item = trashDao.byId(trashId) ?: return@withContext
-        requireMediaOperation(mediaStoreActions.permanentlyDeleteMedia(item.uri))
-        markTrashItemDeletedLocally(item)
-    }
-
-    override suspend fun permanentlyDeleteAllTrash() = withContext(Dispatchers.IO) {
-        observeTrash().first().forEach { permanentlyDeleteTrashItem(it.id) }
-    }
-
     override suspend fun restoreAllTrash() = withContext(Dispatchers.IO) {
         observeTrash().first().forEach { restoreTrashItem(it.id) }
     }
+
+    override suspend fun finalizePermanentDelete(trashIds: Collection<Long>): PermanentDeleteFinalization =
+        withContext(Dispatchers.IO) {
+            val items = trashIds.distinct().mapNotNull { trashDao.byId(it) }
+            if (items.isEmpty()) {
+                return@withContext PermanentDeleteFinalization(
+                    deletedTrashIds = emptyList(),
+                    failedTrashIds = emptyList(),
+                    result = MediaAuthorizationResult.Completed,
+                )
+            }
+            when (val verification = mediaStoreActions.verifyMediaDeleted(items.map { it.uri })) {
+                MediaAuthorizationResult.Completed -> {
+                    items.forEach { markTrashItemDeletedLocally(it) }
+                    PermanentDeleteFinalization(
+                        deletedTrashIds = items.map { it.id },
+                        failedTrashIds = emptyList(),
+                        result = verification,
+                    )
+                }
+                is MediaAuthorizationResult.PartialFailure -> {
+                    val deletedUris = verification.succeededUris.map { it.toString() }.toSet()
+                    val deletedItems = items.filter { it.uri in deletedUris }
+                    val deletedIds = deletedItems.map { it.id }.toSet()
+                    deletedItems.forEach { markTrashItemDeletedLocally(it) }
+                    PermanentDeleteFinalization(
+                        deletedTrashIds = deletedItems.map { it.id },
+                        failedTrashIds = items.filterNot { it.id in deletedIds }.map { it.id },
+                        result = verification,
+                    )
+                }
+                is MediaAuthorizationResult.Failed -> PermanentDeleteFinalization(
+                    deletedTrashIds = emptyList(),
+                    failedTrashIds = items.map { it.id },
+                    result = verification,
+                )
+                is MediaAuthorizationResult.NeedsUserConsent,
+                is MediaAuthorizationResult.Cancelled,
+                -> PermanentDeleteFinalization(
+                    deletedTrashIds = emptyList(),
+                    failedTrashIds = items.map { it.id },
+                    result = verification,
+                )
+            }
+        }
 
     override suspend fun createUndoAuthorizationRequest(mediaType: String?): MediaAuthorizationResult =
         withContext(Dispatchers.IO) {
@@ -864,10 +894,6 @@ class AppRepositoryImpl @Inject constructor(
             videoDao.updateDeletionStatus(listOf(item.mediaId), DeletionStatus.DELETED)
         }
         trashDao.deleteById(item.id)
-    }
-
-    private fun requireMediaOperation(result: MediaOperationResult) {
-        if (result is MediaOperationResult.Failed) throw IllegalStateException(result.reason)
     }
 
     override suspend fun undoLastAction(mediaType: String?): Boolean = withContext(Dispatchers.IO) {
