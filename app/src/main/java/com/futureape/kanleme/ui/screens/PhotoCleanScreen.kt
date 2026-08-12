@@ -141,6 +141,17 @@ fun PhotoCleanScreen(
     val context = LocalContext.current
     val haptics = rememberHapticKit(settings)
     val displayOptions = settings.toPhotoCleanDisplayOptions()
+    val photoMediaFilterTypes = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long")
+    val photoMediaFilters = listOf(
+        "全部" to typeStats.all.toString(),
+        "普通" to typeStats.normal.toString(),
+        "截图" to typeStats.screenshot.toString(),
+        "自拍" to typeStats.selfie.toString(),
+        "实况" to typeStats.motion.toString(),
+        "GIF" to typeStats.gif.toString(),
+        "长图" to typeStats.longImage.toString(),
+    )
+    val selectedMediaIndex = photoMediaFilterTypes.indexOf(scope.mediaType).coerceAtLeast(0)
     val swipeSoundPlayer = remember(context, settings.swipeSound, settings.swipeSoundStyle) {
         PhotoSwipeSoundPlayer(context, settings.swipeSound, settings.swipeSoundStyle)
     }
@@ -447,6 +458,12 @@ fun PhotoCleanScreen(
                 currentPhoto = currentPhoto,
                 settings = settings,
                 displayOptions = displayOptions,
+                mediaFilters = photoMediaFilters,
+                selectedMediaIndex = selectedMediaIndex,
+                onMediaSelected = { index ->
+                    haptics.tick()
+                    photoMediaFilterTypes.getOrNull(index)?.let(viewModel::setPhotoTypeFilter)
+                },
                 haptics = haptics,
                 progressPercent = progressPercent,
                 remaining = remainingPhotos,

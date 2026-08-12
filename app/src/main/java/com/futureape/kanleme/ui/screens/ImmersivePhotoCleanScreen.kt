@@ -145,6 +145,9 @@ internal fun ImmersivePhotoCleanContent(
     currentPhoto: PhotoEntity,
     settings: com.futureape.kanleme.data.settings.AppSettings,
     displayOptions: PhotoCleanDisplayOptions,
+    mediaFilters: List<Pair<String, String>> = emptyList(),
+    selectedMediaIndex: Int = 0,
+    onMediaSelected: (Int) -> Unit = {},
     haptics: com.futureape.kanleme.ui.util.HapticKit,
     progressPercent: Int,
     remaining: Int,
@@ -244,11 +247,18 @@ internal fun ImmersivePhotoCleanContent(
                             enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { -it / 3 },
                             exit = fadeOut(tween(140)) + slideOutVertically(tween(180)) { -it / 4 },
                         ) {
-                            KeepixTopPill(
-                                label = photoMediaKindLabel(currentPhoto),
-                                trailing = remaining.toString(),
-                                onClick = onDateClick,
-                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                PhotoMediaFilterMenu(
+                                    filters = mediaFilters,
+                                    selectedIndex = selectedMediaIndex,
+                                    onSelected = onMediaSelected,
+                                )
+                                KeepixTopPill(
+                                    label = photoMediaKindLabel(currentPhoto),
+                                    trailing = remaining.toString(),
+                                    onClick = onDateClick,
+                                )
+                            }
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -404,6 +414,39 @@ private fun PhotoOverflowActionMenu(
                     onUndo()
                 },
             )
+        }
+    }
+}
+
+@Composable
+private fun PhotoMediaFilterMenu(
+    filters: List<Pair<String, String>>,
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+) {
+    if (filters.isEmpty()) return
+    var expanded by remember { mutableStateOf(false) }
+    val selected = filters.getOrNull(selectedIndex) ?: filters.first()
+    Box {
+        KeepixTopPill(
+            label = selected.first,
+            trailing = selected.second,
+            onClick = { expanded = true },
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            filters.forEachIndexed { index, filter ->
+                DropdownMenuItem(
+                    text = { Text(filter.first) },
+                    trailingIcon = { Text(filter.second) },
+                    onClick = {
+                        expanded = false
+                        onSelected(index)
+                    },
+                )
+            }
         }
     }
 }

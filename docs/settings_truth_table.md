@@ -49,13 +49,13 @@
 | `excludedFolderPaths` | `emptySet()` | `excluded_folder_paths` / 增删/清空方法 | 扫描后的照片/视频队列过滤 | ACTIVE | 两种媒体均排除且可恢复 |
 | `onboardingShown` | `false` | `onboarding_shown` / `setOnboardingShown` | 根导航门禁 | ACTIVE | 首次流程、进程重建、返回路径 |
 | `photoFocusMode` | `false` | `photo_focus_mode` / `setPhotoFocusMode` | 照片整理页 chrome 显示 | ACTIVE | 专注模式仍保留等价操作入口 |
-| `photoShowTopBar` | `true` | `photo_show_top_bar` / `setPhotoShowTopBar` | 当前主要为设置页预览 | PREVIEW_ONLY | C02 接通后补真实页两态测试 |
-| `photoShowFilterChips` | `true` | `photo_show_filter_chips` / `setPhotoShowFilterChips` | 当前主要为设置页预览 | PREVIEW_ONLY | C02 接通后补真实页两态测试 |
-| `photoShowFolderChips` | `true` | `photo_show_folder_chips` / `setPhotoShowFolderChips` | 当前主要为设置页预览 | PREVIEW_ONLY | C02 接通后补真实页两态测试 |
-| `photoShowActionRail` | `true` | `photo_show_action_rail` / `setPhotoShowActionRail` | 当前未找到真实页面消费者 | STORAGE_ONLY | C02 先定义替代入口再接通 |
-| `photoShowInfoBar` | `true` | `photo_show_info_bar` / `setPhotoShowInfoBar` | 当前主要为设置页预览 | PREVIEW_ONLY | C02 接通后补真实页两态测试 |
-| `photoShowGestureHint` | `true` | `photo_show_gesture_hint` / `setPhotoShowGestureHint` | 光效/引导相关设置与预览 | PREVIEW_ONLY | C02 明确光效与文字提示边界 |
-| `photoShowShuffleButton` | `true` | `photo_show_shuffle_button` / `setPhotoShowShuffleButton` | 当前主要为设置页预览 | PREVIEW_ONLY | C02 接通后验证固定种子不被破坏 |
+| `photoShowTopBar` | `true` | `photo_show_top_bar` / `setPhotoShowTopBar` | 照片整理页顶部进度条 | ACTIVE | 关闭后顶部进度条隐藏，队列和手势不变 |
+| `photoShowFilterChips` | `true` | `photo_show_filter_chips` / `setPhotoShowFilterChips` | 照片整理页类型/时间筛选菜单 | ACTIVE | 关闭后筛选入口隐藏，当前筛选仍保持 |
+| `photoShowFolderChips` | `true` | `photo_show_folder_chips` / `setPhotoShowFolderChips` | 照片整理页信息栏文件夹入口 | ACTIVE | 关闭后文件夹不可点击但日期信息保留 |
+| `photoShowActionRail` | `true` | `photo_show_action_rail` / `setPhotoShowActionRail` | 照片整理页分享/撤销操作栏 | ACTIVE | 关闭后通过更多操作菜单保留等价入口 |
+| `photoShowInfoBar` | `true` | `photo_show_info_bar` / `setPhotoShowInfoBar` | 照片整理页底部日期/文件夹信息栏 | ACTIVE | 关闭后信息栏隐藏，卡片手势和操作不变 |
+| `photoShowGestureHint` | `true` | `photo_show_gesture_hint` / `setPhotoShowGestureHint` | 照片整理页边缘滑动光效 | ACTIVE | 关闭后不显示光效，动作仍提交 |
+| `photoShowShuffleButton` | `true` | `photo_show_shuffle_button` / `setPhotoShowShuffleButton` | 照片整理页顶部重新随机按钮 | ACTIVE | 关闭后按钮隐藏，固定种子语义不变 |
 | `videoShowTopBar` | `true` | `video_show_top_bar` / `setVideoShowTopBar` | 视频 chrome 可见性 | ACTIVE | 关闭后仍有可发现控制入口 |
 | `videoShowActionRail` | `true` | `video_show_action_rail` / `setVideoShowActionRail` | 视频右侧操作栏 | ACTIVE | 隐藏后保留等价手势/菜单 |
 | `videoShowInfoPanel` | `true` | `video_show_info_panel` / `setVideoShowInfoPanel` | 视频底部信息面板 | ACTIVE | 关闭后进度条仍按设置显示 |
@@ -66,4 +66,4 @@
 
 ## 当前结论
 
-消费缺口集中在快捷操作交换、沉浸背景、照片清理模式、照片真实页显示开关和视频文件夹 chips。后续 C02～C04 必须按表逐组接通或做删除决策；在此之前不把设置页预览截图作为功能完成证据。
+消费缺口集中在快捷操作交换、沉浸背景、照片清理模式和视频文件夹 chips。照片真实页显示开关已由 C02 接通；后续 C03～C04 继续按表逐组接通或做删除决策，不把设置页预览截图单独作为功能完成证据。
