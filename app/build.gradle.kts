@@ -40,6 +40,7 @@ android {
         versionName = "2.3.4"
 
         vectorDrawables.useSupportLibrary = true
+        testInstrumentationRunner = "com.futureape.kanleme.HiltTestRunner"
     }
 
     buildFeatures {
@@ -114,6 +115,7 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.3.2")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
     debugImplementation("androidx.compose.ui:ui-tooling:1.8.2")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.8.2")
 
     implementation("androidx.room:room-runtime:2.7.1")
     implementation("androidx.room:room-ktx:2.7.1")
@@ -135,4 +137,13 @@ dependencies {
     implementation("io.coil-kt:coil-gif:2.7.0")
 
     testImplementation("junit:junit:4.13.2")
+
+    androidTestImplementation("androidx.test:core-ktx:1.6.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.8.2")
+    androidTestImplementation("androidx.room:room-testing:2.7.1")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.56.1")
+    kaptAndroidTest("com.google.dagger:hilt-compiler:2.56.1")
 }
