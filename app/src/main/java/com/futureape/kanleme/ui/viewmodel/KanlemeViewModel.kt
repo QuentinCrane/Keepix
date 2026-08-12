@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.VideoEntity
+import com.futureape.kanleme.data.media.MediaAccessState
 import com.futureape.kanleme.data.media.MediaAuthorizationResult
 import com.futureape.kanleme.data.media.MediaOperationKind
 import com.futureape.kanleme.data.media.MediaOperationRequest
@@ -12,6 +13,7 @@ import com.futureape.kanleme.data.media.MediaOperationTracker
 import com.futureape.kanleme.data.repository.AppRepository
 import com.futureape.kanleme.data.repository.CleaningScope
 import com.futureape.kanleme.data.repository.DashboardStats
+import com.futureape.kanleme.data.repository.MediaLibrarySyncOptions
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.data.repository.PhotoTypeStats
 import com.futureape.kanleme.data.repository.AnnualReport
@@ -51,6 +53,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private fun MediaAccessState?.toSyncOptions(): MediaLibrarySyncOptions =
+    MediaLibrarySyncOptions(
+        markMissingPhotos = this?.canReadImages ?: true,
+        markMissingVideos = this?.canReadVideos ?: true,
+    )
 
 data class SimilarDetectionUiState(
     val running: Boolean = false,
@@ -280,6 +288,7 @@ class KanlemeViewModel @Inject constructor(
     val mediaLibraryRefreshing = _mediaLibraryRefreshing.asStateFlow()
 
     private var lastAutoRefreshAccessKey: String? = null
+    private var currentMediaAccessState: MediaAccessState? = null
     private var photoDeckRefilling = false
     private var videoDeckRefilling = false
     private var photoDeckLoadJob: Job? = null
@@ -327,29 +336,36 @@ class KanlemeViewModel @Inject constructor(
         }
     }
 
-    fun onMediaAccessReady(accessKey: String, accessLabel: String) {
-        if (lastAutoRefreshAccessKey == accessKey) return
-        lastAutoRefreshAccessKey = accessKey
+    fun onMediaAccessReady(access: MediaAccessState, accessLabel: String) {
+        if (lastAutoRefreshAccessKey == access.key && !access.isPartialVisualAccess) return
+        lastAutoRefreshAccessKey = access.key
+        currentMediaAccessState = access
         val needsBootstrap = _photoDeck.value.isEmpty() &&
             _videoDeck.value.isEmpty() &&
             dashboard.value.photoCount == 0 &&
             dashboard.value.videoCount == 0
         if (needsBootstrap) _startupMediaBootstrapPending.value = true
         // 首次授权后的自动同步不再弹出悬浮提示，避免遮挡首页或整理页按钮。
-        refreshLibrary(accessLabel = accessLabel, showMessage = false, startupBootstrap = needsBootstrap)
+        refreshLibrary(
+            accessLabel = accessLabel,
+            showMessage = false,
+            startupBootstrap = needsBootstrap,
+            syncOptions = access.toSyncOptions(),
+        )
     }
 
     fun refreshLibrary(
         accessLabel: String? = null,
         showMessage: Boolean = true,
         startupBootstrap: Boolean = false,
+        syncOptions: MediaLibrarySyncOptions? = null,
     ) = viewModelScope.launch {
         val prefix = accessLabel?.let { it + "：" }.orEmpty()
         val showPhotoPreparing = _photoDeck.value.isEmpty()
         if (showPhotoPreparing) _photoDeckPreparing.value = true
         _mediaLibraryRefreshing.value = true
         try {
-            runCatching { repository.refreshMediaLibrary() }
+            runCatching { repository.refreshMediaLibrary(syncOptions ?: currentMediaAccessState.toSyncOptions()) }
                 .onSuccess { (p, v) ->
                     if (showMessage) {
                         _message.value = uiText(R.string.message_library_synced, p, v)
@@ -1847,7 +1863,7 @@ class KanlemeViewModel @Inject constructor(
             try {
                 if (dashboard.value.photoCount == 0) {
                     _similarDetectionState.value = _similarDetectionState.value.copy(stage = uiText(R.string.similar_stage_syncing_before_first_run))
-                    runCatching { repository.refreshMediaLibrary() }
+                    runCatching { repository.refreshMediaLibrary(currentMediaAccessState.toSyncOptions()) }
                 }
                 runCatching {
                     repository.generateSimilarGroups(limit = limit) { processed, total, stage ->

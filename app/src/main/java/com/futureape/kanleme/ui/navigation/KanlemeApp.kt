@@ -151,8 +151,8 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
             OnboardingScreen(onFinish = { viewModel.markOnboardingShown() })
         } else {
             MediaPermissionGate(
-                onPermissionReady = { accessKey, accessLabel ->
-                    viewModel.onMediaAccessReady(accessKey, accessLabel)
+                onPermissionReady = { access, accessLabel ->
+                    viewModel.onMediaAccessReady(access, accessLabel)
                 },
             ) {
             Box(Modifier.fillMaxSize().background(transitionBackdrop)) {

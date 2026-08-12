@@ -88,6 +88,13 @@ data class AchievementUi(
     val remaining: Int get() = (target - current).coerceAtLeast(0)
 }
 
+data class MediaLibrarySyncOptions(
+    /** Mark unseen photos as missing only when the current permission covers all photos. */
+    val markMissingPhotos: Boolean = true,
+    /** Mark unseen videos as missing only when the current permission covers all videos. */
+    val markMissingVideos: Boolean = true,
+)
+
 enum class SwipeAction { Keep, Favorite, Delete }
 
 data class MovePhotoResult(
@@ -125,7 +132,7 @@ interface AppRepository {
     fun observeTrash(): Flow<List<TrashItemEntity>>
     fun observeSimilarGroups(): Flow<List<SimilarGroupEntity>>
 
-    suspend fun refreshMediaLibrary(): Pair<Int, Int>
+    suspend fun refreshMediaLibrary(options: MediaLibrarySyncOptions = MediaLibrarySyncOptions()): Pair<Int, Int>
     suspend fun loadPhotoDeck(scope: CleaningScope): List<PhotoEntity>
     suspend fun loadVideoDeck(scope: CleaningScope): List<VideoEntity>
     suspend fun loadPhotoMemoryWindow(currentPhoto: PhotoEntity, dayCount: Int = 7, limit: Int = 420): List<PhotoEntity>

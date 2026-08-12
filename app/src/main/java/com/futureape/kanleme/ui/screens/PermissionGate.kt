@@ -37,6 +37,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.futureape.kanleme.R
+import com.futureape.kanleme.data.media.MediaAccessState
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.i18n.Text
 
@@ -45,52 +46,58 @@ import com.futureape.kanleme.ui.i18n.Text
  * access or partial Selected Photos Access. This gate never persists permission
  * state; it reads the real system permission every time the composable enters.
  */
-data class MediaAccessState(
-    val canReadImages: Boolean,
-    val canReadVideos: Boolean,
-    val canReadSelectedVisualMedia: Boolean,
-) {
-    val isGranted: Boolean get() = canReadImages || canReadVideos || canReadSelectedVisualMedia
-    val isFullVisualAccess: Boolean get() = canReadImages && canReadVideos
-    val isPartialVisualAccess: Boolean get() = !isFullVisualAccess && canReadSelectedVisualMedia
-    val key: String get() = "images=$canReadImages;videos=$canReadVideos;selected=$canReadSelectedVisualMedia"
-    val label: String get() = when {
-        isFullVisualAccess -> "完整相册访问"
-        isPartialVisualAccess -> "部分照片访问"
-        canReadImages -> "仅照片访问"
-        canReadVideos -> "仅视频访问"
-        else -> "未授权"
-    }
-}
-
 @Composable
 fun MediaPermissionGate(
-    onPermissionReady: (accessKey: String, accessLabel: String) -> Unit,
+    onPermissionReady: (access: MediaAccessState, accessLabel: String) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val permissions = remember { requiredMediaPermissions() }
     var access by remember { mutableStateOf(currentMediaAccessState(context)) }
+    var firstResumeObserved by remember { mutableStateOf(false) }
+
+    val accessLabel = when {
+        access.isFullVisualAccess -> stringResource(R.string.permission_access_full)
+        access.isPartialVisualAccess -> stringResource(R.string.permission_access_partial)
+        access.canReadImages -> stringResource(R.string.permission_access_images)
+        access.canReadVideos -> stringResource(R.string.permission_access_videos)
+        else -> stringResource(R.string.permission_access_none)
+    }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        access = currentMediaAccessState(context)
+        val latest = currentMediaAccessState(context)
+        val changed = latest.key != access.key
+        access = latest
+        if (!changed && latest.isPartialVisualAccess) {
+            // The selected-media URI set may change without changing permission booleans.
+            onPermissionReady(latest, accessLabel)
+        }
     }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        access = currentMediaAccessState(context)
+        val latest = currentMediaAccessState(context)
+        val changed = latest.key != access.key
+        access = latest
+        if (firstResumeObserved && !changed && latest.isPartialVisualAccess) {
+            // Android 14 can keep READ_MEDIA_VISUAL_USER_SELECTED granted while the
+            // user replaces the selected photos/videos in Settings.
+            onPermissionReady(latest, accessLabel)
+        }
+        firstResumeObserved = true
     }
 
-    LaunchedEffect(access.key) {
+    LaunchedEffect(access.key, accessLabel) {
         if (access.isGranted) {
-            onPermissionReady(access.key, access.label)
+            onPermissionReady(access, accessLabel)
         }
     }
 
     if (access.isGranted || permissions.isEmpty()) {
         Box(Modifier.fillMaxSize()) {
             content()
-            if (access.isPartialVisualAccess) {
-                PartialAccessBanner(
+            if (access.isGranted && !access.isFullVisualAccess) {
+                LimitedAccessBanner(
+                    accessLabel = accessLabel,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 12.dp, start = 16.dp, end = 16.dp),
@@ -107,20 +114,20 @@ fun MediaPermissionGate(
                     horizontalAlignment = Alignment.Start,
                 ) {
                     Icon(Icons.Rounded.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text("需要访问相册", style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.permission_title), style = MaterialTheme.typography.headlineSmall)
                     Text(
                         stringResource(R.string.permission_intro),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "Android 14 及以上如果选择“选择照片和视频”，只能整理你选中的部分内容；要做全相册整理，请在系统弹窗里选择允许访问所有照片和视频。",
+                        stringResource(R.string.permission_platform_notice),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(onClick = { launcher.launch(permissions) }) { Text("授权相册访问") }
-                        AssistChip(onClick = { access = currentMediaAccessState(context) }, label = { Text("刷新状态") })
+                        Button(onClick = { launcher.launch(permissions) }) { Text(stringResource(R.string.permission_action_authorize)) }
+                        AssistChip(onClick = { access = currentMediaAccessState(context) }, label = { Text(stringResource(R.string.permission_action_refresh)) })
                     }
                 }
             }
@@ -129,21 +136,22 @@ fun MediaPermissionGate(
 }
 
 @Composable
-private fun PartialAccessBanner(
+private fun LimitedAccessBanner(
+    accessLabel: String,
     modifier: Modifier = Modifier,
     onRequestFullAccess: () -> Unit,
 ) {
     GlassSurface(modifier = modifier.fillMaxWidth(), tonalAlpha = 0.82f) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text("当前是部分照片访问", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.permission_limited_title, accessLabel), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(4.dp))
             Text(
-                stringResource(R.string.permission_partial_notice),
+                stringResource(R.string.permission_scope_notice),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(8.dp))
-            FilledTonalButton(onClick = onRequestFullAccess) { Text("重新选择授权范围") }
+            FilledTonalButton(onClick = onRequestFullAccess) { Text(stringResource(R.string.permission_action_reselect)) }
         }
     }
 }

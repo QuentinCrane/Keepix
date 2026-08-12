@@ -136,7 +136,7 @@ class AppRepositoryImpl @Inject constructor(
     override fun observeTrash(): Flow<List<TrashItemEntity>> = trashDao.observeTrash()
     override fun observeSimilarGroups(): Flow<List<SimilarGroupEntity>> = similarDao.observeGroups()
 
-    override suspend fun refreshMediaLibrary(): Pair<Int, Int> = withContext(Dispatchers.IO) {
+    override suspend fun refreshMediaLibrary(options: MediaLibrarySyncOptions): Pair<Int, Int> = withContext(Dispatchers.IO) {
         // Scan images and videos independently. A slow or failing image provider row should not
         // prevent the video library from being discovered, and vice versa. This also protects the
         // first permission sync from showing an empty library just because one MediaStore query failed.
@@ -206,11 +206,11 @@ class AppRepositoryImpl @Inject constructor(
 
         db.withTransaction {
             if (photoScan.isSuccess) {
-                photoDao.markAllMissing(now)
+                if (options.markMissingPhotos) photoDao.markAllMissing(now)
                 if (mergedPhotos.isNotEmpty()) photoDao.upsertAll(mergedPhotos)
             }
             if (videoScan.isSuccess) {
-                videoDao.markAllMissing(now)
+                if (options.markMissingVideos) videoDao.markAllMissing(now)
                 if (mergedVideos.isNotEmpty()) videoDao.upsertAll(mergedVideos)
             }
         }
