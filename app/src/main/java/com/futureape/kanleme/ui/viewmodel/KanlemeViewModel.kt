@@ -317,6 +317,7 @@ class KanlemeViewModel @Inject constructor(
     private val photoSessionActions = ArrayDeque<PhotoSessionAction>()
     private val photoPersistenceBarriers = mutableMapOf<Long, Job>()
     private val handledVideoActionMediaIds = mutableSetOf<Long>()
+    private val videoActionInFlightMediaIds = mutableSetOf<Long>()
     private val pendingVideoKeepOperations = mutableMapOf<Long, Deferred<Long>>()
 
     val photoDeckMatchesCurrentScope = combine(_photoScope, _photoDeckScope) { scope, deckScope ->
@@ -1695,34 +1696,39 @@ class KanlemeViewModel @Inject constructor(
         action: SwipeAction,
         systemTrashAuthorized: Boolean = false,
     ) = viewModelScope.launch {
-        if (action == SwipeAction.Delete &&
-            settings.value.deleteMode == DeleteMode.SYSTEM_TRASH &&
-            !systemTrashAuthorized
-        ) {
-            requestSystemTrashForVideo(video)
-            return@launch
-        }
-        handledVideoActionMediaIds += video.mediaStoreId
-        invalidateVideoDeckLoads()
-        val pendingKeepOperation = removePendingVideoKeep(video)
-        _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == video.mediaStoreId }
+        if (!videoActionInFlightMediaIds.add(video.mediaStoreId)) return@launch
         try {
-            if (pendingKeepOperation != null && action == SwipeAction.Keep) {
-                pendingKeepOperation.await()
-            } else {
-                pendingKeepOperation?.await()
-                repository.handleVideoAction(video, action, systemTrashAuthorized)
+            if (action == SwipeAction.Delete &&
+                settings.value.deleteMode == DeleteMode.SYSTEM_TRASH &&
+                !systemTrashAuthorized
+            ) {
+                requestSystemTrashForVideo(video)
+                return@launch
             }
-            if (pendingKeepOperation == null || action != SwipeAction.Keep) _videoSessionActionCount.value += 1
-            _lastVideoAction.value = action
-            refillVideoDeckIfNeeded()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (throwable: Throwable) {
-            handledVideoActionMediaIds -= video.mediaStoreId
+            handledVideoActionMediaIds += video.mediaStoreId
             invalidateVideoDeckLoads()
-            loadVideoDeck()
-            _message.value = throwable.message?.let(::dynamicUiText) ?: uiText(R.string.message_video_action_failed)
+            val pendingKeepOperation = removePendingVideoKeep(video)
+            _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == video.mediaStoreId }
+            try {
+                if (pendingKeepOperation != null && action == SwipeAction.Keep) {
+                    pendingKeepOperation.await()
+                } else {
+                    pendingKeepOperation?.await()
+                    repository.handleVideoAction(video, action, systemTrashAuthorized)
+                }
+                if (pendingKeepOperation == null || action != SwipeAction.Keep) _videoSessionActionCount.value += 1
+                _lastVideoAction.value = action
+                refillVideoDeckIfNeeded()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (throwable: Throwable) {
+                handledVideoActionMediaIds -= video.mediaStoreId
+                invalidateVideoDeckLoads()
+                loadVideoDeck()
+                _message.value = throwable.message?.let(::dynamicUiText) ?: uiText(R.string.message_video_action_failed)
+            }
+        } finally {
+            videoActionInFlightMediaIds -= video.mediaStoreId
         }
     }
 

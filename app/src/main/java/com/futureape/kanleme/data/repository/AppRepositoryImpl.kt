@@ -519,62 +519,81 @@ class AppRepositoryImpl @Inject constructor(
         action: SwipeAction,
         systemTrashAuthorized: Boolean,
     ): Long = withContext(Dispatchers.IO) {
-        val current = photoDao.byId(photo.id) ?: photo
-        val actionAllowed = current.deletionStatus == DeletionStatus.NONE
         val settings = if (action == SwipeAction.Delete) settingsRepository.settings.first() else null
         val systemTrashRequested = action == SwipeAction.Delete &&
             (settings?.deleteMode == DeleteMode.SYSTEM_TRASH || systemTrashAuthorized)
         if (systemTrashRequested && !systemTrashAuthorized) {
             throw IllegalStateException("系统回收站操作需要先完成用户确认")
         }
-        val targetProcessing = when (action) {
-            SwipeAction.Keep -> ProcessingStatus.KEPT
-            SwipeAction.Favorite -> ProcessingStatus.FAVORITED
-            SwipeAction.Delete -> current.processingStatus
-        }
-        val newProcessing = if (actionAllowed) targetProcessing else current.processingStatus
-        val newDeletion = if (action == SwipeAction.Delete && actionAllowed) {
-            if (systemTrashRequested) DeletionStatus.TRASHED else DeletionStatus.PENDING
-        } else {
-            current.deletionStatus
-        }
-        val operationId = recordOperation(current.id, "photo", current.processingStatus, current.deletionStatus, newProcessing, newDeletion, action.name)
-        when (action) {
-            SwipeAction.Keep -> {
-                if (actionAllowed && current.processingStatus != ProcessingStatus.KEPT) {
-                    photoDao.updateProcessingStatus(current.id, ProcessingStatus.KEPT)
-                    if (current.processingStatus == ProcessingStatus.UNPROCESSED) {
-                        bumpStats(photoDelta = 1, sourceRef = operationSourceRef(operationId))
-                    }
-                }
+        db.withTransaction {
+            val current = photoDao.byId(photo.id) ?: return@withTransaction 0L
+            val existingOperation = operationDao.lastByMediaAndAction(current.id, "photo", action.name)
+            if (
+                isCleanupActionAlreadyApplied(action, current.processingStatus, current.deletionStatus) ||
+                current.deletionStatus != DeletionStatus.NONE
+            ) {
+                return@withTransaction existingOperation?.id ?: 0L
             }
-            SwipeAction.Favorite -> {
-                if (actionAllowed && current.processingStatus != ProcessingStatus.FAVORITED) {
-                    photoDao.updateProcessingStatus(current.id, ProcessingStatus.FAVORITED)
-                    bumpStats(
-                        favoriteDelta = 1,
+            val targetProcessing = when (action) {
+                SwipeAction.Keep -> ProcessingStatus.KEPT
+                SwipeAction.Favorite -> ProcessingStatus.FAVORITED
+                SwipeAction.Delete -> current.processingStatus
+            }
+            val newProcessing = targetProcessing
+            val newDeletion = if (action == SwipeAction.Delete) {
+                if (systemTrashRequested) DeletionStatus.TRASHED else DeletionStatus.PENDING
+            } else {
+                current.deletionStatus
+            }
+            val operationId = recordOperation(
+                current.id,
+                "photo",
+                current.processingStatus,
+                current.deletionStatus,
+                newProcessing,
+                newDeletion,
+                action.name,
+            )
+            val adjustment = when (action) {
+                SwipeAction.Keep -> {
+                    photoDao.updateProcessingStatus(current.id, ProcessingStatus.KEPT)
+                    StatsAdjustment(
                         photoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
-                        sourceRef = operationSourceRef(operationId),
                     )
                 }
-            }
-            SwipeAction.Delete -> {
-                if (actionAllowed) {
+                SwipeAction.Favorite -> {
+                    photoDao.updateProcessingStatus(current.id, ProcessingStatus.FAVORITED)
+                    StatsAdjustment(
+                        photoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
+                        favoriteDelta = 1,
+                    )
+                }
+                SwipeAction.Delete -> {
                     photoDao.updateDeletionStatus(
                         listOf(current.id),
                         if (systemTrashRequested) DeletionStatus.TRASHED else DeletionStatus.PENDING,
                     )
                     trashDao.deleteByMedia(current.id, "photo")
                     trashDao.insert(current.toTrashItem())
-                    bumpStats(
+                    StatsAdjustment(
                         photoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
-                        deletedSize = current.size,
-                        sourceRef = operationSourceRef(operationId),
+                        storageDelta = current.size.coerceAtLeast(0L),
                     )
                 }
             }
+            if (adjustment.hasDelta()) {
+                adjustStatsInTransaction(
+                    photoDelta = adjustment.photoDelta,
+                    videoDelta = adjustment.videoDelta,
+                    favoriteDelta = adjustment.favoriteDelta,
+                    deletedSize = adjustment.storageDelta,
+                    undoDelta = 0,
+                    cleanupEventSourceRefToDelete = null,
+                    sourceRef = operationSourceRef(operationId),
+                )
+            }
+            operationId
         }
-        operationId
     }
 
     override suspend fun handleVideoAction(
@@ -582,62 +601,81 @@ class AppRepositoryImpl @Inject constructor(
         action: SwipeAction,
         systemTrashAuthorized: Boolean,
     ): Long = withContext(Dispatchers.IO) {
-        val current = videoDao.byId(video.id) ?: video
-        val actionAllowed = current.deletionStatus == DeletionStatus.NONE
         val settings = if (action == SwipeAction.Delete) settingsRepository.settings.first() else null
         val systemTrashRequested = action == SwipeAction.Delete &&
             (settings?.deleteMode == DeleteMode.SYSTEM_TRASH || systemTrashAuthorized)
         if (systemTrashRequested && !systemTrashAuthorized) {
             throw IllegalStateException("系统回收站操作需要先完成用户确认")
         }
-        val targetProcessing = when (action) {
-            SwipeAction.Keep -> ProcessingStatus.KEPT
-            SwipeAction.Favorite -> ProcessingStatus.FAVORITED
-            SwipeAction.Delete -> current.processingStatus
-        }
-        val newProcessing = if (actionAllowed) targetProcessing else current.processingStatus
-        val newDeletion = if (action == SwipeAction.Delete && actionAllowed) {
-            if (systemTrashRequested) DeletionStatus.TRASHED else DeletionStatus.PENDING
-        } else {
-            current.deletionStatus
-        }
-        val operationId = recordOperation(current.id, "video", current.processingStatus, current.deletionStatus, newProcessing, newDeletion, action.name)
-        when (action) {
-            SwipeAction.Keep -> {
-                if (actionAllowed && current.processingStatus != ProcessingStatus.KEPT) {
-                    videoDao.updateProcessingStatus(current.id, ProcessingStatus.KEPT)
-                    if (current.processingStatus == ProcessingStatus.UNPROCESSED) {
-                        bumpStats(videoDelta = 1, sourceRef = operationSourceRef(operationId))
-                    }
-                }
+        db.withTransaction {
+            val current = videoDao.byId(video.id) ?: return@withTransaction 0L
+            val existingOperation = operationDao.lastByMediaAndAction(current.id, "video", action.name)
+            if (
+                isCleanupActionAlreadyApplied(action, current.processingStatus, current.deletionStatus) ||
+                current.deletionStatus != DeletionStatus.NONE
+            ) {
+                return@withTransaction existingOperation?.id ?: 0L
             }
-            SwipeAction.Favorite -> {
-                if (actionAllowed && current.processingStatus != ProcessingStatus.FAVORITED) {
-                    videoDao.updateProcessingStatus(current.id, ProcessingStatus.FAVORITED)
-                    bumpStats(
-                        favoriteDelta = 1,
+            val targetProcessing = when (action) {
+                SwipeAction.Keep -> ProcessingStatus.KEPT
+                SwipeAction.Favorite -> ProcessingStatus.FAVORITED
+                SwipeAction.Delete -> current.processingStatus
+            }
+            val newProcessing = targetProcessing
+            val newDeletion = if (action == SwipeAction.Delete) {
+                if (systemTrashRequested) DeletionStatus.TRASHED else DeletionStatus.PENDING
+            } else {
+                current.deletionStatus
+            }
+            val operationId = recordOperation(
+                current.id,
+                "video",
+                current.processingStatus,
+                current.deletionStatus,
+                newProcessing,
+                newDeletion,
+                action.name,
+            )
+            val adjustment = when (action) {
+                SwipeAction.Keep -> {
+                    videoDao.updateProcessingStatus(current.id, ProcessingStatus.KEPT)
+                    StatsAdjustment(
                         videoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
-                        sourceRef = operationSourceRef(operationId),
                     )
                 }
-            }
-            SwipeAction.Delete -> {
-                if (actionAllowed) {
+                SwipeAction.Favorite -> {
+                    videoDao.updateProcessingStatus(current.id, ProcessingStatus.FAVORITED)
+                    StatsAdjustment(
+                        videoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
+                        favoriteDelta = 1,
+                    )
+                }
+                SwipeAction.Delete -> {
                     videoDao.updateDeletionStatus(
                         listOf(current.id),
                         if (systemTrashRequested) DeletionStatus.TRASHED else DeletionStatus.PENDING,
                     )
                     trashDao.deleteByMedia(current.id, "video")
                     trashDao.insert(current.toTrashItem())
-                    bumpStats(
+                    StatsAdjustment(
                         videoDelta = if (current.processingStatus == ProcessingStatus.UNPROCESSED) 1 else 0,
-                        deletedSize = current.size,
-                        sourceRef = operationSourceRef(operationId),
+                        storageDelta = current.size.coerceAtLeast(0L),
                     )
                 }
             }
+            if (adjustment.hasDelta()) {
+                adjustStatsInTransaction(
+                    photoDelta = adjustment.photoDelta,
+                    videoDelta = adjustment.videoDelta,
+                    favoriteDelta = adjustment.favoriteDelta,
+                    deletedSize = adjustment.storageDelta,
+                    undoDelta = 0,
+                    cleanupEventSourceRefToDelete = null,
+                    sourceRef = operationSourceRef(operationId),
+                )
+            }
+            operationId
         }
-        operationId
     }
 
     override suspend fun createMediaAuthorizationRequest(
@@ -1027,27 +1065,6 @@ class AppRepositoryImpl @Inject constructor(
         )
     }
 
-    private suspend fun bumpStats(
-        photoDelta: Int = 0,
-        videoDelta: Int = 0,
-        favoriteDelta: Int = 0,
-        deletedSize: Long = 0L,
-        undoDelta: Int = 0,
-        sourceRef: String? = null,
-    ) {
-        db.withTransaction {
-            adjustStatsInTransaction(
-                photoDelta = photoDelta,
-                videoDelta = videoDelta,
-                favoriteDelta = favoriteDelta,
-                deletedSize = deletedSize,
-                undoDelta = undoDelta,
-                cleanupEventSourceRefToDelete = null,
-                sourceRef = sourceRef,
-            )
-        }
-    }
-
     private suspend fun adjustStatsInTransaction(
         photoDelta: Int,
         videoDelta: Int,
@@ -1350,12 +1367,25 @@ class AppRepositoryImpl @Inject constructor(
     }
 }
 
+internal fun isCleanupActionAlreadyApplied(
+    action: SwipeAction,
+    processingStatus: String,
+    deletionStatus: String,
+): Boolean = when (action) {
+    SwipeAction.Keep -> processingStatus == ProcessingStatus.KEPT
+    SwipeAction.Favorite -> processingStatus == ProcessingStatus.FAVORITED
+    SwipeAction.Delete -> deletionStatus != DeletionStatus.NONE
+}
+
 internal data class StatsAdjustment(
     val photoDelta: Int = 0,
     val videoDelta: Int = 0,
     val favoriteDelta: Int = 0,
     val storageDelta: Long = 0L,
-)
+) {
+    fun hasDelta(): Boolean =
+        photoDelta != 0 || videoDelta != 0 || favoriteDelta != 0 || storageDelta != 0L
+}
 
 internal fun statsAdjustmentForUndo(
     operation: OperationHistoryEntity,

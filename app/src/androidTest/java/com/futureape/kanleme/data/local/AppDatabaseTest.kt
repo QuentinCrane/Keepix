@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -80,6 +81,26 @@ class AppDatabaseTest {
 
         assertEquals(12, firstOrder.size)
         assertEquals(firstOrder, refreshedOrder)
+    }
+
+    @Test
+    fun operationHistoryProvidesOneUndoableRecordUntilConsumed() = runBlocking {
+        val operationId = database.operationDao().insert(
+            OperationHistoryEntity(
+                mediaId = 77L,
+                mediaType = "photo",
+                previousProcessingStatus = ProcessingStatus.UNPROCESSED,
+                previousDeletionStatus = DeletionStatus.NONE,
+                newProcessingStatus = ProcessingStatus.KEPT,
+                newDeletionStatus = DeletionStatus.NONE,
+                action = "Keep",
+            ),
+        )
+
+        assertEquals(operationId, database.operationDao().undoableById(operationId)?.id)
+        database.operationDao().markUndone(operationId)
+        assertNull(database.operationDao().undoableById(operationId))
+        assertNull(database.operationDao().lastUndoable("photo"))
     }
 
     @Test
