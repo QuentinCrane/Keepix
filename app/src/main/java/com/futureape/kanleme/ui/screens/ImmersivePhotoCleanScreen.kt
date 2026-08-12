@@ -140,6 +140,7 @@ internal fun ImmersivePhotoCleanContent(
     photos: List<PhotoEntity>,
     currentPhoto: PhotoEntity,
     settings: com.futureape.kanleme.data.settings.AppSettings,
+    displayOptions: PhotoCleanDisplayOptions,
     haptics: com.futureape.kanleme.ui.util.HapticKit,
     progressPercent: Int,
     remaining: Int,
@@ -334,7 +335,7 @@ internal fun ImmersivePhotoCleanContent(
                 }
             }
         }
-        if (settings.photoShowGestureHint) {
+        if (displayOptions.showGestureHint) {
             PhotoEdgeGlow(feedback = photoSwipeFeedback)
         }
     }

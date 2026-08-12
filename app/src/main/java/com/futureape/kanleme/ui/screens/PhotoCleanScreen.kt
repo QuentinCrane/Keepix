@@ -140,6 +140,7 @@ fun PhotoCleanScreen(
     val undoAnimation by viewModel.photoUndoAnimation.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptics = rememberHapticKit(settings)
+    val displayOptions = settings.toPhotoCleanDisplayOptions()
     val swipeSoundPlayer = remember(context, settings.swipeSound, settings.swipeSoundStyle) {
         PhotoSwipeSoundPlayer(context, settings.swipeSound, settings.swipeSoundStyle)
     }
@@ -445,6 +446,7 @@ fun PhotoCleanScreen(
                 photos = visibleDeck,
                 currentPhoto = currentPhoto,
                 settings = settings,
+                displayOptions = displayOptions,
                 haptics = haptics,
                 progressPercent = progressPercent,
                 remaining = remainingPhotos,
