@@ -72,6 +72,7 @@
     <string name="message_tap_to_dismiss">點一下關閉</string>
 
     <string name="media_error_invalid_uri">媒體地址無效</string>
+    <string name="media_error_authorization_failed">系統媒體授權請求失敗</string>
     <string name="media_error_move_no_rows">系統沒有移動該媒體，可能需要先授予完整相簿權限</string>
     <string name="media_error_move_security">系統要求單獨授權修改這個媒體檔案。目前版本已保留介面位置，後續可接入 MediaStore 寫入授權彈窗</string>
     <string name="media_error_move_folder_failed">移動資料夾失敗</string>

@@ -72,6 +72,7 @@
     <string name="message_tap_to_dismiss">轻点关闭</string>
 
     <string name="media_error_invalid_uri">媒体地址无效</string>
+    <string name="media_error_authorization_failed">系统媒体授权请求失败</string>
     <string name="media_error_move_no_rows">系统没有移动该媒体，可能需要先授予完整照片权限</string>
     <string name="media_error_move_security">系统要求单独授权修改这个媒体文件。当前版本已保留接口位置，后续可接入 MediaStore 写入授权弹窗</string>
     <string name="media_error_move_folder_failed">移动文件夹失败</string>
