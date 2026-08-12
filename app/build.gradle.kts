@@ -30,12 +30,12 @@ val releaseSigningConfigured = listOf(
 
 android {
     namespace = "com.futureape.kanleme"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.futureape.kanleme"
         minSdk = 30
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 60
         versionName = "2.3.4"
 
