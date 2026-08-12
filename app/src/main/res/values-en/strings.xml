@@ -139,6 +139,9 @@
     <string name="a11y_close_preview">Close preview</string>
     <string name="a11y_add_folder">Add folder</string>
     <string name="a11y_share">Share</string>
+    <string name="a11y_shuffle">Shuffle again</string>
+    <string name="a11y_more_actions">More actions</string>
+    <string name="action_undo">Undo last action</string>
     <string name="a11y_refresh">Refresh</string>
     <string name="a11y_back_to_previous_photo">Back to previous photo</string>
     <string name="a11y_choose_album">Choose album: %1$s</string>

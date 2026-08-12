@@ -467,6 +467,7 @@ fun PhotoCleanScreen(
                 onShare = { haptics.tick(); sharePhoto(context, currentPhoto) },
                 onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
                 onToggleFocus = { haptics.tick(); viewModel.setPhotoFocusMode(!settings.photoFocusMode) },
+                onShuffle = { haptics.threshold(); viewModel.reshufflePhotoCleaningSession() },
                 onDateClick = { haptics.tick(); showDatePicker = true },
                 onFolderClick = { haptics.tick(); showFolderPicker = true },
             )

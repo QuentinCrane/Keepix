@@ -62,13 +62,17 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Swipe
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -158,6 +162,7 @@ internal fun ImmersivePhotoCleanContent(
     onShare: () -> Unit,
     onUndo: () -> Unit,
     onToggleFocus: () -> Unit,
+    onShuffle: () -> Unit,
     onDateClick: () -> Unit,
     onFolderClick: () -> Unit,
 ) {
@@ -246,11 +251,20 @@ internal fun ImmersivePhotoCleanContent(
                             )
                         }
                     }
-                    KeepixRoundButton(
-                        icon = if (focusMode) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                        contentDescription = null,
-                        onClick = onToggleFocus,
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (displayOptions.showShuffleButton) {
+                            KeepixRoundButton(
+                                icon = Icons.Rounded.Shuffle,
+                                contentDescription = stringResource(R.string.a11y_shuffle),
+                                onClick = onShuffle,
+                            )
+                        }
+                        KeepixRoundButton(
+                            icon = if (focusMode) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                            contentDescription = null,
+                            onClick = onToggleFocus,
+                        )
+                    }
                 }
 
                 PhotoDeckStage(
@@ -301,11 +315,13 @@ internal fun ImmersivePhotoCleanContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        KeepixRoundButton(
-                            icon = Icons.Rounded.Share,
-                            contentDescription = null,
-                            onClick = onShare,
-                        )
+                        if (displayOptions.showActionRail) {
+                            KeepixRoundButton(
+                                icon = Icons.Rounded.Share,
+                                contentDescription = stringResource(R.string.a11y_share),
+                                onClick = onShare,
+                            )
+                        }
                         if (displayOptions.showInfoBar) {
                             KeepixBottomInfoBar(
                                 photo = currentPhoto,
@@ -314,12 +330,20 @@ internal fun ImmersivePhotoCleanContent(
                                 onClick = onFolderClick,
                             )
                         }
-                        KeepixRoundButton(
-                            icon = Icons.AutoMirrored.Rounded.Undo,
-                            contentDescription = null,
-                            enabled = sessionActionCount > 0,
-                            onClick = onUndo,
-                        )
+                        if (displayOptions.showActionRail) {
+                            KeepixRoundButton(
+                                icon = Icons.AutoMirrored.Rounded.Undo,
+                                contentDescription = stringResource(R.string.action_undo),
+                                enabled = sessionActionCount > 0,
+                                onClick = onUndo,
+                            )
+                        } else {
+                            PhotoOverflowActionMenu(
+                                sessionActionCount = sessionActionCount,
+                                onShare = onShare,
+                                onUndo = onUndo,
+                            )
+                        }
                     }
                 }
                 AnimatedVisibility(
@@ -342,6 +366,44 @@ internal fun ImmersivePhotoCleanContent(
         }
         if (displayOptions.showGestureHint) {
             PhotoEdgeGlow(feedback = photoSwipeFeedback)
+        }
+    }
+}
+
+@Composable
+private fun PhotoOverflowActionMenu(
+    sessionActionCount: Int,
+    onShare: () -> Unit,
+    onUndo: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        KeepixRoundButton(
+            icon = Icons.Rounded.MoreHoriz,
+            contentDescription = stringResource(R.string.a11y_more_actions),
+            onClick = { expanded = true },
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.a11y_share)) },
+                leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onShare()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_undo)) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null) },
+                enabled = sessionActionCount > 0,
+                onClick = {
+                    expanded = false
+                    onUndo()
+                },
+            )
         }
     }
 }

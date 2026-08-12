@@ -139,6 +139,9 @@
     <string name="a11y_close_preview">關閉預覽</string>
     <string name="a11y_add_folder">新增資料夾</string>
     <string name="a11y_share">分享</string>
+    <string name="a11y_shuffle">重新隨機</string>
+    <string name="a11y_more_actions">更多操作</string>
+    <string name="action_undo">撤銷上一步</string>
     <string name="a11y_refresh">重新整理</string>
     <string name="a11y_back_to_previous_photo">回到上一張照片</string>
     <string name="a11y_choose_album">選擇相簿：%1$s</string>
