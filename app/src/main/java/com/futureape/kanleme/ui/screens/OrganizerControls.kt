@@ -72,6 +72,7 @@ fun OrganizerProgressPill(
     releasableBytes: Long,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    progressLabel: String? = null,
 ) {
     val percent = progressPercent.coerceIn(0, 100)
     Surface(
@@ -101,7 +102,7 @@ fun OrganizerProgressPill(
                 horizontalArrangement = if (compact) Arrangement.Center else Arrangement.SpaceBetween,
             ) {
                 Text(
-                    percent.toString() + "%",
+                    (progressLabel?.let { it + " " } ?: "") + percent + "%",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.primary,

@@ -16,7 +16,10 @@ data class CleaningScope(
     val mediaType: String = "all", // all, normal, screenshot, selfie, motion, long, gif, raw
     val sortOrder: String = "random", // newest, random
     val todayInHistory: Boolean = false,
-    val batchSize: Int = 0,
+    /** User-facing number of items to aim for in this cleaning session. */
+    val sessionTarget: Int = 0,
+    /** Internal load window used to keep the continuous deck responsive. */
+    val deckLoadWindow: Int = 0,
     val randomSeed: Long = 1L, // stable random order seed; changes only when the user explicitly toggles random again
 )
 

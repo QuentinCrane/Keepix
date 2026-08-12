@@ -259,6 +259,7 @@ fun PhotoCleanScreen(
         dashboard.photoCount,
         dashboard.processedPhotoCount,
         scope,
+        sessionActionCount,
         batchSummary,
         batchFinishing,
     ) {
@@ -269,6 +270,11 @@ fun PhotoCleanScreen(
         }
         if (deckPreparing || mediaLibraryRefreshing || batchSummary != null || batchFinishing) {
             emptyStateVisible = false
+            return@LaunchedEffect
+        }
+        if (sessionActionCount > 0) {
+            emptyStateVisible = false
+            batchFinishing = true
             return@LaunchedEffect
         }
         val prepareKey = scope to (dashboard.photoCount to dashboard.processedPhotoCount)
@@ -399,8 +405,15 @@ fun PhotoCleanScreen(
 
     val currentPhoto = deck.first()
     val memoryPhotos = dayMemoryPhotos.ifEmpty { listOf(currentPhoto) }
-    val remainingPhotos = (dashboard.photoCount - dashboard.processedPhotoCount).coerceAtLeast(deck.size)
-    val remainingInBatch = (settings.photoBatchSize.coerceIn(1, 100) - sessionActionCount).coerceAtLeast(1)
+    val remainingPhotos = (dashboard.photoCount - dashboard.processedPhotoCount)
+        .coerceAtLeast(0)
+        .coerceAtLeast(deck.size)
+    val sessionProgress = cleaningSessionProgress(
+        completedActions = sessionActionCount,
+        requestedTarget = settings.photoBatchSize,
+        availableRemaining = remainingPhotos,
+    )
+    val remainingInBatch = sessionProgress.remaining.coerceAtLeast(1)
     val visibleDeck = deck.take(remainingInBatch.coerceAtMost(3))
     val dayMemoryVisible = showDayMemory || dayMemoryPinch.progress > 0.001f
     val dimAlpha by animateFloatAsState(targetValue = if (showGuide) 0.46f else 0f, label = "guide_dim")
@@ -432,16 +445,12 @@ fun PhotoCleanScreen(
         lastBatchDeleteBytes = if (action == SwipeAction.Delete) photo.size else 0L
         viewModel.onPhotoAction(photo, action, exitTargetX, exitTargetY)
         val nextActionCount = sessionActionCount + 1
-        if (nextActionCount >= settings.photoBatchSize.coerceIn(1, 100)) {
+        if (nextActionCount >= sessionProgress.target) {
             batchFinishing = true
         }
     }
 
-    val progressPercent = if (dashboard.photoCount > 0) {
-        ((dashboard.processedPhotoCount * 100f) / dashboard.photoCount).toInt().coerceIn(0, 100)
-    } else {
-        0
-    }
+    val progressPercent = sessionProgress.percent
 
     Box(
         Modifier
@@ -467,7 +476,7 @@ fun PhotoCleanScreen(
                 },
                 haptics = haptics,
                 progressPercent = progressPercent,
-                remaining = remainingPhotos,
+                remaining = sessionProgress.remaining,
                 sessionActionCount = sessionActionCount,
                 undoAnimation = undoAnimation,
                 onBack = ::leaveCleaning,

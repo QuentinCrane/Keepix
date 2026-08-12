@@ -160,10 +160,10 @@ class KanlemeViewModel @Inject constructor(
     private val settingsRepository: AppSettingsRepository,
 ) : ViewModel() {
     private companion object {
-        const val CONTINUOUS_PHOTO_DECK_SIZE = 420
-        const val CONTINUOUS_VIDEO_DECK_SIZE = 240
-        const val PHOTO_PREFETCH_THRESHOLD = 120
-        const val VIDEO_PREFETCH_THRESHOLD = 80
+        const val PHOTO_DECK_LOAD_WINDOW = 420
+        const val VIDEO_DECK_LOAD_WINDOW = 240
+        const val PHOTO_DECK_REFILL_THRESHOLD = 120
+        const val VIDEO_DECK_REFILL_THRESHOLD = 80
         const val HOME_PREVIEW_DECK_SIZE = 3
         const val MAX_MEDIA_AUTHORIZATION_BATCH = 100
     }
@@ -803,12 +803,12 @@ class KanlemeViewModel @Inject constructor(
     // Home preview must come from the same generated deck as the actual cleaning session,
     // otherwise random candidate-pool differences will make the preview jump on entry.
     private fun homePhotoPreviewLoadScope(scope: CleaningScope): CleaningScope =
-        scope.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE)
+        scope.copy(deckLoadWindow = PHOTO_DECK_LOAD_WINDOW)
 
     private fun homeVideoPreviewLoadScope(scope: CleaningScope): CleaningScope =
-        scope.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE)
+        scope.copy(deckLoadWindow = VIDEO_DECK_LOAD_WINDOW)
 
-    private fun CleaningScope.deckScopeKey(): CleaningScope = copy(batchSize = 0)
+    private fun CleaningScope.deckScopeKey(): CleaningScope = copy(sessionTarget = 0, deckLoadWindow = 0)
 
     private fun samePhotoDeckScope(left: CleaningScope?, right: CleaningScope): Boolean =
         left?.deckScopeKey() == right.deckScopeKey()
@@ -857,7 +857,7 @@ class KanlemeViewModel @Inject constructor(
         val currentVisible = _photoDeck.value.withoutLocalPhotoExclusions()
         return (currentVisible + loaded)
             .distinctBy { it.mediaStoreId }
-            .take(CONTINUOUS_PHOTO_DECK_SIZE)
+            .take(PHOTO_DECK_LOAD_WINDOW)
     }
 
     private fun rememberPhotoSessionAction(
@@ -913,7 +913,7 @@ class KanlemeViewModel @Inject constructor(
         if (_photoDeck.value.none { it.mediaStoreId == photo.mediaStoreId }) {
             _photoDeck.value = (listOf(photo) + _photoDeck.value)
                 .distinctBy { it.mediaStoreId }
-                .take(CONTINUOUS_PHOTO_DECK_SIZE)
+                .take(PHOTO_DECK_LOAD_WINDOW)
             photoDeckScope = _photoScope.value
         }
         _photoSessionActionCount.value = (_photoSessionActionCount.value - 1).coerceAtLeast(0)
@@ -931,7 +931,7 @@ class KanlemeViewModel @Inject constructor(
         invalidatePhotoDeckLoads()
         _photoDeck.value = (listOf(photo) + _photoDeck.value)
             .distinctBy { it.mediaStoreId }
-            .take(CONTINUOUS_PHOTO_DECK_SIZE)
+            .take(PHOTO_DECK_LOAD_WINDOW)
         photoDeckScope = _photoScope.value
         _photoSessionActionCount.value = (_photoSessionActionCount.value - 1).coerceAtLeast(0)
         _lastPhotoAction.value = snapshot.action
@@ -1023,7 +1023,7 @@ class KanlemeViewModel @Inject constructor(
         photoDeckLoadJob = viewModelScope.launch {
             try {
                 val loaded = repository
-                    .loadPhotoDeck(requestedScope.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
+                    .loadPhotoDeck(requestedScope.copy(deckLoadWindow = PHOTO_DECK_LOAD_WINDOW))
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == photoDeckGeneration) {
@@ -1172,7 +1172,7 @@ class KanlemeViewModel @Inject constructor(
         videoDeckLoadJob = viewModelScope.launch {
             try {
                 val loaded = repository
-                    .loadVideoDeck(requestedScope.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
+                    .loadVideoDeck(requestedScope.copy(deckLoadWindow = VIDEO_DECK_LOAD_WINDOW))
                     .withoutLocalVideoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == videoDeckGeneration) {
@@ -1263,7 +1263,7 @@ class KanlemeViewModel @Inject constructor(
             if (session.sortOrder == "random") settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed)
             try {
                 val loaded = repository
-                    .loadPhotoDeck(session.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
+                    .loadPhotoDeck(session.copy(deckLoadWindow = PHOTO_DECK_LOAD_WINDOW))
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == photoDeckGeneration) {
@@ -1306,7 +1306,7 @@ class KanlemeViewModel @Inject constructor(
             if (session.sortOrder == "random") settingsRepository.setVideoSortOrderWithSeed("random", session.randomSeed)
             try {
                 val loaded = repository
-                    .loadVideoDeck(session.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
+                    .loadVideoDeck(session.copy(deckLoadWindow = VIDEO_DECK_LOAD_WINDOW))
                     .withoutLocalVideoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == videoDeckGeneration) {
@@ -1331,7 +1331,7 @@ class KanlemeViewModel @Inject constructor(
             settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed)
             try {
                 val loaded = repository
-                    .loadPhotoDeck(session.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
+                    .loadPhotoDeck(session.copy(deckLoadWindow = PHOTO_DECK_LOAD_WINDOW))
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == photoDeckGeneration) {
@@ -1361,7 +1361,7 @@ class KanlemeViewModel @Inject constructor(
             settingsRepository.setVideoSortOrderWithSeed("random", session.randomSeed)
             try {
                 val loaded = repository
-                    .loadVideoDeck(session.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
+                    .loadVideoDeck(session.copy(deckLoadWindow = VIDEO_DECK_LOAD_WINDOW))
                     .withoutLocalVideoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == videoDeckGeneration) _videoDeck.value = loaded
@@ -1372,19 +1372,19 @@ class KanlemeViewModel @Inject constructor(
     }
 
     private suspend fun refillPhotoDeckIfNeeded(force: Boolean = false) {
-        if (!force && _photoDeck.value.size > PHOTO_PREFETCH_THRESHOLD) return
+        if (!force && _photoDeck.value.size > PHOTO_DECK_REFILL_THRESHOLD) return
         if (photoDeckRefilling) return
         val generation = photoDeckGeneration
         val showPreparing = _photoDeck.value.isEmpty()
         if (showPreparing) _photoDeckPreparing.value = true
         photoDeckRefilling = true
         try {
-            val fresh = repository.loadPhotoDeck(_photoScope.value.copy(batchSize = CONTINUOUS_PHOTO_DECK_SIZE))
+            val fresh = repository.loadPhotoDeck(_photoScope.value.copy(deckLoadWindow = PHOTO_DECK_LOAD_WINDOW))
             if (generation != photoDeckGeneration) return
             val merged = (_photoDeck.value + fresh)
                 .withoutLocalPhotoExclusions()
                 .distinctBy { it.mediaStoreId }
-                .take(CONTINUOUS_PHOTO_DECK_SIZE)
+                .take(PHOTO_DECK_LOAD_WINDOW)
             if (generation == photoDeckGeneration) {
                 _photoDeck.value = merged
                 photoDeckScope = _photoScope.value
@@ -1396,17 +1396,17 @@ class KanlemeViewModel @Inject constructor(
     }
 
     private suspend fun refillVideoDeckIfNeeded(force: Boolean = false) {
-        if (!force && _videoDeck.value.size > VIDEO_PREFETCH_THRESHOLD) return
+        if (!force && _videoDeck.value.size > VIDEO_DECK_REFILL_THRESHOLD) return
         if (videoDeckRefilling) return
         val generation = videoDeckGeneration
         videoDeckRefilling = true
         try {
-            val fresh = repository.loadVideoDeck(_videoScope.value.copy(batchSize = CONTINUOUS_VIDEO_DECK_SIZE))
+            val fresh = repository.loadVideoDeck(_videoScope.value.copy(deckLoadWindow = VIDEO_DECK_LOAD_WINDOW))
             if (generation != videoDeckGeneration) return
             val merged = (_videoDeck.value + fresh)
                 .withoutLocalVideoExclusions()
                 .distinctBy { it.mediaStoreId }
-                .take(CONTINUOUS_VIDEO_DECK_SIZE)
+                .take(VIDEO_DECK_LOAD_WINDOW)
             if (generation == videoDeckGeneration) _videoDeck.value = merged
         } finally {
             videoDeckRefilling = false
@@ -1527,13 +1527,13 @@ class KanlemeViewModel @Inject constructor(
     fun cyclePhotoBatchSize() = viewModelScope.launch {
         val next = nextBatchSize(settings.value.photoBatchSize)
         settingsRepository.setPhotoBatchSize(next)
-        _photoScope.value = _photoScope.value.copy(batchSize = next)
+        _photoScope.value = _photoScope.value.copy(sessionTarget = next)
     }
 
     fun setPhotoBatchSize(size: Int) = viewModelScope.launch {
         val next = size.coerceIn(1, 100)
         settingsRepository.setPhotoBatchSize(next)
-        _photoScope.value = _photoScope.value.copy(batchSize = next)
+        _photoScope.value = _photoScope.value.copy(sessionTarget = next)
     }
 
     fun setVideoFolder(path: String?) = viewModelScope.launch {
@@ -1577,13 +1577,13 @@ class KanlemeViewModel @Inject constructor(
     fun cycleVideoBatchSize() = viewModelScope.launch {
         val next = nextBatchSize(settings.value.videoBatchSize)
         settingsRepository.setVideoBatchSize(next)
-        _videoScope.value = _videoScope.value.copy(batchSize = next)
+        _videoScope.value = _videoScope.value.copy(sessionTarget = next)
     }
 
     fun setVideoBatchSize(size: Int) = viewModelScope.launch {
         val next = size.coerceIn(1, 100)
         settingsRepository.setVideoBatchSize(next)
-        _videoScope.value = _videoScope.value.copy(batchSize = next)
+        _videoScope.value = _videoScope.value.copy(sessionTarget = next)
     }
 
     fun onPhotoAction(photo: PhotoEntity, action: SwipeAction) {
@@ -2082,8 +2082,8 @@ class KanlemeViewModel @Inject constructor(
     fun setDeleteMode(value: DeleteMode) = viewModelScope.launch { settingsRepository.setDeleteMode(value) }
 
     fun cycleBatchSize() = viewModelScope.launch {
-        // Kept for old settings compatibility. The organizer now uses a continuous rolling buffer,
-        // so this no longer limits a cleaning round.
+        // Kept for old settings compatibility. The setting is a session target;
+        // continuous Deck loading uses its own internal window.
         loadPhotoDeck()
         loadVideoDeck()
     }
@@ -2246,7 +2246,7 @@ class KanlemeViewModel @Inject constructor(
         mediaType = photoMediaType,
         sortOrder = photoSortOrder,
         todayInHistory = photoDateMode == "today_history",
-        batchSize = photoBatchSize,
+        sessionTarget = photoBatchSize.coerceIn(1, 100),
         randomSeed = photoRandomSeed,
     )
 
@@ -2255,7 +2255,7 @@ class KanlemeViewModel @Inject constructor(
         folderPaths = videoFolderPath.takeIf { it.isNotBlank() }?.let { setOf(it) } ?: emptySet(),
         sortOrder = videoSortOrder,
         todayInHistory = videoDateMode == "today_history",
-        batchSize = videoBatchSize,
+        sessionTarget = videoBatchSize.coerceIn(1, 100),
         randomSeed = videoRandomSeed,
     )
 }

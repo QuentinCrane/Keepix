@@ -444,7 +444,7 @@ private fun KeepixQueueMenu(
                 )
             }
             KeepixMenuRow(
-                title = "每组数量",
+                title = "本次整理目标",
                 selected = false,
                 icon = Icons.Rounded.Tune,
                 value = activeBatch.toString(),
@@ -467,7 +467,7 @@ private fun KeepixBatchSlider(value: Int, onSelect: (Int) -> Unit) {
     var localValue by remember(value) { mutableStateOf(value.coerceIn(1, 100).toFloat()) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("每组数量", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.62f))
+            Text("本次整理目标", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.62f))
             Text((localValue + 0.5f).toInt().coerceIn(1, 100).toString(), style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
         }
         Slider(

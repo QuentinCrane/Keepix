@@ -270,6 +270,14 @@ fun VideoCleanScreen(
 
     val currentVideo = videos.getOrNull(pagerState.currentPage)
     val activeVideoPage = pagerState.targetPage.coerceIn(0, videos.lastIndex)
+    val remainingVideos = (dashboard.videoCount - dashboard.processedVideoCount - pendingVideoKeeps.size)
+        .coerceAtLeast(0)
+        .coerceAtLeast(videos.size)
+    val sessionProgress = cleaningSessionProgress(
+        completedActions = videoSessionActionCount,
+        requestedTarget = settings.videoBatchSize,
+        availableRemaining = remainingVideos,
+    )
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         AdaptiveWidthInfo { isMediumOrExpanded, isExpanded ->
@@ -323,8 +331,8 @@ fun VideoCleanScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             VideoOrganizerTopRow(
-                    progressPercent = if (dashboard.videoCount > 0) (((dashboard.processedVideoCount + pendingVideoKeeps.size) * 100f) / dashboard.videoCount).toInt().coerceIn(0, 100) else 0,
-                    remainingCount = (dashboard.videoCount - dashboard.processedVideoCount - pendingVideoKeeps.size).coerceAtLeast(0),
+                    progressPercent = sessionProgress.percent,
+                    remainingCount = sessionProgress.remaining,
                     deletedSizeBytes = dashboard.pendingDeleteBytes,
                     displayMode = settings.videoDisplayMode,
                     dateMode = scope.dateMode,
@@ -482,6 +490,7 @@ private fun VideoOrganizerTopRow(
             releasableBytes = deletedSizeBytes,
             modifier = Modifier.width(94.dp),
             compact = true,
+            progressLabel = "目标",
         )
         if (showShuffle) {
             ShuffleSessionButton(

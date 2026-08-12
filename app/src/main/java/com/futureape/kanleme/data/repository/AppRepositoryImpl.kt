@@ -269,17 +269,21 @@ class AppRepositoryImpl @Inject constructor(
         val settings = settingsRepository.settings.first()
         val range = rangeFor(scope.dateMode)
         val monthTokens = monthTokensForDateMode(scope.dateMode)
-        val targetLimit = scope.batchSize.takeIf { it > 0 } ?: settings.photoBatchSize
+        val loadLimit = (
+            scope.deckLoadWindow.takeIf { it > 0 }
+                ?: scope.sessionTarget.takeIf { it > 0 }
+                ?: settings.photoBatchSize
+            ).coerceAtLeast(1)
         val randomMode = scope.sortOrder == "random"
-        val randomQueryLimit = if (targetLimit <= 24) {
-            (targetLimit * 120).coerceIn(240, 1200)
+        val randomQueryLimit = if (loadLimit <= 24) {
+            (loadLimit * 120).coerceIn(240, 1200)
         } else {
-            (targetLimit * 18).coerceIn(4000, 16000)
+            (loadLimit * 18).coerceIn(4000, 16000)
         }
         val queryLimit = if (settings.excludedFolderPaths.isEmpty()) {
             when {
                 randomMode -> randomQueryLimit
-                else -> (targetLimit * 6).coerceAtLeast(120)
+                else -> (loadLimit * 6).coerceAtLeast(120)
             }
         } else {
             if (randomMode) (randomQueryLimit * 2).coerceAtMost(24000) else 20000
@@ -299,9 +303,9 @@ class AppRepositoryImpl @Inject constructor(
             .filter { dateModeMatches(it.dateTaken, scope.dateMode) }
             .filterNot { isExcludedFolder(it.folderPath, settings.excludedFolderPaths) }
         if (randomMode) {
-            spreadRandomPhotosForCleaning(photos, scope.randomSeed, targetLimit)
+            spreadRandomPhotosForCleaning(photos, scope.randomSeed, loadLimit)
         } else {
-            photos.take(targetLimit)
+            photos.take(loadLimit)
         }
     }
 
@@ -309,9 +313,13 @@ class AppRepositoryImpl @Inject constructor(
         val settings = settingsRepository.settings.first()
         val range = rangeFor(scope.dateMode)
         val monthTokens = monthTokensForDateMode(scope.dateMode)
-        val targetLimit = scope.batchSize.takeIf { it > 0 } ?: settings.videoBatchSize
+        val loadLimit = (
+            scope.deckLoadWindow.takeIf { it > 0 }
+                ?: scope.sessionTarget.takeIf { it > 0 }
+                ?: settings.videoBatchSize
+            ).coerceAtLeast(1)
         val queryLimit = if (settings.excludedFolderPaths.isEmpty()) {
-            (targetLimit * 6).coerceAtLeast(120)
+            (loadLimit * 6).coerceAtLeast(120)
         } else {
             5000
         }
@@ -328,9 +336,9 @@ class AppRepositoryImpl @Inject constructor(
             .filter { dateModeMatches(it.dateTaken, scope.dateMode) }
             .filterNot { isExcludedFolder(it.folderPath, settings.excludedFolderPaths) }
         if (scope.sortOrder == "random") {
-            spreadRandomVideosByFolder(videos, scope.randomSeed, targetLimit)
+            spreadRandomVideosByFolder(videos, scope.randomSeed, loadLimit)
         } else {
-            videos.take(targetLimit)
+            videos.take(loadLimit)
         }
     }
 

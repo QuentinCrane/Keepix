@@ -49,7 +49,7 @@
     <string name="photo_clean_mode_diagnostic_desc">保持原来的清理体验，并在整理页显示队列和进度诊断信息</string>
     <string name="photo_clean_mode_performance">流畅优先</string>
     <string name="photo_clean_mode_performance_desc">关闭沉浸背景和入场动效，减少卡顿；滑动、撤销和队列逻辑不变</string>
-    <string name="photo_diagnostic_hud">诊断 · 预览 %1$d · 当前 %2$d · 剩余 %3$d · 进度 %4$d%%</string>
+    <string name="photo_diagnostic_hud">诊断 · 预览 %1$d · 当前 %2$d · 目标余 %3$d · 进度 %4$d%%</string>
 
     <string name="message_library_synced">已同步 %1$d 张照片、%2$d 个视频</string>
     <string name="message_library_sync_failed">媒体库同步失败，请检查相册权限</string>

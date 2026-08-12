@@ -58,6 +58,7 @@ docs/*
 !docs/technical_overview.md
 !docs/settings_truth_table.md
 !docs/photo_clean_modes.md
+!docs/cleanup_session_targets.md
 !docs/trash_retention_semantics.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md

@@ -245,7 +245,18 @@ internal fun ImmersivePhotoCleanContent(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         if (displayOptions.showTopBar) {
-                            KeepixProgressBar(progress = progressPercent / 100f)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            ) {
+                                Text(
+                                    "目标 " + progressPercent + "%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.82f),
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                KeepixProgressBar(progress = progressPercent / 100f)
+                            }
                         }
                         AnimatedVisibility(
                             visible = !focusMode && displayOptions.showFilterChips,

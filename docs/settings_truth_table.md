@@ -11,8 +11,8 @@
 | 字段 | 默认值 | DataStore key / 写入口 | 当前运行时消费者 | 状态 | 最小验收 |
 | --- | --- | --- | --- | --- | --- |
 | `deleteMode` | `PENDING_CONFIRM` | `delete_mode` / `setDeleteMode` | ViewModel 删除动作与系统回收站授权 | ACTIVE | 两种模式分别走预期删除路径 |
-| `photoBatchSize` | `30` | `photo_batch_size` / `setPhotoBatchSize` | 照片会话目标与 Deck 加载 | ACTIVE | 修改后新会话目标和进度一致 |
-| `videoBatchSize` | `20` | `video_batch_size` / `setVideoBatchSize` | 视频会话目标与 Deck 加载 | ACTIVE | 修改后新会话目标和进度一致 |
+| `photoBatchSize` | `30` | `photo_batch_size` / `setPhotoBatchSize` | 照片本次整理目标、目标进度与目标完成总结 | ACTIVE | 修改后新会话使用目标；队列不足时按可处理数量收敛 |
+| `videoBatchSize` | `20` | `video_batch_size` / `setVideoBatchSize` | 视频本次整理目标与目标进度 | ACTIVE | 修改后新会话使用目标；达到目标后仍可连续整理 |
 | `autoMoveOnKeepFavorite` | `true` | `auto_move_on_keep_favorite` / `setAutoMoveOnKeepFavorite` | 保留/收藏后的归档移动入口 | ACTIVE | 开关关闭时不发起移动授权 |
 | `similarDetection` | `false` | `similar_detection` / `setSimilarDetection` | 相似照片开关触发当前 ViewModel 任务 | ACTIVE（待 C08 持久化） | 开关、关闭、进程重建行为有明确定义 |
 | `swipeSensitivity` | `STANDARD` | `swipe_sensitivity` / `setSwipeSensitivity` | 卡片阈值、视频快进阈值 | ACTIVE | 三档阈值与手势方向均可复现 |
