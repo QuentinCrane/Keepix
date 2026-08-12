@@ -481,6 +481,15 @@ fun PhotoCleanScreen(
                 onUndoAnimationConsumed = { sequence -> viewModel.clearPhotoUndoAnimation(sequence) },
                 onActionCommitted = swipeSoundPlayer::play,
                 onAction = { photo, action, _, _, targetX, targetY -> perform(photo, action, targetX, targetY) },
+                onQuickAction = { action ->
+                    val exitTargetX = if (action == SwipeAction.Keep) 980f else 0f
+                    val exitTargetY = when (action) {
+                        SwipeAction.Delete -> -1260f
+                        SwipeAction.Favorite -> 1260f
+                        SwipeAction.Keep -> 0f
+                    }
+                    perform(currentPhoto, action, exitTargetX, exitTargetY)
+                },
                 onShare = { haptics.tick(); sharePhoto(context, currentPhoto) },
                 onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
                 onToggleFocus = { haptics.tick(); viewModel.setPhotoFocusMode(!settings.photoFocusMode) },

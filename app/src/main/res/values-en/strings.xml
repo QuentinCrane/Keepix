@@ -139,6 +139,9 @@
     <string name="a11y_close_preview">Close preview</string>
     <string name="a11y_add_folder">Add folder</string>
     <string name="a11y_share">Share</string>
+    <string name="a11y_keep">Keep</string>
+    <string name="a11y_favorite">Favorite</string>
+    <string name="a11y_delete">Pending delete</string>
     <string name="a11y_shuffle">Shuffle again</string>
     <string name="a11y_more_actions">More actions</string>
     <string name="action_undo">Undo last action</string>

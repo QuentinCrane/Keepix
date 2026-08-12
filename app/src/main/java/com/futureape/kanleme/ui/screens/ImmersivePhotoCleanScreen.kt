@@ -62,6 +62,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Shuffle
@@ -162,6 +163,7 @@ internal fun ImmersivePhotoCleanContent(
     onUndoAnimationConsumed: (Long) -> Unit,
     onActionCommitted: (SwipeAction) -> Unit = {},
     onAction: (PhotoEntity, SwipeAction, Float, Float, Float, Float) -> Unit,
+    onQuickAction: (SwipeAction) -> Unit = {},
     onShare: () -> Unit,
     onUndo: () -> Unit,
     onToggleFocus: () -> Unit,
@@ -308,8 +310,20 @@ internal fun ImmersivePhotoCleanContent(
                     undoAnimation = undoAnimation,
                     onUndoAnimationConsumed = onUndoAnimationConsumed,
                     onActionCommitted = onActionCommitted,
-                    onAction = onAction,
+                        onAction = onAction,
                 )
+
+                AnimatedVisibility(
+                    visible = !focusMode && settings.quickActionButtons,
+                    enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { it / 5 },
+                    exit = fadeOut(tween(140)) + slideOutVertically(tween(180)) { it / 5 },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 84.dp)
+                        .zIndex(6f),
+                ) {
+                    PhotoQuickActionDock(onAction = onQuickAction)
+                }
 
                 AnimatedVisibility(
                     visible = !focusMode,
@@ -376,6 +390,36 @@ internal fun ImmersivePhotoCleanContent(
         }
         if (displayOptions.showGestureHint) {
             PhotoEdgeGlow(feedback = photoSwipeFeedback)
+        }
+    }
+}
+
+@Composable
+private fun PhotoQuickActionDock(onAction: (SwipeAction) -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = Color.Black.copy(alpha = 0.28f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            KeepixRoundButton(
+                icon = Icons.Rounded.Check,
+                contentDescription = stringResource(R.string.a11y_keep),
+                onClick = { onAction(SwipeAction.Keep) },
+            )
+            KeepixRoundButton(
+                icon = Icons.Rounded.FavoriteBorder,
+                contentDescription = stringResource(R.string.a11y_favorite),
+                onClick = { onAction(SwipeAction.Favorite) },
+            )
+            KeepixRoundButton(
+                icon = Icons.Rounded.Delete,
+                contentDescription = stringResource(R.string.a11y_delete),
+                onClick = { onAction(SwipeAction.Delete) },
+            )
         }
     }
 }

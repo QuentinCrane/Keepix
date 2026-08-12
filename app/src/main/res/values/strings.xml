@@ -139,6 +139,9 @@
     <string name="a11y_close_preview">关闭预览</string>
     <string name="a11y_add_folder">添加文件夹</string>
     <string name="a11y_share">分享</string>
+    <string name="a11y_keep">保留</string>
+    <string name="a11y_favorite">收藏</string>
+    <string name="a11y_delete">待删</string>
     <string name="a11y_shuffle">重新随机</string>
     <string name="a11y_more_actions">更多操作</string>
     <string name="action_undo">撤销上一步</string>
