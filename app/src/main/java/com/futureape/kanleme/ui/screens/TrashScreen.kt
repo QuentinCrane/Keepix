@@ -83,6 +83,7 @@ import coil.compose.AsyncImage
 import coil.imageLoader
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
+import com.futureape.kanleme.data.local.TrashRetentionPolicy
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.data.settings.TodayInHistoryEntryMode
 import com.futureape.kanleme.R
@@ -96,7 +97,6 @@ import com.futureape.kanleme.ui.util.trashImageRequest
 import com.futureape.kanleme.ui.util.trashThumbnailImageRequest
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.delay
-import kotlin.math.ceil
 import com.futureape.kanleme.ui.i18n.Text
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -116,7 +116,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
             Column(Modifier.fillMaxSize().padding(top = 46.dp)) {
                 ProfilePageHeader(
                     title = if (selectedMediaType == "video") "视频回收站" else "照片回收站",
-                    subtitle = "照片和视频分开处理，30 天安全期内可恢复",
+                    subtitle = stringResource(R.string.trash_review_subtitle),
                     onBack = onBack,
                     modifier = Modifier.padding(horizontal = 22.dp),
                 )
@@ -246,7 +246,7 @@ private fun TrashGalleryHeader(
                     Text("预计可释放 " + formatSize(selectedSize), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.58f))
                 }
                 Surface(shape = RoundedCornerShape(999.dp), color = ProfileScreenAccent.copy(alpha = 0.16f), contentColor = ProfileScreenAccent) {
-                    Text("30 天内可恢复", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.trash_review_badge), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -295,7 +295,15 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit, onDelete
             color = Color.Black.copy(alpha = 0.50f),
             contentColor = Color.White,
         ) {
-            Text("${item.daysLeft()}天", modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall)
+            Text(
+                text = if (item.reviewDaysLeft() > 0) {
+                    stringResource(R.string.trash_review_days_left, item.reviewDaysLeft())
+                } else {
+                    stringResource(R.string.trash_review_due)
+                },
+                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
         IconButton(
             onClick = onDelete,
@@ -545,6 +553,16 @@ private fun TrashPreviewOverlay(
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2,
                 )
+                Text(
+                    text = if (currentItem.reviewDaysLeft() > 0) {
+                        stringResource(R.string.trash_review_due_on, formatDate(currentItem.reviewDueAt))
+                    } else {
+                        stringResource(R.string.trash_review_overdue)
+                    },
+                    color = Color.White.copy(alpha = 0.62f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                )
                 TrashPreviewWideAction(
                     text = "那年今日",
                     icon = Icons.Rounded.CalendarToday,
@@ -729,7 +747,5 @@ private fun TrashPreviewWideAction(
     }
 }
 
-private fun TrashItemEntity.daysLeft(): Int {
-    val left = autoDeleteAt - System.currentTimeMillis()
-    return ceil(left / (24.0 * 60.0 * 60.0 * 1000.0)).toInt().coerceAtLeast(0)
-}
+private fun TrashItemEntity.reviewDaysLeft(): Int =
+    TrashRetentionPolicy.daysUntilReview(reviewDueAt, System.currentTimeMillis())

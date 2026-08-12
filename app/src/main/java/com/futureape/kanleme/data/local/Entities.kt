@@ -190,7 +190,11 @@ data class TrashItemEntity(
     @ColumnInfo(name = "trashed_at") val trashedAt: Long,
     @ColumnInfo(name = "auto_delete_at") val autoDeleteAt: Long,
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
-)
+) {
+    /** Legacy column name; this timestamp is only a local review reminder, never an auto-delete trigger. */
+    val reviewDueAt: Long
+        get() = autoDeleteAt
+}
 
 @Entity(tableName = "folder_filters")
 data class FolderFilterEntity(

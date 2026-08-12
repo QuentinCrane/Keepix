@@ -56,6 +56,7 @@ docs/*
 !docs/privacy.md
 !docs/release_notes.md
 !docs/technical_overview.md
+!docs/trash_retention_semantics.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md
 !docs/全面审计_功能完善_性能优化实施规划.md

@@ -9,6 +9,7 @@ import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.ProcessingStatus
 import com.futureape.kanleme.data.local.SimilarGroupEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
+import com.futureape.kanleme.data.local.TrashRetentionPolicy
 import com.futureape.kanleme.data.local.UserStatsEntity
 import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.media.MediaAuthorizationResult
@@ -1250,7 +1251,7 @@ class AppRepositoryImpl @Inject constructor(
         width = width,
         height = height,
         trashedAt = System.currentTimeMillis(),
-        autoDeleteAt = System.currentTimeMillis() + 30L * 24L * 60L * 60L * 1000L,
+        autoDeleteAt = TrashRetentionPolicy.reviewDueAt(System.currentTimeMillis()),
     )
 
     private fun VideoEntity.toTrashItem(): TrashItemEntity = TrashItemEntity(
@@ -1268,7 +1269,7 @@ class AppRepositoryImpl @Inject constructor(
         height = height,
         duration = duration,
         trashedAt = System.currentTimeMillis(),
-        autoDeleteAt = System.currentTimeMillis() + 30L * 24L * 60L * 60L * 1000L,
+        autoDeleteAt = TrashRetentionPolicy.reviewDueAt(System.currentTimeMillis()),
     )
 
     private data class AchievementSpec(

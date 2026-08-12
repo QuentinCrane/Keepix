@@ -9,6 +9,12 @@
     <string name="delete_mode_pending_confirm_desc">先放入待刪清單，確認後再處理</string>
     <string name="delete_mode_system_trash">系統垃圾桶</string>
     <string name="delete_mode_system_trash_desc">嘗試移入系統垃圾桶，不額外限制</string>
+    <string name="trash_review_subtitle">照片和影片分開處理；應用程式不會自動永久刪除，建議依複核日期處理</string>
+    <string name="trash_review_badge">建議複核</string>
+    <string name="trash_review_days_left">距離建議複核還有 %1$d 天</string>
+    <string name="trash_review_due">已到複核日期</string>
+    <string name="trash_review_due_on">建議複核：%1$s</string>
+    <string name="trash_review_overdue">已到建議複核日期；仍不會自動刪除</string>
     <string name="swipe_sound_soft_breeze">柔和滑過</string>
     <string name="swipe_sound_soft_breeze_desc">預設推薦的輕柔滑動聲</string>
     <string name="swipe_sound_low_tap">短促滑過</string>

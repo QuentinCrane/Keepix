@@ -9,6 +9,12 @@
     <string name="delete_mode_pending_confirm_desc">Put items in the pending-delete list first, then review them before taking action</string>
     <string name="delete_mode_system_trash">System trash</string>
     <string name="delete_mode_system_trash_desc">Try moving items to system trash without extra restrictions</string>
+    <string name="trash_review_subtitle">Photos and videos are handled separately. Keepix will not permanently delete them automatically; review them by the suggested date</string>
+    <string name="trash_review_badge">Review suggested</string>
+    <string name="trash_review_days_left">%1$d days until review</string>
+    <string name="trash_review_due">Review due</string>
+    <string name="trash_review_due_on">Review suggested by %1$s</string>
+    <string name="trash_review_overdue">Review date reached; nothing is deleted automatically</string>
     <string name="swipe_sound_soft_breeze">Soft breeze</string>
     <string name="swipe_sound_soft_breeze_desc">A gentle recorded swipe sound, recommended by default</string>
     <string name="swipe_sound_low_tap">Short glide</string>
