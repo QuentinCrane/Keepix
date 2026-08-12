@@ -105,7 +105,6 @@ fun FloatingGlassNav(
     selectedIndex: Int,
     items: List<Pair<String, ImageVector>>,
     onSelected: (Int) -> Unit,
-    onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(

@@ -62,7 +62,6 @@ import com.futureape.kanleme.ui.screens.MediaPermissionGate
 import com.futureape.kanleme.ui.screens.OnboardingScreen
 import com.futureape.kanleme.ui.screens.PhotoHistoryScreen
 import com.futureape.kanleme.ui.screens.PhotoCleanScreen
-import com.futureape.kanleme.ui.screens.PhotoStartScreen
 import com.futureape.kanleme.ui.screens.PhotoViewerScreen
 import com.futureape.kanleme.ui.screens.SettingsScreen
 import com.futureape.kanleme.ui.screens.SimilarPhotosScreen
@@ -72,7 +71,6 @@ import com.futureape.kanleme.ui.screens.TodayInHistoryScreen
 import com.futureape.kanleme.ui.screens.AnnualReportScreen
 import com.futureape.kanleme.ui.screens.AchievementsScreen
 import com.futureape.kanleme.ui.screens.VideoCleanScreen
-import com.futureape.kanleme.ui.screens.VideoStartScreen
 import com.futureape.kanleme.ui.i18n.asString
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
@@ -123,12 +121,12 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
     }
 
     LaunchedEffect(initialShortcutTarget, shortcutNonce) {
-        when (initialShortcutTarget) {
-            "photo" -> {
+        when (NavigationContract.routeForShortcut(initialShortcutTarget)) {
+            Destinations.PHOTO -> {
                 viewModel.startPhotoCleaningSession()
                 navController.navigate(Destinations.PHOTO) { launchSingleTop = true }
             }
-            "video" -> {
+            Destinations.VIDEO -> {
                 viewModel.startVideoCleaningSession()
                 navController.navigate(Destinations.VIDEO) { launchSingleTop = true }
             }
@@ -185,16 +183,6 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onSettings = { navController.navigate(Destinations.SETTINGS) },
                     )
                 }
-                composable(Destinations.PHOTO_START) {
-                    PhotoStartScreen(
-                        viewModel = viewModel,
-                        onBack = { navController.popBackStack() },
-                        onStart = {
-                            viewModel.startPhotoCleaningSession()
-                            navController.navigate(Destinations.PHOTO)
-                        },
-                    )
-                }
                 composable(Destinations.PHOTO) {
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         PhotoCleanScreen(
@@ -209,16 +197,6 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                             },
                         )
                     }
-                }
-                composable(Destinations.VIDEO_START) {
-                    VideoStartScreen(
-                        viewModel = viewModel,
-                        onBack = { navController.popBackStack() },
-                        onStart = {
-                            viewModel.startVideoCleaningSession()
-                            navController.navigate(Destinations.VIDEO)
-                        },
-                    )
                 }
                 composable(Destinations.VIDEO) {
                     VideoCleanScreen(
@@ -362,7 +340,6 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         selectedIndex = selectedNavIndex,
                         items = navItems,
                         onSelected = onNavSelected,
-                        onAdd = {},
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .zIndex(100f)
@@ -480,9 +457,8 @@ private fun routeMotionRank(route: String?): Int = when (route) {
     Destinations.HOME -> 0
     Destinations.VIDEO -> 1
     Destinations.ME -> 2
-    Destinations.PHOTO_START -> 10
-    Destinations.PHOTO -> 11
-    Destinations.VIDEO_START -> 12
+    Destinations.PHOTO -> 10
+    Destinations.VIDEO -> 11
     Destinations.TIMELINE -> 20
     Destinations.TODAY -> 21
     Destinations.VIEWER -> 30

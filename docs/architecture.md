@@ -38,8 +38,8 @@ app/
 ```text
 整理 Home
   ├── 横向照片 / 视频整理入口 Pager
-  ├── 照片整理入口 PhotoStart -> PhotoClean
-  ├── 视频整理入口 VideoStart -> VideoClean
+  ├── 照片整理入口 -> PhotoClean（直接进入清理流）
+  ├── 视频整理入口 -> VideoClean（直接进入清理流）
   ├── 全相册 / 全视频时间轴 Timeline
   ├── 当年今日 TodayInHistory
   ├── 今日整理报告 AnnualReport

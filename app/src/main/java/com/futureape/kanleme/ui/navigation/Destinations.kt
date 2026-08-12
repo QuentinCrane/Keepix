@@ -2,9 +2,7 @@ package com.futureape.kanleme.ui.navigation
 
 object Destinations {
     const val HOME = "home"
-    const val PHOTO_START = "photo_start"
     const val PHOTO = "photo_clean"
-    const val VIDEO_START = "video_start"
     const val VIDEO = "video"
     const val TIMELINE = "timeline"
     const val VIEWER_ARG_PHOTO_ID = "photoId"

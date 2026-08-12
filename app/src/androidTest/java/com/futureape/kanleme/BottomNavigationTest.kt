@@ -31,7 +31,6 @@ class BottomNavigationTest {
                         "我的" to Icons.Rounded.Person,
                     ),
                     onSelected = {},
-                    onAdd = {},
                 )
             }
         }
@@ -48,7 +47,6 @@ class BottomNavigationTest {
                         "我的" to Icons.Rounded.Person,
                     ),
                     onSelected = {},
-                    onAdd = {},
                 )
             }
         }
