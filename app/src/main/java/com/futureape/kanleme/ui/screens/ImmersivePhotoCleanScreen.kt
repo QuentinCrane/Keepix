@@ -340,28 +340,38 @@ internal fun ImmersivePhotoCleanContent(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         if (displayOptions.showActionRail) {
-                            KeepixRoundButton(
-                                icon = Icons.Rounded.Share,
-                                contentDescription = stringResource(R.string.a11y_share),
-                                onClick = onShare,
-                            )
-                        }
-                        if (displayOptions.showInfoBar) {
-                            KeepixBottomInfoBar(
-                                photo = currentPhoto,
-                                showFolder = displayOptions.showFolderChips,
-                                modifier = Modifier.weight(1f),
-                                onClick = onFolderClick,
-                            )
-                        }
-                        if (displayOptions.showActionRail) {
-                            KeepixRoundButton(
-                                icon = Icons.AutoMirrored.Rounded.Undo,
-                                contentDescription = stringResource(R.string.action_undo),
-                                enabled = sessionActionCount > 0,
-                                onClick = onUndo,
-                            )
+                            photoBottomActionOrder(settings.swapShareAndUndo).forEach { action ->
+                                when (action) {
+                                    PhotoBottomAction.SHARE -> KeepixRoundButton(
+                                        icon = Icons.Rounded.Share,
+                                        contentDescription = stringResource(R.string.a11y_share),
+                                        onClick = onShare,
+                                    )
+                                    PhotoBottomAction.INFO -> if (displayOptions.showInfoBar) {
+                                        KeepixBottomInfoBar(
+                                            photo = currentPhoto,
+                                            showFolder = displayOptions.showFolderChips,
+                                            modifier = Modifier.weight(1f),
+                                            onClick = onFolderClick,
+                                        )
+                                    }
+                                    PhotoBottomAction.UNDO -> KeepixRoundButton(
+                                        icon = Icons.AutoMirrored.Rounded.Undo,
+                                        contentDescription = stringResource(R.string.action_undo),
+                                        enabled = sessionActionCount > 0,
+                                        onClick = onUndo,
+                                    )
+                                }
+                            }
                         } else {
+                            if (displayOptions.showInfoBar) {
+                                KeepixBottomInfoBar(
+                                    photo = currentPhoto,
+                                    showFolder = displayOptions.showFolderChips,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = onFolderClick,
+                                )
+                            }
                             PhotoOverflowActionMenu(
                                 sessionActionCount = sessionActionCount,
                                 onShare = onShare,

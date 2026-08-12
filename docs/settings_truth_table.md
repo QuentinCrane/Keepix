@@ -18,7 +18,7 @@
 | `swipeSensitivity` | `STANDARD` | `swipe_sensitivity` / `setSwipeSensitivity` | 卡片阈值、视频快进阈值 | ACTIVE | 三档阈值与手势方向均可复现 |
 | `gestureDirection` | `DEFAULT` | `gesture_direction` / `setGestureDirection` | 照片卡片上下动作映射 | ACTIVE | 反向后 UI 提示和实际动作一致 |
 | `quickActionButtons` | `true` | `quick_action_buttons` / `setQuickActionButtons` | 照片整理页底部保留/收藏/待删快捷按钮 | ACTIVE | 关闭后仍可用滑动手势和其他入口 |
-| `swapShareAndUndo` | `false` | `swap_share_and_undo` / `setSwapShareAndUndo` | 当前未找到真实页面消费者 | STORAGE_ONLY | C03 前不得宣称已生效 |
+| `swapShareAndUndo` | `false` | `swap_share_and_undo` / `setSwapShareAndUndo` | 照片整理页底部分享/撤销位置 | ACTIVE | 只交换视觉顺序，不交换业务回调 |
 | `swipeSound` | `true` | `swipe_sound` / `setSwipeSound` | `PhotoSwipeSoundPlayer` | ACTIVE | 保留/收藏/待删均遵守开关 |
 | `swipeSoundStyle` | `SOFT_BREEZE` | `swipe_sound_style` / `setSwipeSoundStyle` | `PhotoSwipeSoundPlayer` | ACTIVE | 三种音色选择和回退路径有效 |
 | `videoDefaultMuted` | `true` | `video_default_muted` / `setVideoDefaultMuted` | 视频清理页播放器初始静音 | ACTIVE | 首次进入、切页、手动恢复声音 |
@@ -66,4 +66,4 @@
 
 ## 当前结论
 
-消费缺口集中在分享/撤销交换、沉浸背景和照片清理模式。照片真实页显示开关与快捷动作按钮已由 C02/C03 接通；视频文件夹按钮已由 C03 接通，后续 C03～C04 继续按表逐组接通或做删除决策，不把设置页预览截图单独作为功能完成证据。
+消费缺口集中在沉浸背景和照片清理模式。照片真实页显示开关、快捷动作按钮与分享/撤销交换已由 C02/C03 接通；视频文件夹按钮已由 C03 接通，后续 C04 继续按表逐组接通或做删除决策，不把设置页预览截图单独作为功能完成证据。

@@ -470,6 +470,7 @@ private fun SettingsPageContent(
                     { SettingsSwitchRow(Icons.Rounded.MusicNote, "打开视频默认静音", "进入视频整理时默认静音，点侧边栏音量按钮可恢复声音", checked = settings.videoDefaultMuted, onCheckedChange = { onTick(); viewModel.setVideoDefaultMuted(it) }, color = Color(0xFFE8A93B)) },
                     { SettingsSegmentedRow(Icons.Rounded.AspectRatio, "视频显示比例", stringResource(settings.videoDisplayMode.labelRes), videoDisplayModeOptions(), settings.videoDisplayMode.name, color = Color(0xFF5E8DB4), onSelected = { onTick(); viewModel.setVideoDisplayMode(VideoDisplayMode.valueOf(it)) }) },
                     { SettingsSwitchRow(Icons.Rounded.TouchApp, "整理快捷按钮", if (settings.quickActionButtons) "照片页显示保留、收藏、待删" else "关闭后继续使用滑动手势", checked = settings.quickActionButtons, onCheckedChange = { onTick(); viewModel.setQuickActionButtons(it) }, color = Color(0xFF5E8DB4)) },
+                    { SettingsSwitchRow(Icons.Rounded.Tune, "分享/撤销位置互换", if (settings.swapShareAndUndo) "底部撤销在左、分享在右" else "底部分享在左、撤销在右", checked = settings.swapShareAndUndo, onCheckedChange = { onTick(); viewModel.setSwapShareAndUndo(it) }, color = Color(0xFF5E8DB4)) },
                     { SettingsSegmentedRow(Icons.Rounded.Vibration, "默认震动强度", stringResource(settings.hapticLevel.labelRes), hapticLevelOptions(), settings.hapticLevel.name, color = Color(0xFF55A6C8), onSelected = { onSuccess(); viewModel.setHapticLevel(HapticLevel.valueOf(it)) }) },
                 ))
             }

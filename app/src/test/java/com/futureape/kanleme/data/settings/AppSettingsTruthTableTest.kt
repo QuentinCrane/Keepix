@@ -22,7 +22,7 @@ private val truthEntries = listOf(
     TruthEntry("swipeSensitivity", "swipe_sensitivity", ConsumerStatus.ACTIVE),
     TruthEntry("gestureDirection", "gesture_direction", ConsumerStatus.ACTIVE),
     TruthEntry("quickActionButtons", "quick_action_buttons", ConsumerStatus.ACTIVE),
-    TruthEntry("swapShareAndUndo", "swap_share_and_undo", ConsumerStatus.STORAGE_ONLY),
+    TruthEntry("swapShareAndUndo", "swap_share_and_undo", ConsumerStatus.ACTIVE),
     TruthEntry("swipeSound", "swipe_sound", ConsumerStatus.ACTIVE),
     TruthEntry("swipeSoundStyle", "swipe_sound_style", ConsumerStatus.ACTIVE),
     TruthEntry("videoDefaultMuted", "video_default_muted", ConsumerStatus.ACTIVE),
@@ -87,7 +87,7 @@ class AppSettingsTruthTableTest {
         val byField = truthEntries.associateBy { it.fieldName }
 
         assertEquals(ConsumerStatus.ACTIVE, byField.getValue("quickActionButtons").status)
-        assertEquals(ConsumerStatus.STORAGE_ONLY, byField.getValue("swapShareAndUndo").status)
+        assertEquals(ConsumerStatus.ACTIVE, byField.getValue("swapShareAndUndo").status)
         assertEquals(ConsumerStatus.STORAGE_ONLY, byField.getValue("immersiveBackground").status)
         assertEquals(ConsumerStatus.STORAGE_ONLY, byField.getValue("photoCleanMode").status)
         assertTrue(byField.getValue("photoShowTopBar").status == ConsumerStatus.PREVIEW_ONLY)
