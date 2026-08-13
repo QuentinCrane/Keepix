@@ -12,6 +12,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -101,6 +102,32 @@ class AppDatabaseTest {
         assertEquals(2, counts.allCount)
         assertEquals(1, counts.normalCount)
         assertEquals(1, counts.screenshotCount)
+    }
+
+    @Test
+    fun criticalQueryPlansUseD05CompositeIndexes() {
+        val queuePlan = explainPlan(
+            "SELECT id FROM photos WHERE processing_status = 'unprocessed' " +
+                "AND deletion_status = 'none' AND missing_since IS NULL " +
+                "ORDER BY date_taken DESC LIMIT 120",
+        )
+        val activePlan = explainPlan(
+            "SELECT id FROM photos WHERE deletion_status = 'none' " +
+                "AND missing_since IS NULL ORDER BY date_taken DESC LIMIT 5000",
+        )
+        val operationPlan = explainPlan(
+            "SELECT id FROM operation_history WHERE media_id = 42 AND media_type = 'photo' " +
+                "AND action = 'Delete' AND is_undone = 0 ORDER BY created_at DESC LIMIT 1",
+        )
+        val eventPlan = explainPlan(
+            "SELECT event_id FROM cleanup_events WHERE source_ref = 'op:1' " +
+                "AND reversal_of_event_id IS NULL ORDER BY occurred_at DESC LIMIT 1",
+        )
+
+        assertTrue(queuePlan, queuePlan.contains("index_photos_queue_date"))
+        assertTrue(activePlan, activePlan.contains("index_photos_active_date"))
+        assertTrue(operationPlan, operationPlan.contains("index_operation_history_media_action"))
+        assertTrue(eventPlan, eventPlan.contains("index_cleanup_events_source"))
     }
 
     @Test
@@ -274,4 +301,13 @@ class AppDatabaseTest {
         width = 1200,
         height = 900,
     )
+
+    private fun explainPlan(sql: String): String {
+        val cursor = database.openHelper.readableDatabase.query("EXPLAIN QUERY PLAN " + sql)
+        return cursor.use { rows ->
+            buildString {
+                while (rows.moveToNext()) append(rows.getString(3)).append('\n')
+            }
+        }
+    }
 }

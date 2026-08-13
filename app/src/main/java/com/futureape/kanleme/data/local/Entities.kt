@@ -14,7 +14,9 @@ import androidx.room.PrimaryKey
         Index("is_selfie"), Index("is_gif"), Index("is_raw"), Index("is_long_image"),
         Index("location_name"), Index("stable_media_key"), Index("missing_since"),
         Index(value = ["media_store_id"], unique = true),
-        Index(value = ["processing_status", "deletion_status"])
+        Index(name = "index_photos_active_date", value = ["deletion_status", "missing_since", "date_taken"]),
+        Index(name = "index_photos_queue_date", value = ["processing_status", "deletion_status", "missing_since", "date_taken"]),
+        Index(name = "index_photos_favorite_updated", value = ["processing_status", "deletion_status", "missing_since", "updated_at"]),
     ]
 )
 data class PhotoEntity(
@@ -81,7 +83,9 @@ data class PhotoEntity(
         Index("date_taken"), Index("folder_path"), Index("processing_status"),
         Index("deletion_status"), Index("stable_media_key"), Index("missing_since"),
         Index(value = ["media_store_id"], unique = true),
-        Index(value = ["processing_status", "deletion_status"])
+        Index(name = "index_videos_active_date", value = ["deletion_status", "missing_since", "date_taken"]),
+        Index(name = "index_videos_queue_date", value = ["processing_status", "deletion_status", "missing_since", "date_taken"]),
+        Index(name = "index_videos_favorite_updated", value = ["processing_status", "deletion_status", "missing_since", "updated_at"]),
     ]
 )
 data class VideoEntity(
@@ -226,6 +230,7 @@ data class AchievementProgressEntity(
         Index("occurred_at"),
         Index("operation_id"),
         Index("reversal_of_event_id"),
+        Index(name = "index_cleanup_events_source", value = ["source_ref", "reversal_of_event_id", "occurred_at"]),
     ],
 )
 data class CleanupEventEntity(
@@ -249,7 +254,15 @@ data class CleanupEventEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
 )
 
-@Entity(tableName = "operation_history", indices = [Index("created_at"), Index("media_type")])
+@Entity(
+    tableName = "operation_history",
+    indices = [
+        Index("created_at"),
+        Index("media_type"),
+        Index(name = "index_operation_history_undo", value = ["is_undone", "action", "media_type", "created_at"]),
+        Index(name = "index_operation_history_media_action", value = ["media_id", "media_type", "action", "is_undone", "created_at"]),
+    ],
+)
 data class OperationHistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "media_id") val mediaId: Long,
