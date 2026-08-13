@@ -136,6 +136,22 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun mediaSyncStatePersistsGenerationAndPermissionScope() = runBlocking {
+        val state = MediaSyncStateEntity(
+            syncKey = "external",
+            volumeName = "external",
+            mediaStoreVersion = "media-store-v1",
+            lastGeneration = 42L,
+            permissionScopeFingerprint = "images=true;videos=false;selected=true",
+            updatedAt = 1_700_000_001_000L,
+        )
+
+        database.mediaSyncStateDao().upsert(state)
+
+        assertEquals(state, database.mediaSyncStateDao().bySyncKey("external"))
+    }
+
+    @Test
     fun currentSchemaDoesNotCreateRemovedPlaceholderTables() {
         val cursor = database.openHelper.readableDatabase.query(
             "SELECT name FROM sqlite_master WHERE type = 'table'",

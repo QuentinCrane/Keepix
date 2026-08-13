@@ -74,6 +74,7 @@ docs/*
 !docs/performance_baseline.md
 !docs/baseline_profile_status.md
 !docs/startup_trace.md
+!docs/media_sync_state.md
 !docs/trash_retention_semantics.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md

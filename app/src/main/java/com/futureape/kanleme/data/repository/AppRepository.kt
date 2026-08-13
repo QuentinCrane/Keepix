@@ -103,6 +103,8 @@ data class MediaLibrarySyncOptions(
     val markMissingPhotos: Boolean = true,
     /** Mark unseen videos as missing only when the current permission covers all videos. */
     val markMissingVideos: Boolean = true,
+    /** Stable permission-scope snapshot used to distinguish a complete scan from a partial one. */
+    val permissionScopeFingerprint: String = "",
 )
 
 enum class SwipeAction { Keep, Favorite, Delete }

@@ -419,6 +419,15 @@ interface OperationDao {
     suspend fun markUndone(id: Long)
 }
 
+@Dao
+interface MediaSyncStateDao {
+    @Query("SELECT * FROM media_sync_state WHERE sync_key = :syncKey LIMIT 1")
+    suspend fun bySyncKey(syncKey: String): MediaSyncStateEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(state: MediaSyncStateEntity)
+}
+
 data class CleanupEventAggregate(
     @ColumnInfo(name = "photo_delta") val photoDelta: Long,
     @ColumnInfo(name = "video_delta") val videoDelta: Long,

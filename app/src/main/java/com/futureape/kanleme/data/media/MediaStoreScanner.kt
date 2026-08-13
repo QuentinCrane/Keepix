@@ -21,6 +21,12 @@ class MediaStoreScanner @Inject constructor(
     private val resolver: ContentResolver,
     @ApplicationContext private val context: Context,
 ) {
+    fun currentSyncSnapshot(): MediaStoreSyncSnapshot = MediaStoreSyncSnapshot(
+        volumeName = MediaStore.VOLUME_EXTERNAL,
+        mediaStoreVersion = MediaStore.getVersion(context),
+        generation = MediaStore.getGeneration(context, MediaStore.VOLUME_EXTERNAL),
+    )
+
     fun scanImages(limit: Int? = null): List<PhotoEntity> {
         val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(

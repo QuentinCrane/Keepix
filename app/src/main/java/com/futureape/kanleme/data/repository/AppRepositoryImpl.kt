@@ -17,6 +17,7 @@ import com.futureape.kanleme.data.local.SimilarAnalysisInputChangedException
 import com.futureape.kanleme.data.local.SimilarAnalysisRunResult
 import com.futureape.kanleme.data.local.SimilarAnalysisTaskEntity
 import com.futureape.kanleme.data.local.SimilarAnalysisTaskStatus
+import com.futureape.kanleme.data.local.MediaSyncStateEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.TrashRetentionPolicy
 import com.futureape.kanleme.data.local.UserStatsEntity
@@ -69,6 +70,7 @@ class AppRepositoryImpl @Inject constructor(
     private val statsDao = db.statsDao()
     private val similarDao = db.similarDao()
     private val operationDao = db.operationDao()
+    private val mediaSyncStateDao = db.mediaSyncStateDao()
 
     override fun observeDashboard(): Flow<DashboardStats> = combine(
         photoDao.observeCount().map { it as Any? },
@@ -262,6 +264,11 @@ class AppRepositoryImpl @Inject constructor(
         val scannedVideosRaw = videoScan.getOrElse { emptyList() }
         val (scannedPhotos, scannedVideos) = linkSeparateDynamicPhotoPairs(scannedPhotosRaw, scannedVideosRaw)
         val now = System.currentTimeMillis()
+        val syncSnapshot = if (photoScan.isSuccess && videoScan.isSuccess) {
+            runCatching { scanner.currentSyncSnapshot() }.getOrNull()
+        } else {
+            null
+        }
 
         val existingPhotos = if (scannedPhotos.isEmpty()) {
             emptyMap()
@@ -325,6 +332,18 @@ class AppRepositoryImpl @Inject constructor(
             if (videoScan.isSuccess) {
                 if (options.markMissingVideos) videoDao.markAllMissing(now)
                 if (mergedVideos.isNotEmpty()) videoDao.upsertAll(mergedVideos)
+            }
+            syncSnapshot?.let { snapshot ->
+                mediaSyncStateDao.upsert(
+                    MediaSyncStateEntity(
+                        syncKey = snapshot.volumeName,
+                        volumeName = snapshot.volumeName,
+                        mediaStoreVersion = snapshot.mediaStoreVersion,
+                        lastGeneration = snapshot.generation,
+                        permissionScopeFingerprint = options.permissionScopeFingerprint,
+                        updatedAt = now,
+                    ),
+                )
             }
         }
                 mergedPhotos.size to mergedVideos.size

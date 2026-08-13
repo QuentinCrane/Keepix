@@ -263,6 +263,16 @@ data class OperationHistoryEntity(
     @ColumnInfo(name = "is_undone") val isUndone: Boolean = false,
 )
 
+@Entity(tableName = "media_sync_state")
+data class MediaSyncStateEntity(
+    @PrimaryKey @ColumnInfo(name = "sync_key") val syncKey: String,
+    @ColumnInfo(name = "volume_name") val volumeName: String,
+    @ColumnInfo(name = "media_store_version") val mediaStoreVersion: String,
+    @ColumnInfo(name = "last_generation") val lastGeneration: Long,
+    @ColumnInfo(name = "permission_scope_fingerprint") val permissionScopeFingerprint: String,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+)
+
 object ProcessingStatus {
     const val UNPROCESSED = "unprocessed"
     const val KEPT = "kept"

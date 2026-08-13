@@ -16,8 +16,9 @@ import androidx.room.RoomDatabase
         CleanupEventEntity::class,
         OperationHistoryEntity::class,
         SimilarAnalysisTaskEntity::class,
+        MediaSyncStateEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,4 +28,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun trashDao(): TrashDao
     abstract fun statsDao(): StatsDao
     abstract fun operationDao(): OperationDao
+    abstract fun mediaSyncStateDao(): MediaSyncStateDao
 }
