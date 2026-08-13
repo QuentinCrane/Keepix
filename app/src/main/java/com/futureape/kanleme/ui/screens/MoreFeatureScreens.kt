@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -40,11 +41,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -443,12 +447,51 @@ private fun todayStatusText(status: String): String = when (status) {
 @Composable
 fun AnnualReportScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
     val report by viewModel.annualReport.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { viewModel.buildAnnualReport() }
+    val currentYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
+    var selectedYear by rememberSaveable { mutableStateOf(currentYear) }
+    var yearMenuExpanded by remember { mutableStateOf(false) }
+    val availableYears = remember(currentYear) { (currentYear downTo (currentYear - 5)).toList() }
+    LaunchedEffect(selectedYear) { viewModel.buildAnnualReport(selectedYear) }
     Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
         ScreenHeader("年度报告", "生成本地整理总结，不上传任何数据", onBack)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("报告年份", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Box {
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { yearMenuExpanded = true },
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text("${selectedYear}年", style = MaterialTheme.typography.labelLarge)
+                        Icon(Icons.Rounded.ExpandMore, contentDescription = null)
+                    }
+                }
+                DropdownMenu(expanded = yearMenuExpanded, onDismissRequest = { yearMenuExpanded = false }) {
+                    availableYears.forEach { year ->
+                        DropdownMenuItem(
+                            text = { Text("${year}年") },
+                            onClick = {
+                                selectedYear = year
+                                yearMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+        }
         val r = report
         if (r == null) {
-            EmptyState("正在生成年度报告", "首次生成需要读取本地统计。", "刷新", { viewModel.buildAnnualReport() }, modifier = Modifier.padding(18.dp))
+            EmptyState("正在生成年度报告", "正在读取 ${selectedYear} 年的本地事件。", "刷新", { viewModel.buildAnnualReport(selectedYear) }, modifier = Modifier.padding(18.dp))
         } else {
             LazyColumn(contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 item {
@@ -471,9 +514,40 @@ fun AnnualReportScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                 item {
                     GlassSurface(modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            ReportLine(Icons.Rounded.AutoGraph, "整理动作", r.actionCount.toString())
                             ReportLine(Icons.Rounded.Favorite, "收藏", r.favoriteCount.toString())
+                            ReportLine(Icons.Rounded.Delete, "放入回收站", r.deletedCount.toString())
+                            ReportLine(Icons.Rounded.CheckCircle, "恢复", r.restoredCount.toString())
                             ReportLine(Icons.Rounded.Storage, "释放空间", formatSize(r.freedBytes))
                             ReportLine(Icons.Rounded.Folder, "最常整理文件夹", r.topFolder)
+                        }
+                    }
+                }
+                item {
+                    GlassSurface(modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("月度整理趋势", style = MaterialTheme.typography.titleMedium)
+                            val maxMonthly = r.monthlyClearedCounts.maxOrNull()?.coerceAtLeast(1) ?: 1
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(
+                                    r.monthlyClearedCounts.mapIndexed { index, count -> index to count },
+                                    key = { it.first },
+                                ) { (index, count) ->
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(5.dp),
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(20.dp)
+                                                .height((18f + (count.toFloat() / maxMonthly * 72f)).dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = if (count == 0) 0.16f else 0.82f)),
+                                        )
+                                        Text("${index + 1}月", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
                         }
                     }
                 }

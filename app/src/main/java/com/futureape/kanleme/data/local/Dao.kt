@@ -1,5 +1,6 @@
 package com.futureape.kanleme.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -418,6 +419,29 @@ interface OperationDao {
     suspend fun markUndone(id: Long)
 }
 
+data class CleanupEventAggregate(
+    @ColumnInfo(name = "photo_delta") val photoDelta: Long,
+    @ColumnInfo(name = "video_delta") val videoDelta: Long,
+    @ColumnInfo(name = "favorite_delta") val favoriteDelta: Long,
+    @ColumnInfo(name = "size_delta_bytes") val sizeDeltaBytes: Long,
+    @ColumnInfo(name = "action_count") val actionCount: Long,
+)
+
+data class CleanupEventDeletionAggregate(
+    @ColumnInfo(name = "moved_to_trash_count") val movedToTrashCount: Long,
+    @ColumnInfo(name = "restored_count") val restoredCount: Long,
+)
+
+data class CleanupEventMonthAggregate(
+    val month: String,
+    @ColumnInfo(name = "cleared_count") val clearedCount: Long,
+)
+
+data class CleanupEventFolderAggregate(
+    @ColumnInfo(name = "folder_path") val folderPath: String,
+    @ColumnInfo(name = "affected_count") val affectedCount: Long,
+)
+
 @Dao
 interface StatsDao {
     @Query("SELECT * FROM user_stats WHERE id = 1")
@@ -463,4 +487,47 @@ interface StatsDao {
 
     @Query("SELECT MAX(0, CAST(COALESCE(SUM(action_count), 0) AS INTEGER)) FROM cleanup_events WHERE local_date = :localDate")
     fun observeTodayActionCount(localDate: String): Flow<Int>
+
+    @Query("""
+        SELECT
+            COALESCE(SUM(photo_delta), 0) AS photo_delta,
+            COALESCE(SUM(video_delta), 0) AS video_delta,
+            COALESCE(SUM(favorite_delta), 0) AS favorite_delta,
+            COALESCE(SUM(size_delta_bytes), 0) AS size_delta_bytes,
+            COALESCE(SUM(action_count), 0) AS action_count
+        FROM cleanup_events
+        WHERE occurred_at >= :startMillis AND occurred_at < :endMillis
+    """)
+    suspend fun aggregateEvents(startMillis: Long, endMillis: Long): CleanupEventAggregate
+
+    @Query("""
+        SELECT
+            COALESCE(SUM(CASE WHEN event_type = 'moved_to_app_trash' THEN affected_media_count ELSE 0 END), 0) AS moved_to_trash_count,
+            COALESCE(SUM(CASE WHEN event_type = 'restored' THEN affected_media_count ELSE 0 END), 0) AS restored_count
+        FROM cleanup_events
+        WHERE occurred_at >= :startMillis AND occurred_at < :endMillis
+    """)
+    suspend fun aggregateDeletionEvents(startMillis: Long, endMillis: Long): CleanupEventDeletionAggregate
+
+    @Query("""
+        SELECT substr(local_date, 6, 2) AS month,
+            COALESCE(SUM(photo_delta + video_delta), 0) AS cleared_count
+        FROM cleanup_events
+        WHERE occurred_at >= :startMillis AND occurred_at < :endMillis
+        GROUP BY substr(local_date, 6, 2)
+        ORDER BY month
+    """)
+    suspend fun monthlyEventCounts(startMillis: Long, endMillis: Long): List<CleanupEventMonthAggregate>
+
+    @Query("""
+        SELECT folder_path, SUM(affected_media_count) AS affected_count
+        FROM cleanup_events
+        WHERE occurred_at >= :startMillis AND occurred_at < :endMillis
+          AND folder_path IS NOT NULL AND folder_path != ''
+          AND event_type IN ('kept', 'favorited', 'moved_to_app_trash', 'archived_moved')
+        GROUP BY folder_path
+        ORDER BY affected_count DESC, folder_path ASC
+        LIMIT 1
+    """)
+    suspend fun topFolderForPeriod(startMillis: Long, endMillis: Long): CleanupEventFolderAggregate?
 }

@@ -1342,24 +1342,56 @@ class AppRepositoryImpl @Inject constructor(
     }
 
     override suspend fun buildAnnualReport(year: Int): AnnualReport = withContext(Dispatchers.IO) {
-        val dashboard = observeDashboard().first()
-        val stats = dashboard.userStats
-        val folders = photoDao.allActive(3000).groupBy { it.folderName }.maxByOrNull { it.value.size }?.key ?: "Camera"
+        val window = localYearWindow(year)
+        val totals = statsDao.aggregateEvents(window.startMillis, window.endMillis)
+        val deletionTotals = statsDao.aggregateDeletionEvents(window.startMillis, window.endMillis)
+        val monthlyTotals = statsDao.monthlyEventCounts(window.startMillis, window.endMillis)
+        val topFolder = statsDao.topFolderForPeriod(window.startMillis, window.endMillis)
+        val photoCount = totals.photoDelta.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val videoCount = totals.videoDelta.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val clearedCount = (photoCount.toLong() + videoCount).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val favoriteCount = totals.favoriteDelta.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val deletedCount = (deletionTotals.movedToTrashCount - deletionTotals.restoredCount)
+            .coerceAtLeast(0L)
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+        val restoredCount = deletionTotals.restoredCount.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val actionCount = totals.actionCount.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val monthlyClearedCounts = MutableList(12) { 0 }
+        monthlyTotals.forEach { month ->
+            val index = month.month.toIntOrNull()?.minus(1)
+            if (index != null && index in monthlyClearedCounts.indices) {
+                monthlyClearedCounts[index] = month.clearedCount.coerceAtLeast(0L)
+                    .coerceAtMost(Int.MAX_VALUE.toLong())
+                    .toInt()
+            }
+        }
+        val hasData = actionCount > 0 || favoriteCount > 0 || clearedCount > 0 || deletedCount > 0 || restoredCount > 0
+        val folder = topFolder?.folderPath?.takeIf { it.isNotBlank() } ?: "暂无数据"
         AnnualReport(
             year = year,
-            photoCount = dashboard.photoCount,
-            videoCount = dashboard.videoCount,
-            clearedCount = dashboard.processedCount,
-            favoriteCount = dashboard.favoriteCount,
-            deletedCount = dashboard.pendingDeleteCount,
-            freedBytes = stats?.totalStorageFreed ?: 0L,
-            topFolder = folders,
+            photoCount = photoCount,
+            videoCount = videoCount,
+            clearedCount = clearedCount,
+            favoriteCount = favoriteCount,
+            deletedCount = deletedCount,
+            freedBytes = totals.sizeDeltaBytes.coerceAtLeast(0L),
+            topFolder = folder,
             styleTitle = when {
-                dashboard.favoriteCount > dashboard.pendingDeleteCount -> "珍藏型整理者"
-                dashboard.pendingDeleteCount > dashboard.favoriteCount * 2 -> "果断型整理者"
+                !hasData -> "这一年还没有整理记录"
+                favoriteCount > deletedCount -> "珍藏型整理者"
+                deletedCount > favoriteCount * 2 -> "果断型整理者"
                 else -> "稳健型整理者"
             },
-            styleDescription = "这一年你更常整理 ${folders}，已处理 ${dashboard.processedCount} 个媒体文件。",
+            styleDescription = if (hasData) {
+                "这一年记录了 ${actionCount} 次本地整理动作，处理 ${clearedCount} 个媒体文件，最常涉及 ${folder}。"
+            } else {
+                "这一年还没有可核对的本地整理事件，已有数据不会被当前媒体库状态冒充。"
+            },
+            actionCount = actionCount,
+            restoredCount = restoredCount,
+            monthlyClearedCounts = monthlyClearedCounts,
+            hasData = hasData,
         )
     }
 

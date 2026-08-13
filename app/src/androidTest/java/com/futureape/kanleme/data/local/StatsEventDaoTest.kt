@@ -14,6 +14,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.LocalDate
+import java.time.ZoneId
 
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -82,6 +84,45 @@ class StatsEventDaoTest {
         assertNotNull(dao.eventBySourceRef("operation:1"))
     }
 
+    @Test
+    fun annualAggregatesUseAHalfOpenWindowAndReturnEmptyPeriodsHonestly() = runBlocking {
+        val zone = ZoneId.of("Asia/Shanghai")
+        val start = LocalDate.of(2024, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val end = LocalDate.of(2025, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val dao = database.statsDao()
+        dao.insertCleanupEvent(event(
+            id = "inside-year",
+            type = CleanupEventType.KEPT,
+            operationId = 11L,
+            mediaType = "photo",
+            photoDelta = 1,
+            sourceRef = "operation:11",
+            localDate = "2024-02-29",
+            occurredAt = start + 1_000L,
+        ))
+        dao.insertCleanupEvent(event(
+            id = "at-next-year",
+            type = CleanupEventType.KEPT,
+            operationId = 12L,
+            mediaType = "photo",
+            photoDelta = 1,
+            sourceRef = "operation:12",
+            localDate = "2025-01-01",
+            occurredAt = end,
+        ))
+
+        val aggregate = dao.aggregateEvents(start, end)
+        val months = dao.monthlyEventCounts(start, end)
+        val folder = dao.topFolderForPeriod(start, end)
+        val empty = dao.aggregateEvents(end, end + 365L * 24L * 60L * 60L * 1_000L)
+
+        assertEquals(1L, aggregate.photoDelta)
+        assertEquals("02", months.single().month)
+        assertEquals("Pictures/Keepix/", folder?.folderPath)
+        assertEquals(0L, empty.photoDelta)
+        assertEquals(0L, empty.actionCount)
+    }
+
     private fun event(
         id: String,
         type: String,
@@ -93,6 +134,7 @@ class StatsEventDaoTest {
         sourceRef: String,
         reversalOfEventId: String? = null,
         localDate: String = "2026-08-13",
+        occurredAt: Long = 1_755_033_600_000L,
     ) = CleanupEventEntity(
         eventId = id,
         eventType = type,
@@ -106,11 +148,11 @@ class StatsEventDaoTest {
         favoriteDelta = favoriteDelta,
         actionCount = 1,
         localDate = localDate,
-        occurredAt = 1_755_033_600_000L,
+        occurredAt = occurredAt,
         sourceType = CleanupEventSourceType.ORGANIZER,
         sourceRef = sourceRef,
         reversalOfEventId = reversalOfEventId,
         folderPath = "Pictures/Keepix/",
-        createdAt = 1_755_033_600_000L,
+        createdAt = occurredAt,
     )
 }

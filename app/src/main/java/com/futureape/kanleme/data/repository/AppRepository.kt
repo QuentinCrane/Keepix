@@ -74,6 +74,10 @@ data class AnnualReport(
     val topFolder: String,
     val styleTitle: String,
     val styleDescription: String,
+    val actionCount: Int = 0,
+    val restoredCount: Int = 0,
+    val monthlyClearedCounts: List<Int> = emptyList(),
+    val hasData: Boolean = false,
 )
 
 data class AchievementUi(
