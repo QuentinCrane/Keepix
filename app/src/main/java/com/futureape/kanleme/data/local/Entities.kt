@@ -136,18 +136,6 @@ data class PhotoFingerprintEntity(
     @ColumnInfo(name = "computed_at") val computedAt: Long,
 )
 
-@Entity(
-    tableName = "lsh_buckets",
-    primaryKeys = ["table_index", "bucket_key", "photo_id"],
-    foreignKeys = [ForeignKey(entity = PhotoFingerprintEntity::class, parentColumns = ["photo_id"], childColumns = ["photo_id"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index("photo_id"), Index(value = ["table_index", "bucket_key"])]
-)
-data class LshBucketEntity(
-    @ColumnInfo(name = "table_index") val tableIndex: Int,
-    @ColumnInfo(name = "bucket_key") val bucketKey: Long,
-    @ColumnInfo(name = "photo_id") val photoId: Long,
-)
-
 @Entity(tableName = "similar_groups", indices = [Index("created_at"), Index("type")])
 data class SimilarGroupEntity(
     @PrimaryKey val id: String,
@@ -195,50 +183,6 @@ data class TrashItemEntity(
     val reviewDueAt: Long
         get() = autoDeleteAt
 }
-
-@Entity(tableName = "folder_filters")
-data class FolderFilterEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    @ColumnInfo(name = "folder_path") val folderPath: String,
-    @ColumnInfo(name = "folder_name") val folderName: String,
-    @ColumnInfo(name = "is_enabled") val isEnabled: Boolean,
-)
-
-@Entity(tableName = "folder_usage")
-data class FolderUsageEntity(
-    @PrimaryKey @ColumnInfo(name = "folder_path") val folderPath: String,
-    @ColumnInfo(name = "folder_name") val folderName: String,
-    @ColumnInfo(name = "last_used_at") val lastUsedAt: Long,
-    @ColumnInfo(name = "usage_count") val usageCount: Int,
-    @ColumnInfo(name = "photo_last_used_at") val photoLastUsedAt: Long? = null,
-    @ColumnInfo(name = "photo_usage_count") val photoUsageCount: Int = 0,
-    @ColumnInfo(name = "video_last_used_at") val videoLastUsedAt: Long? = null,
-    @ColumnInfo(name = "video_usage_count") val videoUsageCount: Int = 0,
-    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
-)
-
-@Entity(tableName = "swipe_statistics")
-data class SwipeStatisticsEntity(
-    @PrimaryKey val date: String,
-    @ColumnInfo(name = "swipe_count") val swipeCount: Int = 0,
-    @ColumnInfo(name = "keep_count") val keepCount: Int = 0,
-    @ColumnInfo(name = "favorite_count") val favoriteCount: Int = 0,
-    @ColumnInfo(name = "delete_count") val deleteCount: Int = 0,
-    @ColumnInfo(name = "undo_count") val undoCount: Int = 0,
-    @ColumnInfo(name = "session_minutes") val sessionMinutes: Int = 0,
-    @ColumnInfo(name = "night_swipe_count") val nightSwipeCount: Int = 0,
-    @ColumnInfo(name = "deleted_size_bytes") val deletedSizeBytes: Long = 0,
-    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
-    @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),
-)
-
-@Entity(tableName = "swipe_stat_sessions", indices = [Index("date")])
-data class SwipeStatSessionEntity(
-    @PrimaryKey @ColumnInfo(name = "session_id") val sessionId: String,
-    val date: String,
-    @ColumnInfo(name = "source_type") val sourceType: String,
-    @ColumnInfo(name = "created_at") val createdAt: Long,
-)
 
 @Entity(tableName = "user_stats")
 data class UserStatsEntity(
@@ -303,31 +247,6 @@ data class CleanupEventEntity(
     @ColumnInfo(name = "reversal_of_event_id") val reversalOfEventId: String? = null,
     @ColumnInfo(name = "folder_path") val folderPath: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: Long,
-)
-
-@Entity(tableName = "backup_import_audit_logs", indices = [Index("backup_file_id"), Index("created_at")])
-data class BackupImportAuditLogEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    @ColumnInfo(name = "backup_file_id") val backupFileId: String,
-    @ColumnInfo(name = "event_type") val eventType: String,
-    val detail: String,
-    @ColumnInfo(name = "created_at") val createdAt: Long,
-)
-
-@Entity(tableName = "device_model_cache", primaryKeys = ["model_norm", "brand_norm", "language_tag"])
-data class DeviceModelCacheEntity(
-    @ColumnInfo(name = "model_norm") val modelNorm: String,
-    @ColumnInfo(name = "brand_norm") val brandNorm: String,
-    @ColumnInfo(name = "language_tag") val languageTag: String,
-    @ColumnInfo(name = "display_name") val displayName: String? = null,
-    @ColumnInfo(name = "brand_display") val brandDisplay: String? = null,
-    @ColumnInfo(name = "fallback_name") val fallbackName: String? = null,
-    @ColumnInfo(name = "source_type") val sourceType: String? = null,
-    val confidence: Double? = null,
-    @ColumnInfo(name = "data_version") val dataVersion: String? = null,
-    @ColumnInfo(name = "last_hit") val lastHit: Long = 0,
-    @ColumnInfo(name = "last_lookup_at") val lastLookupAt: Long = 0,
-    @ColumnInfo(name = "updated_at") val updatedAt: Long = 0,
 )
 
 @Entity(tableName = "operation_history", indices = [Index("created_at"), Index("media_type")])

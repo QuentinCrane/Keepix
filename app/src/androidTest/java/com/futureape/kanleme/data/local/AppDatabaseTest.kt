@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
@@ -132,6 +133,29 @@ class AppDatabaseTest {
         assertEquals(24, restored?.cursor)
         assertEquals("media-v1", restored?.mediaVersion)
         assertEquals("run-1", restored?.runToken)
+    }
+
+    @Test
+    fun currentSchemaDoesNotCreateRemovedPlaceholderTables() {
+        val cursor = database.openHelper.readableDatabase.query(
+            "SELECT name FROM sqlite_master WHERE type = 'table'",
+        )
+        val tables = buildSet {
+            while (cursor.moveToNext()) add(cursor.getString(0))
+        }
+        cursor.close()
+
+        listOf(
+            "lsh_buckets",
+            "folder_filters",
+            "folder_usage",
+            "swipe_statistics",
+            "swipe_stat_sessions",
+            "backup_import_audit_logs",
+            "device_model_cache",
+        ).forEach { removedTable ->
+            assertFalse("removed table must not be created: $removedTable", removedTable in tables)
+        }
     }
 
     @Test
