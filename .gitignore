@@ -84,6 +84,7 @@ docs/*
 !docs/motion_photo_fixtures.md
 !docs/video_playback_trace.md
 !docs/compose_performance_contract.md
+!docs/apk_size_report.md
 !docs/trash_retention_semantics.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md

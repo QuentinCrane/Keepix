@@ -4,6 +4,3 @@
 # Preserve app entry point names for easier crash-log reading.
 -keep class com.futureape.kanleme.KanlemeApplication { *; }
 -keep class com.futureape.kanleme.MainActivity { *; }
-
-# MediaStore/EXIF helpers sometimes surface reflective warnings through platform code; do not warn on them.
--dontwarn androidx.exifinterface.**

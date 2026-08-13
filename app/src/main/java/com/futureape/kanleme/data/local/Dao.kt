@@ -388,9 +388,6 @@ interface SimilarDao {
     @Query("SELECT photo_id FROM photo_fingerprints")
     suspend fun fingerprintedIds(): List<Long>
 
-    @Query("SELECT * FROM photo_fingerprints")
-    suspend fun allFingerprints(): List<PhotoFingerprintEntity>
-
     @Query("SELECT * FROM photo_fingerprints WHERE photo_id IN (:photoIds)")
     suspend fun fingerprintsByPhotoIds(photoIds: List<Long>): List<PhotoFingerprintEntity>
 
