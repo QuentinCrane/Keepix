@@ -109,7 +109,7 @@ fun OrganizerProgressPill(
                 )
                 if (!compact) {
                     Text(
-                        "剩余 " + remainingCount + " " + remainingLabel + " · 可释放 " + formatSize(releasableBytes),
+                        stringResource(R.string.organizer_progress_summary, remainingCount, remainingLabel, formatSize(releasableBytes)),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -188,12 +188,12 @@ fun OrganizerDatePickerOverlay(
                     )
                 }
                 TextButton(onClick = { onApply("all"); onDismiss() }) {
-                    Text("全部")
+                    Text(stringResource(R.string.photo_filter_all))
                 }
             }
 
             Text(
-                "选择年份",
+                stringResource(R.string.organizer_select_year),
                 modifier = Modifier.padding(top = 18.dp, bottom = 10.dp),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
@@ -446,22 +446,23 @@ fun OrganizerFolderPickerOverlay(
 fun folderLabel(path: String): String =
     path.trim('/').substringAfterLast('/').ifBlank { "相册" }
 
+@Composable
 fun organizerDateModeLabel(mode: String): String = when {
-    mode == "all" -> "全部时间"
-    mode == "seven_days" -> "最近 7 天"
-    mode == "month" -> "本月"
-    mode == "year" -> "今年"
-    mode.startsWith("y:") -> mode.removePrefix("y:") + " 年"
+    mode == "all" -> stringResource(R.string.organizer_date_all)
+    mode == "seven_days" -> stringResource(R.string.organizer_date_recent_days, 7)
+    mode == "month" -> stringResource(R.string.organizer_date_month)
+    mode == "year" -> stringResource(R.string.organizer_date_year, Calendar.getInstance().get(Calendar.YEAR))
+    mode.startsWith("y:") -> mode.removePrefix("y:").toIntOrNull()?.let { stringResource(R.string.organizer_date_year, it) } ?: mode.removePrefix("y:")
     mode.startsWith("ym:") -> {
         val parts = mode.removePrefix("ym:").split("-")
-        val year = parts.getOrNull(0).orEmpty()
-        val month = parts.getOrNull(1).orEmpty().toIntOrNull()?.toString().orEmpty()
-        if (year.isNotBlank() && month.isNotBlank()) year + " 年 " + month + " 月" else "指定月份"
+        val year = parts.getOrNull(0).orEmpty().toIntOrNull()
+        val month = parts.getOrNull(1).orEmpty().toIntOrNull()
+        if (year != null && month != null) stringResource(R.string.organizer_date_year_month, year, month) else stringResource(R.string.organizer_date_specified_month)
     }
     mode.startsWith("d:") -> mode.removePrefix("d:").replace("-", "/")
-    mode.startsWith("multiym:") -> "多选月份 " + mode.removePrefix("multiym:").split(",").count { it.isNotBlank() }
-    mode == "today_history" -> "那年今日"
-    else -> "全部时间"
+    mode.startsWith("multiym:") -> stringResource(R.string.organizer_date_multi_months, mode.removePrefix("multiym:").split(",").count { it.isNotBlank() })
+    mode == "today_history" -> stringResource(R.string.organizer_date_today_history)
+    else -> stringResource(R.string.organizer_date_all)
 }
 
 fun actionFeedbackColor(action: SwipeAction?, fallback: Color): Color = when (action) {

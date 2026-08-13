@@ -63,6 +63,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -112,7 +113,6 @@ import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.util.sharePhoto
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
-import com.futureape.kanleme.ui.i18n.Text
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -147,15 +147,31 @@ fun PhotoCleanScreen(
     val haptics = rememberHapticKit(settings)
     val displayOptions = settings.toPhotoCleanDisplayOptions()
     val runtimePolicy = settings.toPhotoCleanRuntimePolicy()
-    val photoMediaFilters = remember(typeStats) {
+    val allFilterLabel = stringResource(R.string.photo_filter_all)
+    val normalFilterLabel = stringResource(R.string.photo_filter_normal)
+    val screenshotFilterLabel = stringResource(R.string.photo_filter_screenshot)
+    val selfieFilterLabel = stringResource(R.string.photo_filter_selfie)
+    val motionFilterLabel = stringResource(R.string.photo_filter_motion)
+    val gifFilterLabel = stringResource(R.string.photo_filter_gif)
+    val longImageFilterLabel = stringResource(R.string.photo_filter_long_image)
+    val photoMediaFilters = remember(
+        typeStats,
+        allFilterLabel,
+        normalFilterLabel,
+        screenshotFilterLabel,
+        selfieFilterLabel,
+        motionFilterLabel,
+        gifFilterLabel,
+        longImageFilterLabel,
+    ) {
         listOf(
-            "全部" to typeStats.all.toString(),
-            "普通" to typeStats.normal.toString(),
-            "截图" to typeStats.screenshot.toString(),
-            "自拍" to typeStats.selfie.toString(),
-            "实况" to typeStats.motion.toString(),
-            "GIF" to typeStats.gif.toString(),
-            "长图" to typeStats.longImage.toString(),
+            allFilterLabel to typeStats.all.toString(),
+            normalFilterLabel to typeStats.normal.toString(),
+            screenshotFilterLabel to typeStats.screenshot.toString(),
+            selfieFilterLabel to typeStats.selfie.toString(),
+            motionFilterLabel to typeStats.motion.toString(),
+            gifFilterLabel to typeStats.gif.toString(),
+            longImageFilterLabel to typeStats.longImage.toString(),
         )
     }
     val selectedMediaIndex = PHOTO_MEDIA_FILTER_TYPES.indexOf(scope.mediaType).coerceAtLeast(0)
@@ -358,13 +374,13 @@ fun PhotoCleanScreen(
             ) {
                 CircularProgressIndicator(color = Color.White.copy(alpha = 0.86f), strokeWidth = 3.dp)
                 Text(
-                    "正在准备整理队列",
+                    stringResource(R.string.photo_queue_preparing),
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White.copy(alpha = 0.82f),
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "预览队列会优先进入，完整队列随后补齐",
+                    stringResource(R.string.photo_queue_preview),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.50f),
                     textAlign = TextAlign.Center,
@@ -394,13 +410,13 @@ fun PhotoCleanScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    "当前没有待整理照片",
+                    stringResource(R.string.photo_queue_empty_title),
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "可以回到首页调整整理范围",
+                    stringResource(R.string.photo_queue_empty_body),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.58f),
                     textAlign = TextAlign.Center,
@@ -524,14 +540,14 @@ fun PhotoCleanScreen(
             }
             OrganizerDatePickerAnimatedOverlay(
                 visible = showDatePicker,
-                title = "照片时间筛选",
+                title = stringResource(R.string.photo_date_filter_title),
                 currentMode = scope.dateMode,
                 onApply = { mode -> haptics.tick(); viewModel.setPhotoSessionDateMode(mode) },
                 onDismiss = { showDatePicker = false },
             )
             OrganizerFolderPickerOverlay(
                 visible = showFolderPicker,
-                title = "归档当前照片",
+                title = stringResource(R.string.photo_archive_current_title),
                 folders = folders.ifEmpty { listOf("DCIM/Camera/", "Pictures/", "Download/") },
                 onArchive = { path -> haptics.keep(); viewModel.archivePhotoToFolder(currentPhoto, path) },
                 onDismiss = { showFolderPicker = false },
@@ -632,9 +648,13 @@ private fun PhotoBatchSummaryOverlay(
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
                     verticalArrangement = Arrangement.spacedBy(13.dp),
                 ) {
-                    val releaseText = if (summary.deleted > 0) "预计释放 " + formatSize(summary.deletedBytes) else "暂无待释放空间"
-                    val summaryText = "已整理 " + summary.total + " 张 · 待删 " + summary.deleted + " 张 · " + releaseText
-                    Text("本轮整理完成", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                    val releaseText = if (summary.deleted > 0) {
+                        stringResource(R.string.photo_batch_release_estimate, formatSize(summary.deletedBytes))
+                    } else {
+                        stringResource(R.string.photo_batch_no_release)
+                    }
+                    val summaryText = stringResource(R.string.photo_batch_summary, summary.total, summary.deleted, releaseText)
+                    Text(stringResource(R.string.photo_batch_complete), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                     Text(
                         summaryText,
                         style = MaterialTheme.typography.bodyLarge,
@@ -649,23 +669,23 @@ private fun PhotoBatchSummaryOverlay(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (summary.lastAction != null) {
-                            PhotoBatchQuietTextButton(text = "撤回最后一张", onClick = onUndoLast)
+                            PhotoBatchQuietTextButton(text = stringResource(R.string.photo_batch_undo_last), onClick = onUndoLast)
                         } else {
                             Spacer(Modifier.width(1.dp))
                         }
                         if (summary.deleted > 0) {
-                            PhotoBatchQuietTextButton(text = "查看待删", onClick = onOpenTrash)
+                            PhotoBatchQuietTextButton(text = stringResource(R.string.photo_batch_view_trash), onClick = onOpenTrash)
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         PhotoBatchSummaryAction(
-                            text = "继续整理",
+                            text = stringResource(R.string.photo_batch_continue),
                             primary = true,
                             modifier = Modifier.weight(1f),
                             onClick = onContinue,
                         )
                         PhotoBatchSummaryAction(
-                            text = "回首页",
+                            text = stringResource(R.string.photo_batch_home),
                             primary = false,
                             modifier = Modifier.weight(1f),
                             onClick = onBackHome,
@@ -779,8 +799,8 @@ private enum class PhotoGuideTarget { TopBar, PhotoCard, BottomInfo, AlbumButton
 
 private data class PositionGuideStep(
     val target: PhotoGuideTarget,
-    val title: String,
-    val body: String,
+    @androidx.annotation.StringRes val title: Int,
+    @androidx.annotation.StringRes val body: Int,
 )
 
 @Composable
@@ -792,23 +812,23 @@ private fun PhotoPositionGuideOverlay(
     val steps = listOf(
         PositionGuideStep(
             target = PhotoGuideTarget.TopBar,
-            title = "顶部操作栏",
-            body = "这里是一行核心动作：保留、重新随机、图片筛选、时间筛选和剩余数量。筛选点开才展开。",
+            title = R.string.photo_guide_top_title,
+            body = R.string.photo_guide_top_body,
         ),
         PositionGuideStep(
             target = PhotoGuideTarget.PhotoCard,
-            title = "中间照片卡片",
-            body = "点按图片进入大图；明显左右滑是保留，明显上下滑才会收藏或待删。斜向拖动不会轻易触发破坏性操作。",
+            title = R.string.photo_guide_card_title,
+            body = R.string.photo_guide_card_body,
         ),
         PositionGuideStep(
             target = PhotoGuideTarget.BottomInfo,
-            title = "底部图片信息",
-            body = "这里集中显示拍摄时间、文件夹、类型、大小和剩余数量；点按信息条也能进入大图查看细节。",
+            title = R.string.photo_guide_info_title,
+            body = R.string.photo_guide_info_body,
         ),
         PositionGuideStep(
             target = PhotoGuideTarget.AlbumButton,
-            title = "相册按钮",
-            body = "点击相册可以展开目标文件夹，选择后保留/收藏会按设置自动归档。",
+            title = R.string.photo_guide_album_title,
+            body = R.string.photo_guide_album_body,
         ),
     )
     val step = steps[stepIndex.coerceIn(0, steps.lastIndex)]
@@ -868,18 +888,18 @@ private fun PhotoPositionGuideOverlay(
                 shadowElevation = 8.dp,
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("步骤 " + (stepIndex + 1) + "/" + steps.size, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    Text(step.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(step.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.photo_guide_step, stepIndex + 1, steps.size), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(step.title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(stringResource(step.body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         if (stepIndex > 0) {
-                            Button(onClick = { stepIndex -= 1 }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text("上一步") }
+                            Button(onClick = { stepIndex -= 1 }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text(stringResource(R.string.onboarding_previous)) }
                         }
                         Button(
                             onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(999.dp),
-                        ) { Text(if (stepIndex < steps.lastIndex) "下一步" else "知道了") }
+                        ) { Text(stringResource(if (stepIndex < steps.lastIndex) R.string.onboarding_next else R.string.photo_guide_done)) }
                     }
                 }
             }
@@ -908,7 +928,7 @@ private fun PhotoOrganizerTopControls(
 ) {
     var openPanel by remember { mutableStateOf<PhotoQuickPanel?>(null) }
     val dateLabel = organizerDateModeLabel(dateMode)
-    val mediaLabel = mediaCounts.getOrNull(selectedMediaIndex)?.first ?: "全部"
+    val mediaLabel = mediaCounts.getOrNull(selectedMediaIndex)?.first ?: stringResource(R.string.photo_filter_all)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = modifier.fillMaxWidth()) {
         Row(
@@ -918,8 +938,8 @@ private fun PhotoOrganizerTopControls(
         ) {
             if (showShuffle) {
                 CompactControlPill(
-                    title = "重新随机",
-                    subtitle = if (randomEnabled) "已随机" else "随机",
+                    title = stringResource(R.string.photo_shuffle_title),
+                    subtitle = stringResource(if (randomEnabled) R.string.photo_shuffle_enabled else R.string.photo_shuffle_disabled),
                     icon = Icons.Rounded.Swipe,
                     selected = randomEnabled,
                     onClick = onShuffle,
@@ -927,14 +947,14 @@ private fun PhotoOrganizerTopControls(
             }
             if (showFilters) {
                 CompactControlPill(
-                    title = "图片筛选",
+                    title = stringResource(R.string.photo_filter_title),
                     subtitle = mediaLabel,
                     icon = Icons.Rounded.FilterAlt,
                     selected = openPanel == PhotoQuickPanel.MEDIA,
                     onClick = { openPanel = if (openPanel == PhotoQuickPanel.MEDIA) null else PhotoQuickPanel.MEDIA },
                 )
                 CompactControlPill(
-                    title = "时间筛选",
+                    title = stringResource(R.string.photo_date_filter),
                     subtitle = dateLabel,
                     icon = Icons.Rounded.CalendarToday,
                     selected = dateMode != "all",
@@ -945,7 +965,7 @@ private fun PhotoOrganizerTopControls(
                 OrganizerProgressPill(
                     progressPercent = progressPercent,
                     remainingCount = remainingCount,
-                    remainingLabel = "张",
+                    remainingLabel = stringResource(R.string.photo_count_unit),
                     releasableBytes = deletedSizeBytes,
                     modifier = Modifier.width(94.dp),
                     compact = true,
@@ -977,7 +997,7 @@ private fun PendingDeletePill(count: Int, sizeBytes: Long) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            Text("可释放", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.photo_releasable), style = MaterialTheme.typography.labelLarge)
             Text(if (sizeBytes > 0L) formatSize(sizeBytes) else count.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
     }
@@ -1048,9 +1068,9 @@ private fun RemainingCountPill(remainingCount: Int) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text("剩余", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.photo_remaining), style = MaterialTheme.typography.labelLarge)
             Text(remainingCount.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("张", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.photo_count_unit), style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -1099,7 +1119,7 @@ private fun PhotoChromeControl(
                     modifier = Modifier.size(18.dp),
                     tint = Color.White.copy(alpha = 0.86f),
                 )
-                Text(if (focusMode) "显示控件" else "隐藏控件", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                Text(stringResource(if (focusMode) R.string.photo_show_controls else R.string.photo_hide_controls), style = MaterialTheme.typography.labelLarge, color = Color.White)
             }
         }
     }
@@ -1148,14 +1168,14 @@ private fun CompactPhotoInfoBar(
             ) {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.Center) {
                     Text(
-                        "剩余 " + remaining + " 张 · " + formatDate(photo.dateTaken),
+                        stringResource(R.string.photo_remaining_info, remaining, formatDate(photo.dateTaken)),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        photo.folderName + " · " + photoMediaKindLabel(photo) + " · " + formatSize(photo.size) + " · 点按查看大图",
+                        stringResource(R.string.photo_info_details, photo.folderName, photoMediaKindLabel(photo), formatSize(photo.size)),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.72f),
                         maxLines = 1,
@@ -1179,7 +1199,7 @@ private fun CompactPhotoInfoBar(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Rounded.Folder, contentDescription = stringResource(R.string.a11y_choose_album, selectedAlbum), modifier = Modifier.size(20.dp))
-                    Text("相册", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    Text(stringResource(R.string.photo_album_label), style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
             }
         }
@@ -1283,9 +1303,9 @@ private fun BoxScope.PhotoFloatingActionHint(feedback: PhotoSwipeFeedback) {
         SwipeAction.Favorite -> "♥"
     }
     val label = when (action) {
-        SwipeAction.Keep -> "保留"
-        SwipeAction.Delete -> "待删"
-        SwipeAction.Favorite -> "收藏"
+        SwipeAction.Keep -> stringResource(R.string.swipe_action_keep)
+        SwipeAction.Delete -> stringResource(R.string.swipe_action_delete)
+        SwipeAction.Favorite -> stringResource(R.string.swipe_action_favorite)
     }
     Column(
         modifier = modifier.graphicsLayer {
