@@ -216,6 +216,10 @@ class KanlemeViewModel @Inject constructor(
     val photoTypeStats: StateFlow<PhotoTypeStats> = repository.observePhotoTypeStats()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PhotoTypeStats())
 
+    val meScreenUiState: StateFlow<MeScreenUiState> = combine(dashboard, photoTypeStats) { dashboard, photoTypeStats ->
+        MeScreenUiState(dashboard = dashboard, photoTypeStats = photoTypeStats)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MeScreenUiState())
+
     val recentPhotos = repository.observeRecentPhotos()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val timelinePhotos = repository.observeTimelinePhotos()
@@ -249,8 +253,9 @@ class KanlemeViewModel @Inject constructor(
     val similarDetectionState: StateFlow<SimilarDetectionUiState> = repository.observeSimilarAnalysisTask()
         .map { it?.toSimilarDetectionUiState() ?: SimilarDetectionUiState() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SimilarDetectionUiState())
-    val similarDetectionRunning = similarDetectionState.map { it.running }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val similarPhotosUiState: StateFlow<SimilarPhotosUiState> = combine(similarGroups, similarDetectionState) { groups, detection ->
+        SimilarPhotosUiState(groups = groups, detection = detection)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SimilarPhotosUiState())
 
     private val _photoScope = MutableStateFlow(CleaningScope())
     val photoScope = _photoScope.asStateFlow()

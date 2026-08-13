@@ -35,8 +35,9 @@ import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 
 @Composable
 fun SimilarPhotosScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onOpenPhoto: (Long) -> Unit = {}) {
-    val groups by viewModel.similarGroups.collectAsStateWithLifecycle()
-    val detection by viewModel.similarDetectionState.collectAsStateWithLifecycle()
+    val screenState by viewModel.similarPhotosUiState.collectAsStateWithLifecycle()
+    val groups = screenState.groups
+    val detection = screenState.detection
     Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
         ScreenHeader("相似照片", "后台检测重复、连拍、截图和模糊照片，可离开页面后回来查看进度", onBack)
         SimilarDetectionProgressCard(

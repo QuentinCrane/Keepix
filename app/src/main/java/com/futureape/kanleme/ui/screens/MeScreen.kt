@@ -64,8 +64,9 @@ fun MeScreen(
     onChangelog: () -> Unit,
     onDiagnosis: () -> Unit,
 ) {
-    val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
-    val photoTypeStats by viewModel.photoTypeStats.collectAsStateWithLifecycle()
+    val screenState by viewModel.meScreenUiState.collectAsStateWithLifecycle()
+    val dashboard = screenState.dashboard
+    val photoTypeStats = screenState.photoTypeStats
     Box(
         Modifier
             .fillMaxSize()
