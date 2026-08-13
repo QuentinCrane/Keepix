@@ -19,8 +19,32 @@ data class SimilarAnalysisInput(
     val height: Int,
 )
 
+data class PhotoTypeStatsProjection(
+    @ColumnInfo(name = "all_count") val allCount: Int,
+    @ColumnInfo(name = "normal_count") val normalCount: Int,
+    @ColumnInfo(name = "screenshot_count") val screenshotCount: Int,
+    @ColumnInfo(name = "selfie_count") val selfieCount: Int,
+    @ColumnInfo(name = "motion_count") val motionCount: Int,
+    @ColumnInfo(name = "gif_count") val gifCount: Int,
+    @ColumnInfo(name = "long_count") val longCount: Int,
+)
+
 @Dao
 interface PhotoDao {
+    @Query("""
+        SELECT
+            COUNT(*) AS all_count,
+            COUNT(CASE WHEN is_screenshot = 0 AND is_selfie = 0 AND is_motion_photo = 0 AND is_long_image = 0 AND is_gif = 0 AND is_raw = 0 THEN 1 END) AS normal_count,
+            COUNT(CASE WHEN is_screenshot = 1 THEN 1 END) AS screenshot_count,
+            COUNT(CASE WHEN is_selfie = 1 THEN 1 END) AS selfie_count,
+            COUNT(CASE WHEN is_motion_photo = 1 THEN 1 END) AS motion_count,
+            COUNT(CASE WHEN is_gif = 1 THEN 1 END) AS gif_count,
+            COUNT(CASE WHEN is_long_image = 1 THEN 1 END) AS long_count
+        FROM photos
+        WHERE deletion_status = 'none' AND missing_since IS NULL
+    """)
+    fun observeTypeStats(): Flow<PhotoTypeStatsProjection>
+
     @Query("SELECT COUNT(*) FROM photos WHERE missing_since IS NULL")
     fun observeCount(): Flow<Int>
 

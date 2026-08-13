@@ -87,6 +87,23 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun photoTypeProjectionCountsOnlyActiveRows() = runBlocking {
+        database.photoDao().upsertAll(
+            listOf(
+                photo(mediaStoreId = 44L, displayName = "normal.jpg"),
+                photo(mediaStoreId = 45L, displayName = "screen.png").copy(isScreenshot = true),
+                photo(mediaStoreId = 46L, displayName = "missing.jpg").copy(missingSince = 1_700_000_000_000L),
+            ),
+        )
+
+        val counts = database.photoDao().observeTypeStats().first()
+
+        assertEquals(2, counts.allCount)
+        assertEquals(1, counts.normalCount)
+        assertEquals(1, counts.screenshotCount)
+    }
+
+    @Test
     fun randomQueueOrderIsStableWhenRefreshedWithTheSameSeed() = runBlocking {
         database.photoDao().upsertAll(
             (0 until 12).map { index ->

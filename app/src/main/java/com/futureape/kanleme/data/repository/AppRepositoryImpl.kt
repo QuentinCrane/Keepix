@@ -98,23 +98,15 @@ class AppRepositoryImpl @Inject constructor(
         )
     }
 
-    override fun observePhotoTypeStats(): Flow<PhotoTypeStats> = combine(
-        photoDao.observeActiveCount(),
-        photoDao.observeTypeCount("normal"),
-        photoDao.observeTypeCount("screenshot"),
-        photoDao.observeTypeCount("selfie"),
-        photoDao.observeTypeCount("motion"),
-        photoDao.observeTypeCount("gif"),
-        photoDao.observeTypeCount("long"),
-    ) { values ->
+    override fun observePhotoTypeStats(): Flow<PhotoTypeStats> = photoDao.observeTypeStats().map { counts ->
         PhotoTypeStats(
-            all = values[0] as Int,
-            normal = values[1] as Int,
-            screenshot = values[2] as Int,
-            selfie = values[3] as Int,
-            motion = values[4] as Int,
-            gif = values[5] as Int,
-            longImage = values[6] as Int,
+            all = counts.allCount,
+            normal = counts.normalCount,
+            screenshot = counts.screenshotCount,
+            selfie = counts.selfieCount,
+            motion = counts.motionCount,
+            gif = counts.gifCount,
+            longImage = counts.longCount,
         )
     }
 
