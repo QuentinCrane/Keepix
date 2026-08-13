@@ -38,6 +38,7 @@ import com.futureape.kanleme.data.settings.nextBatchSize
 import com.futureape.kanleme.data.worker.SimilarAnalysisScheduler
 import com.futureape.kanleme.data.worker.SimilarAnalysisWorkMode
 import com.futureape.kanleme.R
+import com.futureape.kanleme.performance.StartupTrace
 import com.futureape.kanleme.ui.i18n.UiText
 import com.futureape.kanleme.ui.i18n.dynamicUiText
 import com.futureape.kanleme.ui.i18n.uiText
@@ -355,14 +356,16 @@ class KanlemeViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val persisted = settingsRepository.loadStartupSettings()
-            val photoScope = startupSeededScope(persisted.toPhotoCleaningScope())
-            val videoScope = startupSeededScope(persisted.toVideoCleaningScope())
-            _photoScope.value = photoScope
-            _videoScope.value = videoScope
-            _organizerScopesReady.value = true
-            loadPhotoDeckPreview(photoScope)
-            loadPhotoDeck(photoScope)
+            StartupTrace.asyncSection("kanleme.startup.viewmodelBootstrap") {
+                val persisted = settingsRepository.loadStartupSettings()
+                val photoScope = startupSeededScope(persisted.toPhotoCleaningScope())
+                val videoScope = startupSeededScope(persisted.toVideoCleaningScope())
+                _photoScope.value = photoScope
+                _videoScope.value = videoScope
+                _organizerScopesReady.value = true
+                loadPhotoDeckPreview(photoScope)
+                loadPhotoDeck(photoScope)
+            }
         }
     }
 
@@ -1069,8 +1072,9 @@ class KanlemeViewModel @Inject constructor(
         val generation = nextPhotoDeckGeneration()
         photoDeckLoadJob = viewModelScope.launch {
             try {
-                val loaded = repository
-                    .loadPhotoDeck(requestedScope.copy(deckLoadWindow = PHOTO_DECK_LOAD_WINDOW))
+                val loaded = StartupTrace.asyncSection("kanleme.photoDeck.query") {
+                    repository.loadPhotoDeck(requestedScope.copy(deckLoadWindow = PHOTO_DECK_LOAD_WINDOW))
+                }
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == photoDeckGeneration) {
@@ -1151,8 +1155,9 @@ class KanlemeViewModel @Inject constructor(
         val generation = ++photoDeckPreviewGeneration
         photoDeckPreviewLoadJob = viewModelScope.launch {
             try {
-                val preview = repository
-                    .loadPhotoDeck(homePhotoPreviewLoadScope(requestedScope))
+                val preview = StartupTrace.asyncSection("kanleme.photoPreview.query") {
+                    repository.loadPhotoDeck(homePhotoPreviewLoadScope(requestedScope))
+                }
                     .withoutLocalPhotoExclusions()
                     .distinctBy { it.mediaStoreId }
                     .take(HOME_PREVIEW_DECK_SIZE)
@@ -1218,8 +1223,9 @@ class KanlemeViewModel @Inject constructor(
         val generation = nextVideoDeckGeneration()
         videoDeckLoadJob = viewModelScope.launch {
             try {
-                val loaded = repository
-                    .loadVideoDeck(requestedScope.copy(deckLoadWindow = VIDEO_DECK_LOAD_WINDOW))
+                val loaded = StartupTrace.asyncSection("kanleme.videoDeck.query") {
+                    repository.loadVideoDeck(requestedScope.copy(deckLoadWindow = VIDEO_DECK_LOAD_WINDOW))
+                }
                     .withoutLocalVideoExclusions()
                     .distinctBy { it.mediaStoreId }
                 if (generation == videoDeckGeneration) {
@@ -1249,8 +1255,9 @@ class KanlemeViewModel @Inject constructor(
         val generation = ++videoDeckPreviewGeneration
         videoDeckPreviewLoadJob = viewModelScope.launch {
             try {
-                val preview = repository
-                    .loadVideoDeck(homeVideoPreviewLoadScope(requestedScope))
+                val preview = StartupTrace.asyncSection("kanleme.videoPreview.query") {
+                    repository.loadVideoDeck(homeVideoPreviewLoadScope(requestedScope))
+                }
                     .withoutLocalVideoExclusions()
                     .distinctBy { it.mediaStoreId }
                     .take(HOME_PREVIEW_DECK_SIZE)

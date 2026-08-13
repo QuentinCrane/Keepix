@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.Density
 import com.futureape.kanleme.ui.navigation.KanlemeApp
 import com.futureape.kanleme.ui.theme.KanlemeTheme
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import com.futureape.kanleme.performance.StartupTrace
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -25,36 +26,38 @@ class MainActivity : ComponentActivity() {
     private var shortcutNonce by mutableStateOf(0L)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
-        super.onCreate(savedInstanceState)
-        // A configuration change recreates the Activity with the original shortcut Intent.
-        // Replaying it would unexpectedly navigate away from the restored destination.
-        if (savedInstanceState == null) handleShortcutIntent(intent)
-        setContent {
-            val viewModel: KanlemeViewModel = hiltViewModel()
-            val settings = viewModel.settings.collectAsStateWithLifecycle().value
-            val baseDensity = LocalDensity.current
-            val screenWidthDp = LocalConfiguration.current.screenWidthDp
-            val densityScale = when {
-                screenWidthDp >= 840 -> 1.02f
-                screenWidthDp >= 600 -> 0.98f
-                else -> 0.90f
-            }
-            val fontScale = when {
-                screenWidthDp >= 600 -> 1.00f
-                else -> 0.98f
-            }
-            val compactDensity = Density(
-                density = baseDensity.density * densityScale,
-                fontScale = baseDensity.fontScale * fontScale,
-            )
-            KanlemeTheme(themeMode = settings.themeMode, accentColor = settings.accentColor) {
-                CompositionLocalProvider(LocalDensity provides compactDensity) {
-                    KanlemeApp(
-                        initialShortcutTarget = shortcutTarget,
-                        shortcutNonce = shortcutNonce,
-                        viewModel = viewModel,
-                    )
+        StartupTrace.section("kanleme.activity.onCreate") {
+            enableEdgeToEdge()
+            super.onCreate(savedInstanceState)
+            // A configuration change recreates the Activity with the original shortcut Intent.
+            // Replaying it would unexpectedly navigate away from the restored destination.
+            if (savedInstanceState == null) handleShortcutIntent(intent)
+            setContent {
+                val viewModel: KanlemeViewModel = hiltViewModel()
+                val settings = viewModel.settings.collectAsStateWithLifecycle().value
+                val baseDensity = LocalDensity.current
+                val screenWidthDp = LocalConfiguration.current.screenWidthDp
+                val densityScale = when {
+                    screenWidthDp >= 840 -> 1.02f
+                    screenWidthDp >= 600 -> 0.98f
+                    else -> 0.90f
+                }
+                val fontScale = when {
+                    screenWidthDp >= 600 -> 1.00f
+                    else -> 0.98f
+                }
+                val compactDensity = Density(
+                    density = baseDensity.density * densityScale,
+                    fontScale = baseDensity.fontScale * fontScale,
+                )
+                KanlemeTheme(themeMode = settings.themeMode, accentColor = settings.accentColor) {
+                    CompositionLocalProvider(LocalDensity provides compactDensity) {
+                        KanlemeApp(
+                            initialShortcutTarget = shortcutTarget,
+                            shortcutNonce = shortcutNonce,
+                            viewModel = viewModel,
+                        )
+                    }
                 }
             }
         }

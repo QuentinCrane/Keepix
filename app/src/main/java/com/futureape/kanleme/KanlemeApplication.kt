@@ -13,6 +13,7 @@ import coil.memory.MemoryCache
 import com.futureape.kanleme.ui.util.IMAGE_DISK_CACHE_MAX_BYTES
 import com.futureape.kanleme.ui.util.installCrashLogger
 import com.futureape.kanleme.ui.util.trimAppCache
+import com.futureape.kanleme.performance.StartupTrace
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import java.io.File
@@ -28,30 +29,34 @@ class KanlemeApplication : Application(), ImageLoaderFactory, Configuration.Prov
             .build()
 
     override fun onCreate() {
-        super.onCreate()
-        installCrashLogger(this)
-        trimAppCache(this)
+        StartupTrace.section("kanleme.application.onCreate") {
+            super.onCreate()
+            installCrashLogger(this)
+            trimAppCache(this)
+        }
     }
 
-    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
-        .crossfade(false)
-        .memoryCache {
-            MemoryCache.Builder(this)
-                .maxSizePercent(0.30)
-                .build()
-        }
-        .diskCache {
-            DiskCache.Builder()
-                .directory(File(cacheDir, "image_cache"))
-                .maxSizeBytes(IMAGE_DISK_CACHE_MAX_BYTES)
-                .build()
-        }
-        .components {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                add(ImageDecoderDecoder.Factory())
-            } else {
-                add(GifDecoder.Factory())
+    override fun newImageLoader(): ImageLoader = StartupTrace.section("kanleme.imageLoader.create") {
+        ImageLoader.Builder(this)
+            .crossfade(false)
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(0.30)
+                    .build()
             }
-        }
-        .build()
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(File(cacheDir, "image_cache"))
+                    .maxSizeBytes(IMAGE_DISK_CACHE_MAX_BYTES)
+                    .build()
+            }
+            .components {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    add(ImageDecoderDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
+            }
+            .build()
+    }
 }

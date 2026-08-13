@@ -30,6 +30,7 @@ import com.futureape.kanleme.data.media.MediaStoreScanner
 import com.futureape.kanleme.data.media.SimilarPhotoAnalyzer
 import com.futureape.kanleme.data.settings.AppSettingsRepository
 import com.futureape.kanleme.data.settings.DeleteMode
+import com.futureape.kanleme.performance.StartupTrace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -246,7 +247,9 @@ class AppRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun refreshMediaLibrary(options: MediaLibrarySyncOptions): Pair<Int, Int> = withContext(Dispatchers.IO) {
+    override suspend fun refreshMediaLibrary(options: MediaLibrarySyncOptions): Pair<Int, Int> =
+        StartupTrace.asyncSection("kanleme.mediaLibrary.refresh") {
+            withContext(Dispatchers.IO) {
         // Scan images and videos independently. A slow or failing image provider row should not
         // prevent the video library from being discovered, and vice versa. This also protects the
         // first permission sync from showing an empty library just because one MediaStore query failed.
@@ -324,8 +327,9 @@ class AppRepositoryImpl @Inject constructor(
                 if (mergedVideos.isNotEmpty()) videoDao.upsertAll(mergedVideos)
             }
         }
-        mergedPhotos.size to mergedVideos.size
-    }
+                mergedPhotos.size to mergedVideos.size
+            }
+        }
 
 
     private fun linkSeparateDynamicPhotoPairs(

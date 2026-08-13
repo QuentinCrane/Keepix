@@ -73,6 +73,7 @@ docs/*
 !docs/database_table_ownership.md
 !docs/performance_baseline.md
 !docs/baseline_profile_status.md
+!docs/startup_trace.md
 !docs/trash_retention_semantics.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md
