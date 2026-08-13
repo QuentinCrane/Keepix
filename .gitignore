@@ -36,6 +36,13 @@ app/*
 !app/schemas/
 !app/schemas/**
 
+# Android benchmark test module.
+!benchmark/
+!benchmark/build.gradle.kts
+!benchmark/README.md
+!benchmark/src/
+!benchmark/src/**
+
 # Gradle wrapper.
 !gradle/
 gradle/*
@@ -64,6 +71,7 @@ docs/*
 !docs/similar_analysis_task_contract.md
 !docs/stats_event_contract.md
 !docs/database_table_ownership.md
+!docs/performance_baseline.md
 !docs/trash_retention_semantics.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md

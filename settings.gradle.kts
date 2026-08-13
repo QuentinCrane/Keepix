@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Kanleme"
 include(":app")
+include(":benchmark")
