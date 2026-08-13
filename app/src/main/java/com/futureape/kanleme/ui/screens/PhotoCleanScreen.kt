@@ -122,6 +122,8 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlinx.coroutines.launch
 
+private val PHOTO_MEDIA_FILTER_TYPES = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long")
+
 @Composable
 fun PhotoCleanScreen(
     viewModel: KanlemeViewModel,
@@ -145,17 +147,18 @@ fun PhotoCleanScreen(
     val haptics = rememberHapticKit(settings)
     val displayOptions = settings.toPhotoCleanDisplayOptions()
     val runtimePolicy = settings.toPhotoCleanRuntimePolicy()
-    val photoMediaFilterTypes = listOf("all", "normal", "screenshot", "selfie", "motion", "gif", "long")
-    val photoMediaFilters = listOf(
-        "全部" to typeStats.all.toString(),
-        "普通" to typeStats.normal.toString(),
-        "截图" to typeStats.screenshot.toString(),
-        "自拍" to typeStats.selfie.toString(),
-        "实况" to typeStats.motion.toString(),
-        "GIF" to typeStats.gif.toString(),
-        "长图" to typeStats.longImage.toString(),
-    )
-    val selectedMediaIndex = photoMediaFilterTypes.indexOf(scope.mediaType).coerceAtLeast(0)
+    val photoMediaFilters = remember(typeStats) {
+        listOf(
+            "全部" to typeStats.all.toString(),
+            "普通" to typeStats.normal.toString(),
+            "截图" to typeStats.screenshot.toString(),
+            "自拍" to typeStats.selfie.toString(),
+            "实况" to typeStats.motion.toString(),
+            "GIF" to typeStats.gif.toString(),
+            "长图" to typeStats.longImage.toString(),
+        )
+    }
+    val selectedMediaIndex = PHOTO_MEDIA_FILTER_TYPES.indexOf(scope.mediaType).coerceAtLeast(0)
     val swipeSoundPlayer = remember(context, settings.swipeSound, settings.swipeSoundStyle) {
         PhotoSwipeSoundPlayer(context, settings.swipeSound, settings.swipeSoundStyle)
     }
@@ -476,7 +479,7 @@ fun PhotoCleanScreen(
                 selectedMediaIndex = selectedMediaIndex,
                 onMediaSelected = { index ->
                     haptics.tick()
-                    photoMediaFilterTypes.getOrNull(index)?.let(viewModel::setPhotoTypeFilter)
+                    PHOTO_MEDIA_FILTER_TYPES.getOrNull(index)?.let(viewModel::setPhotoTypeFilter)
                 },
                 haptics = haptics,
                 progressPercent = progressPercent,

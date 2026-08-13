@@ -907,6 +907,17 @@ private fun PhotoCardMetaOverlay(
     modifier: Modifier = Modifier,
 ) {
     val location = photo.locationName?.takeIf { it.isNotBlank() }
+    val dateLabel = remember(photo.dateTaken) { formatDate(photo.dateTaken) }
+    val sizeLabel = remember(photo.size) { formatSize(photo.size) }
+    val badges = photoMediaBadges(photo)
+    val detailLabel = remember(dateLabel, badges, location, sizeLabel) {
+        listOfNotNull(
+            dateLabel,
+            badges.take(2).joinToString(" · ").ifBlank { null },
+            location,
+            sizeLabel,
+        ).joinToString(" · ")
+    }
     Surface(
         modifier = modifier.fillMaxWidth(0.88f),
         shape = RoundedCornerShape(24.dp),
@@ -923,12 +934,7 @@ private fun PhotoCardMetaOverlay(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                listOfNotNull(
-                    formatDate(photo.dateTaken),
-                    photoMediaBadges(photo).take(2).joinToString(" · ").ifBlank { null },
-                    location,
-                    formatSize(photo.size),
-                ).joinToString(" · "),
+                detailLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.White.copy(alpha = 0.72f),
                 maxLines = 1,
@@ -1351,6 +1357,9 @@ fun PhotoGrid(photos: List<PhotoEntity>, modifier: Modifier = Modifier, onPhotoC
     ) {
         items(photos, key = { it.id }) { photo ->
             val shape = RoundedCornerShape(18.dp)
+            val thumbnailModel = remember(photo.mediaStoreId, photo.updatedAt) {
+                photoThumbnailImageRequest(context, photo)
+            }
             val canPlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
             var motionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
             var motionLoading by remember(photo.id) { mutableStateOf(false) }
@@ -1371,7 +1380,7 @@ fun PhotoGrid(photos: List<PhotoEntity>, modifier: Modifier = Modifier, onPhotoC
                         )
                     } else {
                         AsyncImage(
-                            model = photoThumbnailImageRequest(context, photo),
+                            model = thumbnailModel,
                             contentDescription = photo.displayName,
                             modifier = Modifier
                                 .fillMaxSize()

@@ -193,8 +193,11 @@ internal fun ImmersivePhotoCleanContent(
                 animationSpec = tween(durationMillis = 520),
                 label = "keepix_photo_background",
             ) { photo ->
+                val backgroundModel = remember(photo.mediaStoreId, photo.updatedAt) {
+                    photoImageRequest(context, photo, "clean_background", 1080, 1440)
+                }
                 AsyncImage(
-                    model = photoImageRequest(context, photo, "clean_background", 1080, 1440),
+                    model = backgroundModel,
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
@@ -1082,8 +1085,11 @@ private fun KeepixMemoryGridPhoto(
                 }
             }
     ) {
+        val thumbnailModel = remember(photo.mediaStoreId, photo.updatedAt) {
+            photoThumbnailImageRequest(context, photo)
+        }
         AsyncImage(
-            model = photoThumbnailImageRequest(context, photo),
+            model = thumbnailModel,
             contentDescription = photo.displayName,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,

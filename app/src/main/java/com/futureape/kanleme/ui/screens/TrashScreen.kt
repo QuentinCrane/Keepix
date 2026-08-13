@@ -276,6 +276,9 @@ private fun TrashFilterPill(text: String, selected: Boolean = false, onClick: ()
 @Composable
 private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit, onDelete: () -> Unit) {
     val context = LocalContext.current
+    val thumbnailModel = remember(item.mediaType, item.mediaStoreId, item.trashedAt) {
+        trashThumbnailImageRequest(context, item)
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -286,7 +289,7 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit, onDelete
             .clickable(onClick = onPreview),
     ) {
         AsyncImage(
-            model = trashThumbnailImageRequest(context, item),
+            model = thumbnailModel,
             contentDescription = item.displayName,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,

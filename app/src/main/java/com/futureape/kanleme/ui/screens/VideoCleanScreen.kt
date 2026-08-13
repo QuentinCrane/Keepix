@@ -578,6 +578,9 @@ private fun VideoReelPage(
     var playbackFailed by remember(video.id) { mutableStateOf(false) }
     var lastTapMillis by remember(video.id) { mutableStateOf(0L) }
     var actionOffsetY by remember(video.id) { mutableStateOf(0f) }
+    val videoInfo = remember(video.id, video.dateTaken, video.duration, video.size, video.folderName) {
+        videoInfoLine(video)
+    }
     val currentPlaybackUris by rememberUpdatedState(playbackUris)
     val currentPlaybackUriIndex by rememberUpdatedState(playbackUriIndex)
 
@@ -819,7 +822,7 @@ private fun VideoReelPage(
                         )
                         androidx.compose.animation.AnimatedVisibility(visible = chromeVisible) {
                             Text(
-                                videoInfoLine(video),
+                                videoInfo,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Color.White.copy(alpha = 0.72f),
                                 maxLines = 1,

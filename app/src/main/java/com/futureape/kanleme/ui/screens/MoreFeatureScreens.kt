@@ -306,6 +306,9 @@ private fun TodayMemoryTile(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val imageModel = remember(item.stableId) {
+        todayMemoryImageRequest(context, item, "today_tile", 560, 760)
+    }
     Box(
         modifier = modifier
             .aspectRatio(0.76f)
@@ -313,7 +316,7 @@ private fun TodayMemoryTile(
             .clickable(onClick = onClick),
     ) {
         AsyncImage(
-            model = todayMemoryImageRequest(context, item, "today_tile", 560, 760),
+            model = imageModel,
             contentDescription = item.displayName,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,

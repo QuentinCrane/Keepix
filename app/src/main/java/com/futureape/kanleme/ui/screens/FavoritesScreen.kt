@@ -452,6 +452,9 @@ private fun FavoritePhotoTile(
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
+    val thumbnailModel = remember(photo.mediaStoreId, photo.updatedAt) {
+        photoThumbnailImageRequest(context, photo)
+    }
     val shape = RoundedCornerShape(16.dp)
     Box(
         modifier = Modifier
@@ -464,7 +467,7 @@ private fun FavoritePhotoTile(
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
-            model = photoThumbnailImageRequest(context, photo),
+            model = thumbnailModel,
             contentDescription = photo.displayName,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
