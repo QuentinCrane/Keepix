@@ -4,11 +4,13 @@ import android.content.Context
 import android.net.Uri
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.media.DynamicPhotoDetector
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.Locale
 
 sealed class MotionPhotoPlaybackSource {
@@ -58,13 +60,45 @@ suspend fun resolveMotionPhotoPlaybackSource(
 }
 
 private const val MIN_VIDEO_BYTES = 16 * 1024L
+private const val MOTION_TAIL_PROBE_BYTES = 8L * 1024L * 1024L
 
 private fun embeddedMotionCacheFile(context: Context, photo: PhotoEntity): File {
     val dir = File(context.cacheDir, "motion_photo_preview").apply { mkdirs() }
-    val identity = listOf(photo.mediaStoreId, photo.dateModified, photo.motionVideoOffset, photo.motionVideoSize)
-        .joinToString(separator = "_")
-    return File(dir, identity + ".mp4")
+    return File(dir, motionPhotoCacheIdentity(photo) + ".mp4")
 }
+
+internal fun motionPhotoCacheIdentity(
+    stableMediaKey: String,
+    mediaStoreId: Long,
+    uri: String,
+    size: Long,
+    dateModified: Long,
+    motionVideoOffset: Long,
+    motionVideoSize: Long,
+): String {
+    val source = listOf(
+        stableMediaKey,
+        mediaStoreId,
+        uri,
+        size,
+        dateModified,
+        motionVideoOffset,
+        motionVideoSize,
+    ).joinToString(separator = "|")
+    return MessageDigest.getInstance("SHA-256")
+        .digest(source.toByteArray(Charsets.UTF_8))
+        .joinToString("") { byte -> "%02x".format(byte) }
+}
+
+private fun motionPhotoCacheIdentity(photo: PhotoEntity): String = motionPhotoCacheIdentity(
+    stableMediaKey = photo.stableMediaKey,
+    mediaStoreId = photo.mediaStoreId,
+    uri = photo.uri,
+    size = photo.size,
+    dateModified = photo.dateModified,
+    motionVideoOffset = photo.motionVideoOffset,
+    motionVideoSize = photo.motionVideoSize,
+)
 
 private fun extractEmbeddedMotionVideo(
     context: Context,
@@ -89,7 +123,7 @@ private fun extractEmbeddedMotionVideo(
     }
 
     // Motion Photo 的视频段通常拼接在文件尾部。只读尾部，避免大图全量读入内存。
-    val searchBytes = size.coerceAtMost(36L * 1024L * 1024L).toInt()
+    val searchBytes = size.coerceAtMost(MOTION_TAIL_PROBE_BYTES).toInt()
     val tailStart = (size - searchBytes).coerceAtLeast(0L)
     val tail = resolver.openInputStream(sourceUri)?.use { input ->
         skipFully(input, tailStart)
@@ -115,40 +149,45 @@ private fun copyRangeFromUri(
     start: Long,
     byteCount: Long,
     target: File,
-): File? = runCatching {
+): File? {
     target.parentFile?.mkdirs()
     val temp = File(target.parentFile, target.name + ".tmp")
-    if (temp.exists() && !temp.delete()) return@runCatching null
-    val inputStream = context.contentResolver.openInputStream(sourceUri) ?: return@runCatching null
-    inputStream.use { input ->
-        skipFully(input, start)
-        FileOutputStream(temp).use { output ->
-            val buffer = ByteArray(64 * 1024)
-            var remaining = byteCount
-            while (remaining > 0L) {
-                val requested = minOf(buffer.size.toLong(), remaining).toInt()
-                val read = input.read(buffer, 0, requested)
-                if (read <= 0) break
-                output.write(buffer, 0, read)
-                remaining -= read
+    if (temp.exists() && !temp.delete()) return null
+    return try {
+        val inputStream = context.contentResolver.openInputStream(sourceUri) ?: return null
+        var remaining = byteCount
+        inputStream.use { input ->
+            skipFully(input, start)
+            FileOutputStream(temp).use { output ->
+                val buffer = ByteArray(64 * 1024)
+                while (remaining > 0L) {
+                    val requested = minOf(buffer.size.toLong(), remaining).toInt()
+                    val read = input.read(buffer, 0, requested)
+                    if (read <= 0) break
+                    output.write(buffer, 0, read)
+                    remaining -= read
+                }
             }
         }
-    }
-    if (temp.length() <= MIN_VIDEO_BYTES) {
-        temp.delete()
-        null
-    } else {
-        if (target.exists() && !target.delete()) {
-            temp.delete()
+        if (remaining > 0L || temp.length() <= MIN_VIDEO_BYTES) {
             null
-        } else if (temp.renameTo(target)) {
-            target
         } else {
-            temp.delete()
-            null
+            if (target.exists() && !target.delete()) {
+                null
+            } else if (temp.renameTo(target)) {
+                target
+            } else {
+                null
+            }
         }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Throwable) {
+        null
+    } finally {
+        if (temp.exists()) temp.delete()
     }
-}.getOrNull()
+}
 
 private fun findEmbeddedMp4Start(bytes: ByteArray): Int? {
     if (bytes.size < 16) return null
