@@ -65,6 +65,7 @@ private fun MediaAccessState?.toSyncOptions(): MediaLibrarySyncOptions =
         markMissingPhotos = this?.canReadImages ?: true,
         markMissingVideos = this?.canReadVideos ?: true,
         permissionScopeFingerprint = this?.key.orEmpty(),
+        allowIncrementalSync = this?.isFullVisualAccess == true,
     )
 
 data class SimilarDetectionUiState(

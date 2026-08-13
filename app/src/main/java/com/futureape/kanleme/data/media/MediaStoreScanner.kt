@@ -27,7 +27,11 @@ class MediaStoreScanner @Inject constructor(
         generation = MediaStore.getGeneration(context, MediaStore.VOLUME_EXTERNAL),
     )
 
-    fun scanImages(limit: Int? = null, afterGeneration: Long? = null): List<PhotoEntity> {
+    fun scanImages(
+        limit: Int? = null,
+        afterGeneration: Long? = null,
+        throughGeneration: Long? = null,
+    ): List<PhotoEntity> {
         val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
@@ -50,6 +54,7 @@ class MediaStoreScanner @Inject constructor(
             fallbackSortColumn = MediaStore.Images.Media.DATE_ADDED,
             limit = limit,
             afterGeneration = afterGeneration,
+            throughGeneration = throughGeneration,
             mediaLabel = context.getString(R.string.media_label_photo),
         )?.use { cursor ->
             val idCol = cursor.require(MediaStore.Images.Media._ID)
@@ -109,7 +114,11 @@ class MediaStoreScanner @Inject constructor(
         return result
     }
 
-    fun scanVideos(limit: Int? = null, afterGeneration: Long? = null): List<VideoEntity> {
+    fun scanVideos(
+        limit: Int? = null,
+        afterGeneration: Long? = null,
+        throughGeneration: Long? = null,
+    ): List<VideoEntity> {
         val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Video.Media._ID,
@@ -132,6 +141,7 @@ class MediaStoreScanner @Inject constructor(
             fallbackSortColumn = MediaStore.Video.Media.DATE_ADDED,
             limit = limit,
             afterGeneration = afterGeneration,
+            throughGeneration = throughGeneration,
             mediaLabel = context.getString(R.string.media_label_video),
         )?.use { cursor ->
             val idCol = cursor.require(MediaStore.Video.Media._ID)
@@ -173,6 +183,7 @@ class MediaStoreScanner @Inject constructor(
         fallbackSortColumn: String,
         limit: Int?,
         afterGeneration: Long?,
+        throughGeneration: Long?,
         mediaLabel: String,
     ): Cursor? {
         val queryArgs = Bundle().apply {
@@ -181,14 +192,29 @@ class MediaStoreScanner @Inject constructor(
             putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_EXCLUDE)
             putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_EXCLUDE)
             if (afterGeneration != null) {
+                val generationPredicate = if (throughGeneration == null) {
+                    "(" + MediaStore.MediaColumns.GENERATION_ADDED + " > ? OR " +
+                        MediaStore.MediaColumns.GENERATION_MODIFIED + " > ?)"
+                } else {
+                    "((" + MediaStore.MediaColumns.GENERATION_ADDED + " > ? AND " +
+                        MediaStore.MediaColumns.GENERATION_ADDED + " <= ?) OR (" +
+                        MediaStore.MediaColumns.GENERATION_MODIFIED + " > ? AND " +
+                        MediaStore.MediaColumns.GENERATION_MODIFIED + " <= ?))"
+                }
                 putString(
                     ContentResolver.QUERY_ARG_SQL_SELECTION,
-                    "(" + MediaStore.MediaColumns.GENERATION_ADDED + " > ? OR " +
-                        MediaStore.MediaColumns.GENERATION_MODIFIED + " > ?)",
+                    generationPredicate,
                 )
                 putStringArray(
                     ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,
-                    arrayOf(afterGeneration.toString(), afterGeneration.toString()),
+                    if (throughGeneration == null) {
+                        arrayOf(afterGeneration.toString(), afterGeneration.toString())
+                    } else {
+                        arrayOf(
+                            afterGeneration.toString(), throughGeneration.toString(),
+                            afterGeneration.toString(), throughGeneration.toString(),
+                        )
+                    },
                 )
             }
             if (limit != null && limit > 0) putInt(ContentResolver.QUERY_ARG_LIMIT, limit)
@@ -207,12 +233,27 @@ class MediaStoreScanner @Inject constructor(
                 append(MediaStore.MediaColumns.IS_TRASHED).append(" = 0")
                 if (afterGeneration != null) {
                     append(" AND (")
-                    append(MediaStore.MediaColumns.GENERATION_ADDED).append(" > ? OR ")
-                    append(MediaStore.MediaColumns.GENERATION_MODIFIED).append(" > ?)")
+                    if (throughGeneration == null) {
+                        append(MediaStore.MediaColumns.GENERATION_ADDED).append(" > ? OR ")
+                        append(MediaStore.MediaColumns.GENERATION_MODIFIED).append(" > ?)")
+                    } else {
+                        append("(")
+                        append(MediaStore.MediaColumns.GENERATION_ADDED).append(" > ? AND ")
+                        append(MediaStore.MediaColumns.GENERATION_ADDED).append(" <= ?) OR (")
+                        append(MediaStore.MediaColumns.GENERATION_MODIFIED).append(" > ? AND ")
+                        append(MediaStore.MediaColumns.GENERATION_MODIFIED).append(" <= ?))")
+                    }
                 }
             }
             val selectionArgs = afterGeneration?.let {
-                arrayOf(it.toString(), it.toString())
+                if (throughGeneration == null) {
+                    arrayOf(it.toString(), it.toString())
+                } else {
+                    arrayOf(
+                        it.toString(), throughGeneration.toString(),
+                        it.toString(), throughGeneration.toString(),
+                    )
+                }
             }
             try {
                 resolver.query(collection, projection, selection, selectionArgs, sortOrder)
@@ -220,6 +261,80 @@ class MediaStoreScanner @Inject constructor(
                 throw MediaStoreAccessException(context.getString(R.string.media_error_read_permission, mediaLabel), security)
             }
         }
+    }
+
+    fun findUnavailableImageIds(mediaStoreIds: List<Long>): Set<Long> =
+        findUnavailableIds(
+            collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            mediaStoreIds = mediaStoreIds,
+            mediaLabel = context.getString(R.string.media_label_photo),
+        )
+
+    fun findUnavailableVideoIds(mediaStoreIds: List<Long>): Set<Long> =
+        findUnavailableIds(
+            collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            mediaStoreIds = mediaStoreIds,
+            mediaLabel = context.getString(R.string.media_label_video),
+        )
+
+    private fun findUnavailableIds(
+        collection: Uri,
+        mediaStoreIds: List<Long>,
+        mediaLabel: String,
+    ): Set<Long> {
+        if (mediaStoreIds.isEmpty()) return emptySet()
+        val unavailable = mutableSetOf<Long>()
+        mediaStoreIds.chunked(900).forEach { chunk ->
+            val placeholders = chunk.joinToString(",") { "?" }
+            val selection = MediaStore.MediaColumns._ID + " IN (" + placeholders + ")"
+            val selectionArgs = chunk.map(Long::toString).toTypedArray()
+            val projection = arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.IS_TRASHED)
+            val queryArgs = Bundle().apply {
+                putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_EXCLUDE)
+                putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_INCLUDE)
+                putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
+                putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, selectionArgs)
+            }
+            val present = mutableMapOf<Long, Boolean>()
+            val cursor = try {
+                resolver.query(collection, projection, queryArgs, null)
+            } catch (_: IllegalArgumentException) {
+                // If an OEM ignores the Bundle form, the normal provider query still gives a
+                // safe answer: trashed rows are normally excluded and therefore count as absent.
+                try {
+                    resolver.query(collection, projection, selection, selectionArgs, null)
+                } catch (_: IllegalArgumentException) {
+                    try {
+                        resolver.query(
+                            collection,
+                            arrayOf(MediaStore.MediaColumns._ID),
+                            selection,
+                            selectionArgs,
+                            null,
+                        )
+                    } catch (security: SecurityException) {
+                        throw MediaStoreAccessException(context.getString(R.string.media_error_read_permission, mediaLabel), security)
+                    }
+                } catch (security: SecurityException) {
+                    throw MediaStoreAccessException(context.getString(R.string.media_error_read_permission, mediaLabel), security)
+                }
+            } catch (security: SecurityException) {
+                throw MediaStoreAccessException(context.getString(R.string.media_error_read_permission, mediaLabel), security)
+            }
+            cursor?.use { rows ->
+                val idColumn = rows.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                val trashedColumn = rows.getColumnIndex(MediaStore.MediaColumns.IS_TRASHED)
+                while (rows.moveToNext()) {
+                    val id = rows.getLong(idColumn)
+                    val isTrashed = trashedColumn >= 0 && !rows.isNull(trashedColumn) && rows.getInt(trashedColumn) != 0
+                    present[id] = isTrashed
+                }
+            }
+            chunk.forEach { id ->
+                if (present[id] != false) unavailable += id
+            }
+        }
+        return unavailable
     }
 
     private fun isScreenshot(path: String?, name: String): Boolean {

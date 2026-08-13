@@ -271,7 +271,14 @@ data class MediaSyncStateEntity(
     @ColumnInfo(name = "last_generation") val lastGeneration: Long,
     @ColumnInfo(name = "permission_scope_fingerprint") val permissionScopeFingerprint: String,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    @ColumnInfo(name = "checkpoint_state") val checkpointState: String = MediaSyncCheckpointState.COMPLETE,
+    @ColumnInfo(name = "checkpoint_generation") val checkpointGeneration: Long = lastGeneration,
 )
+
+object MediaSyncCheckpointState {
+    const val RUNNING = "running"
+    const val COMPLETE = "complete"
+}
 
 object ProcessingStatus {
     const val UNPROCESSED = "unprocessed"

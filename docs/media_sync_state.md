@@ -17,7 +17,15 @@
 
 ## 当前边界
 
-增量查询只负责发现新增/修改项，不负责判断删除项。下一块会处理 generation/version 变化、权限缩小、系统 trash、外部删除和可恢复 checkpoint 的安全 reconciliation。
+## D04c 已落地内容
+
+- 增量查询使用 `(previousGeneration, startGeneration]` 窗口；扫描期间发生的新变化留给下一次同步，避免把“扫描开始后才发生”的行漏掉。全量扫描完成时保留扫描开始游标，同样让扫描期间的变化在下一次增量中补齐
+- 同步前先提交 `running` checkpoint；取消、崩溃或任一查询失败后不会写成 `complete`，下次同步会保守地回到全量路径
+- 只有完整图片/视频权限、generation 确实前进且明确允许增量时，才对 active MediaStore ID 做存在性探测；系统 trash 和外部不可见 ID 标记为 `missing_since`，不直接删除 Room 行
+- 部分权限、权限范围变化以及选中照片权限不会执行删除 reconciliation，因此不会把不可见媒体误判为已删除
+- 删除探测失败时跳过本轮缺失标记，并保留 `running` checkpoint；下一次同步从全量路径重试，避免把已前进的 generation 当成已完成
+
+增量查询负责发现新增/修改项，并在完整权限下做有限的缺失探测；它不永久删除数据。SD 卡和多 volume 的真实设备验收仍需在设备可用后完成，当前代码仍使用 `VOLUME_EXTERNAL` 聚合视图。
 
 ## 验证
 

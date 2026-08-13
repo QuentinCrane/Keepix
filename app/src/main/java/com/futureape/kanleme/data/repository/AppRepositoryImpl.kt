@@ -18,6 +18,7 @@ import com.futureape.kanleme.data.local.SimilarAnalysisRunResult
 import com.futureape.kanleme.data.local.SimilarAnalysisTaskEntity
 import com.futureape.kanleme.data.local.SimilarAnalysisTaskStatus
 import com.futureape.kanleme.data.local.MediaSyncStateEntity
+import com.futureape.kanleme.data.local.MediaSyncCheckpointState
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.TrashRetentionPolicy
 import com.futureape.kanleme.data.local.UserStatsEntity
@@ -253,6 +254,7 @@ class AppRepositoryImpl @Inject constructor(
     override suspend fun refreshMediaLibrary(options: MediaLibrarySyncOptions): Pair<Int, Int> =
         StartupTrace.asyncSection("kanleme.mediaLibrary.refresh") {
             withContext(Dispatchers.IO) {
+        val syncStartedAt = System.currentTimeMillis()
         val initialSyncSnapshot = runCatching { scanner.currentSyncSnapshot() }.getOrNull()
         val previousSyncState = initialSyncSnapshot?.let { snapshot ->
             mediaSyncStateDao.bySyncKey(snapshot.volumeName)
@@ -260,16 +262,50 @@ class AppRepositoryImpl @Inject constructor(
         val incrementalAfterGeneration = initialSyncSnapshot?.incrementalAfterGeneration(
             previous = previousSyncState,
             permissionScopeFingerprint = options.permissionScopeFingerprint,
+            allowIncrementalSync = options.allowIncrementalSync,
         )
         val isIncrementalSync = incrementalAfterGeneration != null
+        val throughGeneration = if (isIncrementalSync) initialSyncSnapshot?.generation else null
+        val hasGenerationChanges = previousSyncState?.let { previous ->
+            initialSyncSnapshot?.let { current ->
+                isIncrementalSync && current.generation > previous.lastGeneration
+            }
+        } ?: false
+
+        // A committed running checkpoint makes cancellation and process death conservative:
+        // the next invocation rejects incremental resume and performs a full scan.
+        initialSyncSnapshot?.let { snapshot ->
+            db.withTransaction {
+                mediaSyncStateDao.upsert(
+                    MediaSyncStateEntity(
+                        syncKey = snapshot.volumeName,
+                        volumeName = snapshot.volumeName,
+                        mediaStoreVersion = snapshot.mediaStoreVersion,
+                        lastGeneration = previousSyncState?.lastGeneration ?: -1L,
+                        permissionScopeFingerprint = options.permissionScopeFingerprint,
+                        updatedAt = syncStartedAt,
+                        checkpointState = MediaSyncCheckpointState.RUNNING,
+                        checkpointGeneration = snapshot.generation,
+                    ),
+                )
+            }
+        }
         // Scan images and videos independently. A slow or failing image provider row should not
         // prevent the video library from being discovered, and vice versa. This also protects the
         // first permission sync from showing an empty library just because one MediaStore query failed.
-        val photoScan = runCatching {
-            scanner.scanImages(afterGeneration = incrementalAfterGeneration).distinctBy { it.mediaStoreId }
+        val photoScan = try {
+            Result.success(scanner.scanImages(afterGeneration = incrementalAfterGeneration, throughGeneration = throughGeneration).distinctBy { it.mediaStoreId })
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            Result.failure(failure)
         }
-        val videoScan = runCatching {
-            scanner.scanVideos(afterGeneration = incrementalAfterGeneration).distinctBy { it.mediaStoreId }
+        val videoScan = try {
+            Result.success(scanner.scanVideos(afterGeneration = incrementalAfterGeneration, throughGeneration = throughGeneration).distinctBy { it.mediaStoreId })
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            Result.failure(failure)
         }
         if (photoScan.isFailure && videoScan.isFailure) {
             throw photoScan.exceptionOrNull() ?: videoScan.exceptionOrNull() ?: IllegalStateException("媒体库同步失败")
@@ -278,10 +314,18 @@ class AppRepositoryImpl @Inject constructor(
         val scannedVideosRaw = videoScan.getOrElse { emptyList() }
         val (scannedPhotos, scannedVideos) = linkSeparateDynamicPhotoPairs(scannedPhotosRaw, scannedVideosRaw)
         val now = System.currentTimeMillis()
-        val syncSnapshot = if (photoScan.isSuccess && videoScan.isSuccess) {
+        val endSyncSnapshot = if (photoScan.isSuccess && videoScan.isSuccess) {
             runCatching { scanner.currentSyncSnapshot() }.getOrNull()
         } else {
             null
+        }
+        var deletionProbeFailed = false
+        val completedSyncSnapshot = if (endSyncSnapshot == null) {
+            null
+        } else if (initialSyncSnapshot == null) {
+            endSyncSnapshot
+        } else {
+            initialSyncSnapshot
         }
 
         val existingPhotos = if (scannedPhotos.isEmpty()) {
@@ -338,16 +382,49 @@ class AppRepositoryImpl @Inject constructor(
             }
         }
 
+        val unavailablePhotoIds = if (hasGenerationChanges && options.markMissingPhotos && photoScan.isSuccess) {
+            currentCoroutineContext().ensureActive()
+            try {
+                scanner.findUnavailableImageIds(photoDao.activeMediaStoreIds())
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                deletionProbeFailed = true
+                emptySet()
+            }
+        } else {
+            emptySet()
+        }
+        val unavailableVideoIds = if (hasGenerationChanges && options.markMissingVideos && videoScan.isSuccess) {
+            currentCoroutineContext().ensureActive()
+            try {
+                scanner.findUnavailableVideoIds(videoDao.activeMediaStoreIds())
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                deletionProbeFailed = true
+                emptySet()
+            }
+        } else {
+            emptySet()
+        }
+
         db.withTransaction {
             if (photoScan.isSuccess) {
                 if (options.markMissingPhotos && !isIncrementalSync) photoDao.markAllMissing(now)
+                unavailablePhotoIds.toList().chunked(SQLITE_BIND_BATCH_SIZE).forEach { ids ->
+                    if (ids.isNotEmpty()) photoDao.markMissingByMediaStoreIds(ids, now)
+                }
                 if (mergedPhotos.isNotEmpty()) photoDao.upsertAll(mergedPhotos)
             }
             if (videoScan.isSuccess) {
                 if (options.markMissingVideos && !isIncrementalSync) videoDao.markAllMissing(now)
+                unavailableVideoIds.toList().chunked(SQLITE_BIND_BATCH_SIZE).forEach { ids ->
+                    if (ids.isNotEmpty()) videoDao.markMissingByMediaStoreIds(ids, now)
+                }
                 if (mergedVideos.isNotEmpty()) videoDao.upsertAll(mergedVideos)
             }
-            syncSnapshot?.let { snapshot ->
+            if (!deletionProbeFailed) completedSyncSnapshot?.let { snapshot ->
                 mediaSyncStateDao.upsert(
                     MediaSyncStateEntity(
                         syncKey = snapshot.volumeName,
@@ -356,6 +433,8 @@ class AppRepositoryImpl @Inject constructor(
                         lastGeneration = snapshot.generation,
                         permissionScopeFingerprint = options.permissionScopeFingerprint,
                         updatedAt = now,
+                        checkpointState = MediaSyncCheckpointState.COMPLETE,
+                        checkpointGeneration = snapshot.generation,
                     ),
                 )
             }

@@ -105,6 +105,8 @@ data class MediaLibrarySyncOptions(
     val markMissingVideos: Boolean = true,
     /** Stable permission-scope snapshot used to distinguish a complete scan from a partial one. */
     val permissionScopeFingerprint: String = "",
+    /** Only full visual access can safely use generation-based deletion reconciliation. */
+    val allowIncrementalSync: Boolean = false,
 )
 
 enum class SwipeAction { Keep, Favorite, Delete }

@@ -18,7 +18,7 @@ import androidx.room.RoomDatabase
         SimilarAnalysisTaskEntity::class,
         MediaSyncStateEntity::class,
     ],
-    version = 20,
+    version = 21,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

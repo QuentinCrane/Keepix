@@ -1,6 +1,7 @@
 package com.futureape.kanleme.data.media
 
 import com.futureape.kanleme.data.local.MediaSyncStateEntity
+import com.futureape.kanleme.data.local.MediaSyncCheckpointState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -30,16 +31,28 @@ class MediaStoreSyncSnapshotTest {
     fun matchingStateReturnsExclusiveGenerationCursor() {
         assertEquals(
             80L,
-            current.incrementalAfterGeneration(previous(), "images=true;videos=true;selected=false"),
+            current.incrementalAfterGeneration(
+                previous(),
+                "images=true;videos=true;selected=false",
+                allowIncrementalSync = true,
+            ),
         )
     }
 
     @Test
     fun firstSyncAndChangedIdentityRequireFullScan() {
         val scope = "images=true;videos=true;selected=false"
-        assertNull(current.incrementalAfterGeneration(null, scope))
-        assertNull(current.incrementalAfterGeneration(previous(mediaStoreVersion = "version-1"), scope))
-        assertNull(current.incrementalAfterGeneration(previous(permissionScopeFingerprint = "images=true;videos=false;selected=false"), scope))
-        assertNull(current.incrementalAfterGeneration(previous(lastGeneration = 101L), scope))
+        assertNull(current.incrementalAfterGeneration(null, scope, allowIncrementalSync = true))
+        assertNull(current.incrementalAfterGeneration(previous(mediaStoreVersion = "version-1"), scope, allowIncrementalSync = true))
+        assertNull(current.incrementalAfterGeneration(previous(permissionScopeFingerprint = "images=true;videos=false;selected=false"), scope, allowIncrementalSync = true))
+        assertNull(current.incrementalAfterGeneration(previous(lastGeneration = 101L), scope, allowIncrementalSync = true))
+        assertNull(current.incrementalAfterGeneration(previous(), scope, allowIncrementalSync = false))
+        assertNull(
+            current.incrementalAfterGeneration(
+                previous().copy(checkpointState = MediaSyncCheckpointState.RUNNING),
+                scope,
+                allowIncrementalSync = true,
+            ),
+        )
     }
 }

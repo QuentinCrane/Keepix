@@ -211,6 +211,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE media_store_id IN (:mediaStoreIds)")
     suspend fun byMediaStoreIds(mediaStoreIds: List<Long>): List<PhotoEntity>
 
+    @Query("SELECT media_store_id FROM photos WHERE deletion_status = 'none' AND missing_since IS NULL")
+    suspend fun activeMediaStoreIds(): List<Long>
+
     @Query("SELECT * FROM photos WHERE id = :id LIMIT 1")
     suspend fun byId(id: Long): PhotoEntity?
 
@@ -234,6 +237,9 @@ interface PhotoDao {
 
     @Query("UPDATE photos SET missing_since = COALESCE(missing_since, :now), updated_at = :now WHERE deletion_status = 'none'")
     suspend fun markAllMissing(now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE photos SET missing_since = COALESCE(missing_since, :now), updated_at = :now WHERE media_store_id IN (:mediaStoreIds) AND deletion_status = 'none'")
+    suspend fun markMissingByMediaStoreIds(mediaStoreIds: List<Long>, now: Long = System.currentTimeMillis())
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(items: List<PhotoEntity>)
@@ -307,6 +313,9 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE media_store_id IN (:mediaStoreIds)")
     suspend fun byMediaStoreIds(mediaStoreIds: List<Long>): List<VideoEntity>
 
+    @Query("SELECT media_store_id FROM videos WHERE deletion_status = 'none' AND missing_since IS NULL")
+    suspend fun activeMediaStoreIds(): List<Long>
+
     @Query("SELECT * FROM videos WHERE processing_status = 'favorited' AND deletion_status = 'none' AND missing_since IS NULL ORDER BY updated_at DESC LIMIT :limit")
     fun observeFavorites(limit: Int): Flow<List<VideoEntity>>
 
@@ -327,6 +336,9 @@ interface VideoDao {
 
     @Query("UPDATE videos SET missing_since = COALESCE(missing_since, :now), updated_at = :now WHERE deletion_status = 'none'")
     suspend fun markAllMissing(now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE videos SET missing_since = COALESCE(missing_since, :now), updated_at = :now WHERE media_store_id IN (:mediaStoreIds) AND deletion_status = 'none'")
+    suspend fun markMissingByMediaStoreIds(mediaStoreIds: List<Long>, now: Long = System.currentTimeMillis())
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(items: List<VideoEntity>)
