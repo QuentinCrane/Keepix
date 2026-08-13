@@ -405,10 +405,10 @@ interface OperationDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: OperationHistoryEntity): Long
 
-    @Query("SELECT * FROM operation_history WHERE is_undone = 0 AND (:mediaType IS NULL OR media_type = :mediaType) ORDER BY created_at DESC, id DESC LIMIT 1")
+    @Query("SELECT * FROM operation_history WHERE is_undone = 0 AND action IN ('Keep', 'Favorite', 'Delete') AND (:mediaType IS NULL OR media_type = :mediaType) ORDER BY created_at DESC, id DESC LIMIT 1")
     suspend fun lastUndoable(mediaType: String?): OperationHistoryEntity?
 
-    @Query("SELECT * FROM operation_history WHERE id = :id AND is_undone = 0 LIMIT 1")
+    @Query("SELECT * FROM operation_history WHERE id = :id AND is_undone = 0 AND action IN ('Keep', 'Favorite', 'Delete') LIMIT 1")
     suspend fun undoableById(id: Long): OperationHistoryEntity?
 
     @Query("SELECT * FROM operation_history WHERE media_id = :mediaId AND media_type = :mediaType AND action = :action AND is_undone = 0 ORDER BY created_at DESC, id DESC LIMIT 1")
@@ -452,15 +452,15 @@ interface StatsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCleanupEvent(event: CleanupEventEntity)
 
-    @Query("DELETE FROM cleanup_events WHERE source_ref = :sourceRef")
-    suspend fun deleteCleanupEventsBySourceRef(sourceRef: String)
+    @Query("SELECT * FROM cleanup_events WHERE source_ref = :sourceRef AND reversal_of_event_id IS NULL ORDER BY occurred_at DESC LIMIT 1")
+    suspend fun eventBySourceRef(sourceRef: String): CleanupEventEntity?
 
-    @Query("SELECT CAST(COALESCE(SUM(photo_count), 0) AS INTEGER) FROM cleanup_events WHERE local_date = :localDate")
+    @Query("SELECT MAX(0, CAST(COALESCE(SUM(photo_delta), 0) AS INTEGER)) FROM cleanup_events WHERE local_date = :localDate")
     fun observeTodayPhotoCount(localDate: String): Flow<Int>
 
-    @Query("SELECT CAST(COALESCE(SUM(video_count), 0) AS INTEGER) FROM cleanup_events WHERE local_date = :localDate")
+    @Query("SELECT MAX(0, CAST(COALESCE(SUM(video_delta), 0) AS INTEGER)) FROM cleanup_events WHERE local_date = :localDate")
     fun observeTodayVideoCount(localDate: String): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM cleanup_events WHERE local_date = :localDate")
+    @Query("SELECT MAX(0, CAST(COALESCE(SUM(action_count), 0) AS INTEGER)) FROM cleanup_events WHERE local_date = :localDate")
     fun observeTodayActionCount(localDate: String): Flow<Int>
 }

@@ -274,17 +274,34 @@ data class AchievementProgressEntity(
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
 )
 
-@Entity(tableName = "cleanup_events", indices = [Index("event_type"), Index("local_date"), Index("occurred_at")])
+@Entity(
+    tableName = "cleanup_events",
+    indices = [
+        Index("event_type"),
+        Index("local_date"),
+        Index("occurred_at"),
+        Index("operation_id"),
+        Index("reversal_of_event_id"),
+    ],
+)
 data class CleanupEventEntity(
     @PrimaryKey @ColumnInfo(name = "event_id") val eventId: String,
     @ColumnInfo(name = "event_type") val eventType: String,
-    @ColumnInfo(name = "photo_count") val photoCount: Int,
-    @ColumnInfo(name = "video_count") val videoCount: Int,
-    @ColumnInfo(name = "freed_bytes") val freedBytes: Long,
+    @ColumnInfo(name = "operation_id") val operationId: Long? = null,
+    @ColumnInfo(name = "media_type") val mediaType: String,
+    @ColumnInfo(name = "photo_delta") val photoDelta: Int = 0,
+    @ColumnInfo(name = "video_delta") val videoDelta: Int = 0,
+    @ColumnInfo(name = "affected_media_count") val affectedMediaCount: Int = 1,
+    @ColumnInfo(name = "media_size_bytes") val mediaSizeBytes: Long = 0L,
+    @ColumnInfo(name = "size_delta_bytes") val sizeDeltaBytes: Long = 0L,
+    @ColumnInfo(name = "favorite_delta") val favoriteDelta: Int = 0,
+    @ColumnInfo(name = "action_count") val actionCount: Int = 1,
     @ColumnInfo(name = "local_date") val localDate: String,
     @ColumnInfo(name = "occurred_at") val occurredAt: Long,
     @ColumnInfo(name = "source_type") val sourceType: String,
     @ColumnInfo(name = "source_ref") val sourceRef: String? = null,
+    @ColumnInfo(name = "reversal_of_event_id") val reversalOfEventId: String? = null,
+    @ColumnInfo(name = "folder_path") val folderPath: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: Long,
 )
 

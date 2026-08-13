@@ -16,6 +16,7 @@ class StatsEventContractTest {
     fun compensationKeepsAffectedMediaAndActionCountButReversesNetEffects() {
         val original = CleanupEventMetrics(
             photoDelta = 1,
+            mediaSizeBytes = 12_345L,
             sizeDeltaBytes = 12_345L,
             favoriteDelta = 1,
             affectedMediaCount = 1,
@@ -25,6 +26,7 @@ class StatsEventContractTest {
         assertEquals(
             CleanupEventMetrics(
                 photoDelta = -1,
+                mediaSizeBytes = 12_345L,
                 sizeDeltaBytes = -12_345L,
                 favoriteDelta = -1,
                 affectedMediaCount = 1,

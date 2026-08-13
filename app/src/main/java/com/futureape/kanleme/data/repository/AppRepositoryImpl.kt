@@ -3,6 +3,9 @@ package com.futureape.kanleme.data.repository
 import androidx.room.withTransaction
 import com.futureape.kanleme.data.local.AppDatabase
 import com.futureape.kanleme.data.local.CleanupEventEntity
+import com.futureape.kanleme.data.local.CleanupEventMetrics
+import com.futureape.kanleme.data.local.CleanupEventSourceType
+import com.futureape.kanleme.data.local.CleanupEventType
 import com.futureape.kanleme.data.local.DeletionStatus
 import com.futureape.kanleme.data.local.OperationHistoryEntity
 import com.futureape.kanleme.data.local.PhotoEntity
@@ -17,6 +20,7 @@ import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.TrashRetentionPolicy
 import com.futureape.kanleme.data.local.UserStatsEntity
 import com.futureape.kanleme.data.local.VideoEntity
+import com.futureape.kanleme.data.local.cleanupEventTypeForAction
 import com.futureape.kanleme.data.media.MediaAuthorizationResult
 import com.futureape.kanleme.data.media.MediaOperationKind
 import com.futureape.kanleme.data.media.MediaOperationResult
@@ -686,17 +690,22 @@ class AppRepositoryImpl @Inject constructor(
                     )
                 }
             }
-            if (adjustment.hasDelta()) {
-                adjustStatsInTransaction(
-                    photoDelta = adjustment.photoDelta,
-                    videoDelta = adjustment.videoDelta,
-                    favoriteDelta = adjustment.favoriteDelta,
-                    deletedSize = adjustment.storageDelta,
-                    undoDelta = 0,
-                    cleanupEventSourceRefToDelete = null,
+            adjustStatsInTransaction(
+                photoDelta = adjustment.photoDelta,
+                videoDelta = adjustment.videoDelta,
+                favoriteDelta = adjustment.favoriteDelta,
+                deletedSize = adjustment.storageDelta,
+                undoDelta = 0,
+                event = cleanupEvent(
+                    eventType = cleanupEventTypeForAction(action.name),
+                    operationId = operationId,
+                    mediaType = "photo",
+                    metrics = adjustment.toCleanupEventMetrics(current.size),
+                    sourceType = CleanupEventSourceType.ORGANIZER,
                     sourceRef = operationSourceRef(operationId),
-                )
-            }
+                    folderPath = current.folderPath,
+                ),
+            )
             operationId
         }
     }
@@ -768,17 +777,22 @@ class AppRepositoryImpl @Inject constructor(
                     )
                 }
             }
-            if (adjustment.hasDelta()) {
-                adjustStatsInTransaction(
-                    photoDelta = adjustment.photoDelta,
-                    videoDelta = adjustment.videoDelta,
-                    favoriteDelta = adjustment.favoriteDelta,
-                    deletedSize = adjustment.storageDelta,
-                    undoDelta = 0,
-                    cleanupEventSourceRefToDelete = null,
+            adjustStatsInTransaction(
+                photoDelta = adjustment.photoDelta,
+                videoDelta = adjustment.videoDelta,
+                favoriteDelta = adjustment.favoriteDelta,
+                deletedSize = adjustment.storageDelta,
+                undoDelta = 0,
+                event = cleanupEvent(
+                    eventType = cleanupEventTypeForAction(action.name),
+                    operationId = operationId,
+                    mediaType = "video",
+                    metrics = adjustment.toCleanupEventMetrics(current.size),
+                    sourceType = CleanupEventSourceType.ORGANIZER,
                     sourceRef = operationSourceRef(operationId),
-                )
-            }
+                    folderPath = current.folderPath,
+                ),
+            )
             operationId
         }
     }
@@ -830,11 +844,41 @@ class AppRepositoryImpl @Inject constructor(
         val normalizedPath = MediaStoreActions.normalizeRelativePath(targetRelativePath)
         when (val result = mediaStoreActions.moveMediaToFolder(photo.uri, normalizedPath)) {
             MediaOperationResult.Success -> {
-                photoDao.updateFolder(
-                    id = photo.id,
-                    relativePath = normalizedPath,
-                    folderName = MediaStoreActions.folderNameOf(normalizedPath),
-                )
+                db.withTransaction {
+                    val current = photoDao.byId(photo.id) ?: photo
+                    if (current.relativePath != normalizedPath) {
+                        photoDao.updateFolder(
+                            id = photo.id,
+                            relativePath = normalizedPath,
+                            folderName = MediaStoreActions.folderNameOf(normalizedPath),
+                        )
+                        val operationId = recordOperation(
+                            mediaId = current.id,
+                            mediaType = "photo",
+                            previousProcessing = current.processingStatus,
+                            previousDeletion = current.deletionStatus,
+                            newProcessing = current.processingStatus,
+                            newDeletion = current.deletionStatus,
+                            action = CleanupEventType.ARCHIVED_MOVED,
+                        )
+                        adjustStatsInTransaction(
+                            photoDelta = 0,
+                            videoDelta = 0,
+                            favoriteDelta = 0,
+                            deletedSize = 0L,
+                            undoDelta = 0,
+                            event = cleanupEvent(
+                                eventType = CleanupEventType.ARCHIVED_MOVED,
+                                operationId = operationId,
+                                mediaType = "photo",
+                                metrics = CleanupEventMetrics(),
+                                sourceType = CleanupEventSourceType.ARCHIVE,
+                                sourceRef = operationSourceRef(operationId),
+                                folderPath = normalizedPath,
+                            ),
+                        )
+                    }
+                }
                 MovePhotoResult(true, "已移动到 ${MediaStoreActions.folderNameOf(normalizedPath)}")
             }
             is MediaOperationResult.Failed -> MovePhotoResult(false, result.reason)
@@ -850,11 +894,41 @@ class AppRepositoryImpl @Inject constructor(
         val normalizedPath = MediaStoreActions.normalizeRelativePath(targetRelativePath)
         when (val result = mediaStoreActions.moveMediaToFolder(video.uri, normalizedPath)) {
             MediaOperationResult.Success -> {
-                videoDao.updateFolder(
-                    id = video.id,
-                    relativePath = normalizedPath,
-                    folderName = MediaStoreActions.folderNameOf(normalizedPath),
-                )
+                db.withTransaction {
+                    val current = videoDao.byId(video.id) ?: video
+                    if (current.folderPath != normalizedPath) {
+                        videoDao.updateFolder(
+                            id = video.id,
+                            relativePath = normalizedPath,
+                            folderName = MediaStoreActions.folderNameOf(normalizedPath),
+                        )
+                        val operationId = recordOperation(
+                            mediaId = current.id,
+                            mediaType = "video",
+                            previousProcessing = current.processingStatus,
+                            previousDeletion = current.deletionStatus,
+                            newProcessing = current.processingStatus,
+                            newDeletion = current.deletionStatus,
+                            action = CleanupEventType.ARCHIVED_MOVED,
+                        )
+                        adjustStatsInTransaction(
+                            photoDelta = 0,
+                            videoDelta = 0,
+                            favoriteDelta = 0,
+                            deletedSize = 0L,
+                            undoDelta = 0,
+                            event = cleanupEvent(
+                                eventType = CleanupEventType.ARCHIVED_MOVED,
+                                operationId = operationId,
+                                mediaType = "video",
+                                metrics = CleanupEventMetrics(),
+                                sourceType = CleanupEventSourceType.ARCHIVE,
+                                sourceRef = operationSourceRef(operationId),
+                                folderPath = normalizedPath,
+                            ),
+                        )
+                    }
+                }
                 MovePhotoResult(true, "已移动到 ${MediaStoreActions.folderNameOf(normalizedPath)}")
             }
             is MediaOperationResult.Failed -> MovePhotoResult(false, result.reason)
@@ -1201,21 +1275,58 @@ class AppRepositoryImpl @Inject constructor(
             undoOperation(deleteOperation, restoreSystemTrash = false, undoDelta = 0)
             return
         }
-        if (item.mediaType == "photo") {
-            photoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
-        } else {
-            videoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
+        db.withTransaction {
+            if (item.mediaType == "photo") {
+                photoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
+            } else {
+                videoDao.restoreStatus(item.mediaId, ProcessingStatus.UNPROCESSED, DeletionStatus.NONE)
+            }
+            trashDao.deleteById(item.id)
+            adjustStatsInTransaction(
+                photoDelta = 0,
+                videoDelta = 0,
+                favoriteDelta = 0,
+                deletedSize = 0L,
+                undoDelta = 0,
+                event = cleanupEvent(
+                    eventType = CleanupEventType.RESTORED,
+                    operationId = null,
+                    mediaType = item.mediaType,
+                    metrics = CleanupEventMetrics(mediaSizeBytes = item.size.coerceAtLeast(0L)),
+                    sourceType = CleanupEventSourceType.UNDO,
+                    sourceRef = "trash:" + item.id + ":restore",
+                    folderPath = item.folderPath,
+                ),
+            )
         }
-        trashDao.deleteById(item.id)
     }
 
     private suspend fun markTrashItemDeletedLocally(item: TrashItemEntity) {
-        if (item.mediaType == "photo") {
-            photoDao.updateDeletionStatus(listOf(item.mediaId), DeletionStatus.DELETED)
-        } else {
-            videoDao.updateDeletionStatus(listOf(item.mediaId), DeletionStatus.DELETED)
+        db.withTransaction {
+            if (item.mediaType == "photo") {
+                photoDao.updateDeletionStatus(listOf(item.mediaId), DeletionStatus.DELETED)
+            } else {
+                videoDao.updateDeletionStatus(listOf(item.mediaId), DeletionStatus.DELETED)
+            }
+            trashDao.deleteById(item.id)
+            val operationId = operationDao.lastByMediaAndAction(item.mediaId, item.mediaType, SwipeAction.Delete.name)?.id
+            adjustStatsInTransaction(
+                photoDelta = 0,
+                videoDelta = 0,
+                favoriteDelta = 0,
+                deletedSize = 0L,
+                undoDelta = 0,
+                event = cleanupEvent(
+                    eventType = CleanupEventType.PERMANENTLY_DELETED,
+                    operationId = operationId,
+                    mediaType = item.mediaType,
+                    metrics = CleanupEventMetrics(mediaSizeBytes = item.size.coerceAtLeast(0L)),
+                    sourceType = CleanupEventSourceType.TRASH,
+                    sourceRef = operationId?.let(::operationSourceRef)?.plus(":permanent"),
+                    folderPath = item.folderPath,
+                ),
+            )
         }
-        trashDao.deleteById(item.id)
     }
 
     override suspend fun undoLastAction(mediaType: String?): Boolean = withContext(Dispatchers.IO) {
@@ -1299,6 +1410,12 @@ class AppRepositoryImpl @Inject constructor(
         }
 
         val adjustment = statsAdjustmentForUndo(op, currentPhoto?.size ?: currentVideo?.size ?: 0L)
+        val originalEvent = statsDao.eventBySourceRef(operationSourceRef(op.id))
+        val compensationEventType = if (op.action == SwipeAction.Delete.name) {
+            CleanupEventType.RESTORED
+        } else {
+            CleanupEventType.COMPENSATED
+        }
         db.withTransaction {
             if (op.mediaType == "photo") {
                 photoDao.restoreStatus(op.mediaId, op.previousProcessingStatus, op.previousDeletionStatus)
@@ -1313,7 +1430,18 @@ class AppRepositoryImpl @Inject constructor(
                 favoriteDelta = adjustment.favoriteDelta,
                 deletedSize = adjustment.storageDelta,
                 undoDelta = undoDelta,
-                cleanupEventSourceRefToDelete = operationSourceRef(op.id),
+                event = cleanupEvent(
+                    eventType = compensationEventType,
+                    operationId = op.id,
+                    mediaType = op.mediaType,
+                    metrics = adjustment.toCleanupEventMetrics(
+                        mediaSizeBytes = currentPhoto?.size ?: currentVideo?.size ?: 0L,
+                    ),
+                    sourceType = CleanupEventSourceType.UNDO,
+                    sourceRef = operationSourceRef(op.id) + ":restore",
+                    reversalOfEventId = originalEvent?.eventId,
+                    folderPath = originalEvent?.folderPath,
+                ),
             )
         }
     }
@@ -1346,10 +1474,9 @@ class AppRepositoryImpl @Inject constructor(
         favoriteDelta: Int,
         deletedSize: Long,
         undoDelta: Int,
-        cleanupEventSourceRefToDelete: String?,
-        sourceRef: String? = null,
+        event: CleanupEventEntity,
     ) {
-        val now = System.currentTimeMillis()
+        val now = event.occurredAt
         statsDao.insertUserStatsIfAbsent(UserStatsEntity())
         statsDao.adjustUserStats(
             photoDelta = photoDelta,
@@ -1359,24 +1486,39 @@ class AppRepositoryImpl @Inject constructor(
             undoDelta = undoDelta,
             now = now,
         )
-        cleanupEventSourceRefToDelete?.let { statsDao.deleteCleanupEventsBySourceRef(it) }
-        if (photoDelta > 0 || videoDelta > 0 || favoriteDelta > 0 || deletedSize > 0L) {
-            statsDao.insertCleanupEvent(
-                CleanupEventEntity(
-                    eventId = UUID.randomUUID().toString(),
-                    eventType = "clean_action",
-                    photoCount = photoDelta,
-                    videoCount = videoDelta,
-                    freedBytes = deletedSize,
-                    localDate = todayLocalDate(now),
-                    occurredAt = now,
-                    sourceType = "organizer",
-                    sourceRef = sourceRef,
-                    createdAt = now,
-                )
-            )
-        }
+        statsDao.insertCleanupEvent(event)
     }
+
+    private fun cleanupEvent(
+        eventType: String,
+        operationId: Long?,
+        mediaType: String,
+        metrics: CleanupEventMetrics,
+        sourceType: String,
+        sourceRef: String?,
+        reversalOfEventId: String? = null,
+        folderPath: String? = null,
+        occurredAt: Long = System.currentTimeMillis(),
+    ): CleanupEventEntity = CleanupEventEntity(
+        eventId = UUID.randomUUID().toString(),
+        eventType = eventType,
+        operationId = operationId,
+        mediaType = mediaType,
+        photoDelta = metrics.photoDelta,
+        videoDelta = metrics.videoDelta,
+        affectedMediaCount = metrics.affectedMediaCount,
+        mediaSizeBytes = metrics.mediaSizeBytes.coerceAtLeast(0L),
+        sizeDeltaBytes = metrics.sizeDeltaBytes,
+        favoriteDelta = metrics.favoriteDelta,
+        actionCount = metrics.actionCount,
+        localDate = todayLocalDate(occurredAt),
+        occurredAt = occurredAt,
+        sourceType = sourceType,
+        sourceRef = sourceRef,
+        reversalOfEventId = reversalOfEventId,
+        folderPath = folderPath,
+        createdAt = occurredAt,
+    )
 
     private fun operationSourceRef(operationId: Long): String = "operation:" + operationId
 
@@ -1661,6 +1803,15 @@ internal data class StatsAdjustment(
     fun hasDelta(): Boolean =
         photoDelta != 0 || videoDelta != 0 || favoriteDelta != 0 || storageDelta != 0L
 }
+
+internal fun StatsAdjustment.toCleanupEventMetrics(mediaSizeBytes: Long = 0L): CleanupEventMetrics =
+    CleanupEventMetrics(
+        photoDelta = photoDelta,
+        videoDelta = videoDelta,
+        mediaSizeBytes = mediaSizeBytes.coerceAtLeast(0L),
+        sizeDeltaBytes = storageDelta,
+        favoriteDelta = favoriteDelta,
+    )
 
 internal fun statsAdjustmentForUndo(
     operation: OperationHistoryEntity,

@@ -24,7 +24,7 @@ import androidx.room.RoomDatabase
         OperationHistoryEntity::class,
         SimilarAnalysisTaskEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

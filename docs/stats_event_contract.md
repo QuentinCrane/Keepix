@@ -9,6 +9,7 @@
 - 每个成功提交、确实改变或记录了一个媒体操作的媒体项写一行事件
 - `operationId` 对应本地 `operation_history.id`；撤销/恢复事件通过 `reversalOfEventId` 指向被抵消的原事件
 - `photoDelta`、`videoDelta`、`sizeDeltaBytes` 和 `favoriteDelta` 是可以用于聚合的有符号净影响；原始用户事件通常为正，恢复或补偿事件可以为负
+- `mediaSizeBytes` 保存受影响媒体体积，`sizeDeltaBytes` 保存对“标记可释放空间”统计的有符号净影响；两者不能混用
 - `affectedMediaCount` 表示本行受影响的媒体数，`actionCount` 表示用户提交的操作数；二者不能互相替代
 - `occurredAt` 保存毫秒时间戳，`localDate` 使用设备当前时区生成，按 `[start, end)` 时间窗口查询
 - 不保存 URI、文件名、指纹、缩略图或其他可反推出媒体内容的敏感信息

@@ -21,6 +21,7 @@ data class CleanupEventMetrics(
     val photoDelta: Int = 0,
     val videoDelta: Int = 0,
     val affectedMediaCount: Int = 1,
+    val mediaSizeBytes: Long = 0L,
     val sizeDeltaBytes: Long = 0L,
     val favoriteDelta: Int = 0,
     val actionCount: Int = 1,
