@@ -32,7 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import com.futureape.kanleme.ui.i18n.Text
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,39 +47,41 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import com.futureape.kanleme.ui.components.GlassSurface
+import com.futureape.kanleme.R
 
 @Composable
 fun OnboardingScreen(onFinish: () -> Unit) {
     var page by remember { mutableIntStateOf(0) }
     val pages = listOf(
         OnboardingPage(
-            title = "看了么",
-            subtitle = "像刷内容一样整理相册",
+            title = R.string.onboarding_home_title,
+            subtitle = R.string.onboarding_home_subtitle,
             icon = Icons.Rounded.PhotoLibrary,
-            body = "照片和视频是并列入口：照片用卡片滑动整理，视频用短视频流上下切换。先看一遍规则，再授权相册。",
-            bullets = listOf("照片：左右保留，上下收藏或待删", "视频：上下切换，左右快进快退", "所有待删内容先进入确认区，避免误删"),
+            body = R.string.onboarding_home_body,
+            bullets = listOf(R.string.onboarding_home_bullet_1, R.string.onboarding_home_bullet_2, R.string.onboarding_home_bullet_3),
         ),
         OnboardingPage(
-            title = "照片整理手势",
-            subtitle = "轻滑、确认、再处理",
+            title = R.string.onboarding_photo_title,
+            subtitle = R.string.onboarding_photo_subtitle,
             icon = Icons.Rounded.Swipe,
-            body = "点击照片可以放大查看；滑动到边缘会出现明显的保留、收藏、待删提示。",
-            bullets = listOf("左右滑：保留", "上滑 / 下滑：按设置执行收藏或待删", "可在设置里排除不想整理的文件夹"),
+            body = R.string.onboarding_photo_body,
+            bullets = listOf(R.string.onboarding_photo_bullet_1, R.string.onboarding_photo_bullet_2, R.string.onboarding_photo_bullet_3),
         ),
         OnboardingPage(
-            title = "视频整理方式",
-            subtitle = "短视频式浏览，不强制一种比例",
+            title = R.string.onboarding_video_title,
+            subtitle = R.string.onboarding_video_subtitle,
             icon = Icons.Rounded.PlayCircle,
-            body = "视频有独立主页，可先切换排序、文件夹、显示比例，再进入沉浸式整理流。",
-            bullets = listOf("上下滑切换视频", "长按 2 倍速，松开恢复", "显示比例可选沉浸裁切 / 完整比例 / 铺满屏宽"),
+            body = R.string.onboarding_video_body,
+            bullets = listOf(R.string.onboarding_video_bullet_1, R.string.onboarding_video_bullet_2, R.string.onboarding_video_bullet_3),
         ),
         OnboardingPage(
-            title = "隐私与安全",
-            subtitle = "本地整理，谨慎删除",
+            title = R.string.onboarding_privacy_title,
+            subtitle = R.string.onboarding_privacy_subtitle,
             icon = Icons.Rounded.Security,
-            body = "看了么以本地 MediaStore 和 Room 为主，默认在本机完成整理与统计。",
-            bullets = listOf("整理性格基于本机真实整理记录生成", "排除文件夹会同时影响照片和视频", "删除默认进入待删确认，不直接物理删除"),
+            body = R.string.onboarding_privacy_body,
+            bullets = listOf(R.string.onboarding_privacy_bullet_1, R.string.onboarding_privacy_bullet_2, R.string.onboarding_privacy_bullet_3),
         ),
     )
 
@@ -124,7 +126,9 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                             onClick = { page -= 1 },
                             modifier = Modifier.weight(1f).height(54.dp),
                             shape = RoundedCornerShape(999.dp),
-                        ) { Text("上一步") }
+                        ) {
+                            Text(stringResource(R.string.onboarding_previous))
+                        }
                     }
                     Button(
                         onClick = {
@@ -132,11 +136,13 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                         },
                         modifier = Modifier.weight(1f).height(54.dp),
                         shape = RoundedCornerShape(999.dp),
-                    ) { Text(if (page < pages.lastIndex) "下一步" else "开始使用") }
+                    ) {
+                        Text(stringResource(if (page < pages.lastIndex) R.string.onboarding_next else R.string.onboarding_start))
+                    }
                 }
 
                 Text(
-                    text = "首次说明之后，进入照片/视频整理页会出现对着真实页面位置的指示；也可在设置中重新播放定位式教程。",
+                    text = stringResource(R.string.onboarding_footer),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -160,16 +166,16 @@ private fun OnboardingPageCard(page: OnboardingPage) {
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(page.title, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            Text(stringResource(page.title), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             Spacer(Modifier.height(4.dp))
-            Text(page.subtitle, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
+            Text(stringResource(page.subtitle), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
         }
-        Text(page.body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(stringResource(page.body), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             page.bullets.forEach { bullet ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Surface(modifier = Modifier.size(8.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {}
-                    Text(bullet, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Text(stringResource(bullet), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -177,11 +183,11 @@ private fun OnboardingPageCard(page: OnboardingPage) {
 }
 
 private data class OnboardingPage(
-    val title: String,
-    val subtitle: String,
+    @androidx.annotation.StringRes val title: Int,
+    @androidx.annotation.StringRes val subtitle: Int,
     val icon: ImageVector,
-    val body: String,
-    val bullets: List<String>,
+    @androidx.annotation.StringRes val body: Int,
+    @androidx.annotation.StringRes val bullets: List<Int>,
 )
 
 

@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -72,6 +73,7 @@ import com.futureape.kanleme.ui.screens.AnnualReportScreen
 import com.futureape.kanleme.ui.screens.AchievementsScreen
 import com.futureape.kanleme.ui.screens.VideoCleanScreen
 import com.futureape.kanleme.ui.i18n.asString
+import com.futureape.kanleme.ui.i18n.uiText
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.delay
@@ -104,7 +106,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
         if (todayInHistoryPhotos.isNotEmpty() || todayInHistoryVideos.isNotEmpty()) {
             navController.navigate(Destinations.TODAY) { launchSingleTop = true }
         } else {
-            viewModel.showMessage("今天暂无往年照片或视频")
+            viewModel.showMessage(uiText(R.string.message_today_history_empty))
         }
     }
     val transitionBackdrop = Color.Black
@@ -282,9 +284,9 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
 
             if (current in setOf(Destinations.HOME, Destinations.VIDEO, Destinations.ME)) {
                 val navItems = listOf(
-                    "照片" to Icons.Rounded.PhotoLibrary,
-                    "视频" to Icons.Rounded.Movie,
-                    "我的" to Icons.Rounded.Person,
+                    stringResource(R.string.nav_photos) to Icons.Rounded.PhotoLibrary,
+                    stringResource(R.string.nav_videos) to Icons.Rounded.Movie,
+                    stringResource(R.string.nav_me) to Icons.Rounded.Person,
                 )
                 val selectedNavIndex = when (current) {
                     Destinations.VIDEO -> 1

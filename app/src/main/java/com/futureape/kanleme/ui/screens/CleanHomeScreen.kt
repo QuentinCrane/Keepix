@@ -58,8 +58,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.futureape.kanleme.ui.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -77,6 +77,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -94,11 +95,13 @@ import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.CleaningScope
 import com.futureape.kanleme.data.repository.DashboardStats
 import com.futureape.kanleme.data.settings.AppSettings
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.rememberHapticKit
 import com.futureape.kanleme.ui.util.shareDailyReportImage
+import com.futureape.kanleme.ui.i18n.uiText
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.launch
 
@@ -151,7 +154,7 @@ fun CleanHomeScreen(
             haptics.tick()
             onToday()
         } else {
-            viewModel.showMessage("今天暂无往年照片或视频")
+            viewModel.showMessage(uiText(R.string.message_today_history_empty))
         }
     }
     LaunchedEffect(settings.homeMediaTab) {
@@ -238,7 +241,7 @@ fun CleanHomeScreen(
         onPhotoDate = { mode ->
             haptics.tick()
             if (mode == "today_history" && !hasTodayMemories) {
-                viewModel.showMessage("今天暂无往年照片或视频")
+                viewModel.showMessage(uiText(R.string.message_today_history_empty))
             } else {
                 viewModel.setPhotoDateModePreview(mode)
             }
@@ -254,7 +257,7 @@ fun CleanHomeScreen(
         onVideoDate = { mode ->
             haptics.tick()
             if (mode == "today_history" && !hasTodayMemories) {
-                viewModel.showMessage("今天暂无往年照片或视频")
+                viewModel.showMessage(uiText(R.string.message_today_history_empty))
             } else {
                 viewModel.setVideoDateModePreview(mode)
             }
@@ -298,7 +301,7 @@ fun CleanHomeScreen(
                     }.onSuccess {
                         haptics.success()
                     }.onFailure {
-                        dailyReportExportError = "导出失败，请稍后再试"
+                        dailyReportExportError = context.getString(R.string.daily_report_export_error)
                     }
                     exportingDailyReport = false
                 }
@@ -336,14 +339,14 @@ private fun DailyReportDialog(
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("今日整理贴纸", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.daily_report_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         Surface(
                             modifier = Modifier.size(42.dp).clickable(onClick = onDismiss),
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.a11y_close), modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -367,7 +370,7 @@ private fun DailyReportDialog(
                             modifier = Modifier.weight(1f).height(48.dp),
                             shape = RoundedCornerShape(999.dp),
                         ) {
-                            Text("关闭", style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.daily_report_close), style = MaterialTheme.typography.titleMedium)
                         }
                         Button(
                             onClick = onExport,
@@ -375,9 +378,12 @@ private fun DailyReportDialog(
                             modifier = Modifier.weight(1.25f).height(48.dp),
                             shape = RoundedCornerShape(999.dp),
                         ) {
-                            Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Rounded.Share, contentDescription = stringResource(R.string.a11y_export), modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(if (exporting) "导出中" else "导出图片", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                stringResource(if (exporting) R.string.daily_report_exporting else R.string.daily_report_export),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                         }
                     }
                 }
@@ -404,20 +410,24 @@ private fun DailyReportSticker(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "今日整理",
+                        stringResource(R.string.daily_report_heading),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        if (total > 0) "你今天处理了 " + total + " 个媒体文件" else "今天还没有开始整理",
+                        if (total > 0) {
+                            stringResource(R.string.daily_report_processed, total)
+                        } else {
+                            stringResource(R.string.daily_report_not_started)
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Surface(shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)) {
                     Text(
-                        "动作 " + todayActions,
+                        stringResource(R.string.daily_report_actions, todayActions),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
@@ -432,15 +442,15 @@ private fun DailyReportSticker(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                 )
-                Text("今日总计", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.daily_report_total), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TodayMetric("照片", todayPhotos, Modifier.weight(1f))
-                TodayMetric("视频", todayVideos, Modifier.weight(1f))
-                TodayMetric("动作", todayActions, Modifier.weight(1f))
+                TodayMetric(R.string.daily_report_photo, todayPhotos, Modifier.weight(1f))
+                TodayMetric(R.string.daily_report_video, todayVideos, Modifier.weight(1f))
+                TodayMetric(R.string.daily_report_action, todayActions, Modifier.weight(1f))
             }
             Text(
-                if (total > 0) "小步整理，也是在腾出生活空间" else "开一小局，从几张照片开始",
+                stringResource(if (total > 0) R.string.daily_report_motto_active else R.string.daily_report_motto_empty),
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -451,7 +461,7 @@ private fun DailyReportSticker(
 }
 
 @Composable
-private fun TodayMetric(label: String, value: Int, modifier: Modifier) {
+private fun TodayMetric(@androidx.annotation.StringRes label: Int, value: Int, modifier: Modifier) {
     Surface(
         modifier = modifier.height(64.dp),
         shape = RoundedCornerShape(20.dp),
@@ -465,7 +475,7 @@ private fun TodayMetric(label: String, value: Int, modifier: Modifier) {
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
             )
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

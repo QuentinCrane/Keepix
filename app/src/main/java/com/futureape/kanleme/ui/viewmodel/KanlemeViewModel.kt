@@ -1,5 +1,6 @@
 package com.futureape.kanleme.ui.viewmodel
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.futureape.kanleme.data.local.PhotoEntity
@@ -456,6 +457,14 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun clearMessage() { _message.value = null }
+
+    fun showMessage(message: UiText) {
+        _message.value = message
+    }
+
+    fun showMessage(@StringRes messageId: Int, vararg args: Any) {
+        showMessage(uiText(messageId, *args))
+    }
 
     fun showMessage(message: String) {
         _message.value = dynamicUiText(message)
