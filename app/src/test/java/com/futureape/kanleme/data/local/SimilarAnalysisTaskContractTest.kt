@@ -17,6 +17,14 @@ class SimilarAnalysisTaskContractTest {
     }
 
     @Test
+    fun pausedAndFailedTasksCanBeCancelledBeforeAWorkerResumes() {
+        assertTrue(SimilarAnalysisTaskStatus.isCancellable(SimilarAnalysisTaskStatus.PAUSED))
+        assertTrue(SimilarAnalysisTaskStatus.isCancellable(SimilarAnalysisTaskStatus.FAILED))
+        assertFalse(SimilarAnalysisTaskStatus.isCancellable(SimilarAnalysisTaskStatus.COMPLETED))
+        assertFalse(SimilarAnalysisTaskStatus.isCancellable(SimilarAnalysisTaskStatus.CANCELLED))
+    }
+
+    @Test
     fun pageSizeAndAlgorithmVersionAreStableTaskInputs() {
         assertTrue(SimilarAnalysisContract.PAGE_SIZE > 0)
         assertTrue(SimilarAnalysisContract.ALGORITHM_VERSION > 0)

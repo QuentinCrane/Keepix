@@ -34,10 +34,11 @@ idle -> queued -> running -> completed
 - 指纹/聚类算法版本变化
 - 用户主动重新检测
 
-关闭“相似照片检测”只请求取消未来任务，不清空已经生成的分组或指纹。后台 Worker 的唯一调度、约束、退避和进程重启续接由 C08b 负责。
+关闭“相似照片检测”只取消未来任务，不清空已经生成的分组或指纹。后台 Worker 使用唯一工作名 `kanleme-similar-photo-analysis`：自动任务采用 `KEEP`、非低电量/非低存储/设备空闲约束；手动开始或继续采用 `REPLACE`、非低电量/非低存储约束。两种模式共享同一个工作名，不会并发运行；失败使用 30 秒起步的指数退避，最多重试 4 次，进程被系统停止时由 WorkManager 保留并恢复任务。
 
 ## 当前验证
 
 - JVM：活动状态集合、分页常量和算法版本合同
 - Room AndroidTest：任务 token、权限/媒体版本、游标和取消标记可写入并恢复
-- 构建：Debug/KAPT/Room schema 已通过；C08b 完成后再增加 WorkManager 调度与强杀恢复验收
+- JVM：自动/手动约束、唯一工作名、KEEP/REPLACE 策略和退避合同
+- 构建：Debug/KAPT/Room schema 已通过；WorkManager 的强杀、重启、低电量和真实权限对话框仍需设备验收

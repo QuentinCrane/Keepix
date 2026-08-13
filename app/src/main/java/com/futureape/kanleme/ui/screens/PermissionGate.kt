@@ -1,8 +1,6 @@
 package com.futureape.kanleme.ui.screens
 
 import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,11 +31,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.futureape.kanleme.R
 import com.futureape.kanleme.data.media.MediaAccessState
+import com.futureape.kanleme.data.media.MediaAccessSnapshot
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.i18n.Text
 
@@ -53,7 +51,7 @@ fun MediaPermissionGate(
 ) {
     val context = LocalContext.current
     val permissions = remember { requiredMediaPermissions() }
-    var access by remember { mutableStateOf(currentMediaAccessState(context)) }
+    var access by remember { mutableStateOf(MediaAccessSnapshot.current(context)) }
     var firstResumeObserved by remember { mutableStateOf(false) }
 
     val accessLabel = when {
@@ -65,7 +63,7 @@ fun MediaPermissionGate(
     }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        val latest = currentMediaAccessState(context)
+        val latest = MediaAccessSnapshot.current(context)
         val changed = latest.key != access.key
         access = latest
         if (!changed && latest.isPartialVisualAccess) {
@@ -75,7 +73,7 @@ fun MediaPermissionGate(
     }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        val latest = currentMediaAccessState(context)
+        val latest = MediaAccessSnapshot.current(context)
         val changed = latest.key != access.key
         access = latest
         if (firstResumeObserved && !changed && latest.isPartialVisualAccess) {
@@ -127,7 +125,7 @@ fun MediaPermissionGate(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button(onClick = { launcher.launch(permissions) }) { Text(stringResource(R.string.permission_action_authorize)) }
-                        AssistChip(onClick = { access = currentMediaAccessState(context) }, label = { Text(stringResource(R.string.permission_action_refresh)) })
+                        AssistChip(onClick = { access = MediaAccessSnapshot.current(context) }, label = { Text(stringResource(R.string.permission_action_refresh)) })
                     }
                 }
             }
@@ -152,28 +150,6 @@ private fun LimitedAccessBanner(
             )
             Spacer(Modifier.height(8.dp))
             FilledTonalButton(onClick = onRequestFullAccess) { Text(stringResource(R.string.permission_action_reselect)) }
-        }
-    }
-}
-
-fun currentMediaAccessState(context: Context): MediaAccessState {
-    fun granted(permission: String): Boolean =
-        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-
-    return when {
-        Build.VERSION.SDK_INT >= 34 -> MediaAccessState(
-            canReadImages = granted(Manifest.permission.READ_MEDIA_IMAGES),
-            canReadVideos = granted(Manifest.permission.READ_MEDIA_VIDEO),
-            canReadSelectedVisualMedia = granted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED),
-        )
-        Build.VERSION.SDK_INT >= 33 -> MediaAccessState(
-            canReadImages = granted(Manifest.permission.READ_MEDIA_IMAGES),
-            canReadVideos = granted(Manifest.permission.READ_MEDIA_VIDEO),
-            canReadSelectedVisualMedia = false,
-        )
-        else -> {
-            val canRead = granted(Manifest.permission.READ_EXTERNAL_STORAGE)
-            MediaAccessState(canReadImages = canRead, canReadVideos = canRead, canReadSelectedVisualMedia = false)
         }
     }
 }

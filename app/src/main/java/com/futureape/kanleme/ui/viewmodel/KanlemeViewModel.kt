@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.SimilarAnalysisContract
-import com.futureape.kanleme.data.local.SimilarAnalysisInputChangedException
 import com.futureape.kanleme.data.local.SimilarAnalysisTaskEntity
 import com.futureape.kanleme.data.local.SimilarAnalysisTaskStatus
 import com.futureape.kanleme.data.local.TrashItemEntity
@@ -36,6 +35,8 @@ import com.futureape.kanleme.data.settings.TodayInHistoryEntryMode
 import com.futureape.kanleme.data.settings.VideoDisplayMode
 import com.futureape.kanleme.data.settings.nextAccentColor
 import com.futureape.kanleme.data.settings.nextBatchSize
+import com.futureape.kanleme.data.worker.SimilarAnalysisScheduler
+import com.futureape.kanleme.data.worker.SimilarAnalysisWorkMode
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.i18n.UiText
 import com.futureape.kanleme.ui.i18n.dynamicUiText
@@ -185,6 +186,7 @@ data class PendingMediaAuthorization(
 class KanlemeViewModel @Inject constructor(
     private val repository: AppRepository,
     private val settingsRepository: AppSettingsRepository,
+    private val similarAnalysisScheduler: SimilarAnalysisScheduler,
 ) : ViewModel() {
     private companion object {
         const val PHOTO_DECK_LOAD_WINDOW = 420
@@ -339,7 +341,6 @@ class KanlemeViewModel @Inject constructor(
     private var videoDeckPreviewGeneration = 0L
     private var photoDayMemoryWindowGeneration = 0L
     private var lastGeneratedRandomSeed = 1L
-    private var similarManualJob: Job? = null
     private val pendingPhotoActionMediaIds = mutableSetOf<Long>()
     private val handledPhotoActionMediaIds = mutableSetOf<Long>()
     private val photoSessionActions = ArrayDeque<PhotoSessionAction>()
@@ -383,6 +384,22 @@ class KanlemeViewModel @Inject constructor(
         )
     }
 
+    private fun resumeSimilarAnalysisIfEnabled(access: MediaAccessState) {
+        viewModelScope.launch {
+            if (!settingsRepository.settings.first().similarDetection) return@launch
+            val task = runCatching {
+                repository.prepareSimilarAnalysis(
+                    accessKey = access.key,
+                    limit = SimilarAnalysisContract.DEFAULT_LIMIT,
+                    forceRestart = false,
+                )
+            }.getOrNull() ?: return@launch
+            if (task.status != SimilarAnalysisTaskStatus.COMPLETED && task.status != SimilarAnalysisTaskStatus.CANCELLED) {
+                similarAnalysisScheduler.enqueue(SimilarAnalysisWorkMode.AUTO)
+            }
+        }
+    }
+
     fun refreshLibrary(
         accessLabel: String? = null,
         showMessage: Boolean = true,
@@ -416,6 +433,7 @@ class KanlemeViewModel @Inject constructor(
                         videoDeckPreviewScopeLoaded = false
                         loadVideoDeckPreview(_videoScope.value)
                     }
+                    currentMediaAccessState?.let(::resumeSimilarAnalysisIfEnabled)
                 }
                 .onFailure {
                     if (showPhotoPreparing) _photoDeckPreparing.value = false
@@ -1880,11 +1898,11 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun seedSimilarGroups(limit: Int = 3600) {
-        if (similarManualJob?.isActive == true || similarDetectionState.value.running) {
+        if (similarDetectionState.value.running) {
             _message.value = uiText(R.string.message_similar_detection_background)
             return
         }
-        similarManualJob = viewModelScope.launch {
+        viewModelScope.launch {
             val accessKey = currentMediaAccessState?.key
             if (accessKey == null) {
                 _message.value = uiText(R.string.message_media_permission_required)
@@ -1893,11 +1911,11 @@ class KanlemeViewModel @Inject constructor(
             if (dashboard.value.photoCount == 0) {
                 runCatching { repository.refreshMediaLibrary(currentMediaAccessState.toSyncOptions()) }
             }
-            runSimilarAnalysis(
-                accessKey = accessKey,
-                limit = limit,
-                forceRestart = true,
-            )
+            val task = prepareSimilarAnalysis(accessKey, limit, forceRestart = true) ?: return@launch
+            similarAnalysisScheduler.enqueue(SimilarAnalysisWorkMode.MANUAL)
+            if (task.status == SimilarAnalysisTaskStatus.COMPLETED) {
+                _message.value = uiText(R.string.message_similar_detection_background)
+            }
         }
     }
 
@@ -1906,30 +1924,31 @@ class KanlemeViewModel @Inject constructor(
             dashboard.value.photoCount > 0 -> dashboard.value.photoCount.coerceAtMost(8000)
             else -> 4800
         }
-        if (similarManualJob?.isActive == true || similarDetectionState.value.running) {
+        if (similarDetectionState.value.running) {
             _message.value = uiText(R.string.message_similar_detection_background)
             return
         }
-        similarManualJob = viewModelScope.launch {
+        viewModelScope.launch {
             val accessKey = currentMediaAccessState?.key
             if (accessKey == null) {
                 _message.value = uiText(R.string.message_media_permission_required)
                 return@launch
             }
-            runSimilarAnalysis(
+            prepareSimilarAnalysis(
                 accessKey = accessKey,
                 limit = nextLimit,
                 forceRestart = similarDetectionState.value.progress >= 1f,
-            )
+            ) ?: return@launch
+            similarAnalysisScheduler.enqueue(SimilarAnalysisWorkMode.MANUAL)
         }
     }
 
-    private suspend fun runSimilarAnalysis(
+    private suspend fun prepareSimilarAnalysis(
         accessKey: String,
         limit: Int,
         forceRestart: Boolean,
-    ) {
-        val task = runCatching {
+    ): SimilarAnalysisTaskEntity? {
+        return runCatching {
             repository.prepareSimilarAnalysis(
                 accessKey = accessKey,
                 limit = limit.coerceIn(2, SimilarAnalysisContract.DEFAULT_LIMIT * 3),
@@ -1937,29 +1956,7 @@ class KanlemeViewModel @Inject constructor(
             )
         }.getOrElse { throwable ->
             _message.value = throwable.message?.let(::dynamicUiText) ?: uiText(R.string.message_similar_detection_failed)
-            return
-        }
-        if (task.status == SimilarAnalysisTaskStatus.COMPLETED && !forceRestart) {
-            return
-        }
-        runCatching {
-            repository.runSimilarAnalysis(task) { _, _, _ -> }
-        }.onSuccess { result ->
-            when (result.status) {
-                SimilarAnalysisTaskStatus.COMPLETED -> {
-                    _message.value = if (result.resultCount > 0) {
-                        UiText.Plural(R.plurals.similar_group_count, result.resultCount)
-                    } else {
-                        uiText(R.string.message_similar_detection_no_result)
-                    }
-                }
-                SimilarAnalysisTaskStatus.CANCELLED -> Unit
-            }
-        }.onFailure { throwable ->
-            _message.value = when (throwable) {
-                is SimilarAnalysisInputChangedException -> throwable.message?.let(::dynamicUiText)
-                else -> throwable.message?.let(::dynamicUiText) ?: uiText(R.string.message_similar_detection_failed)
-            }
+            null
         }
     }
 
@@ -2150,12 +2147,14 @@ class KanlemeViewModel @Inject constructor(
                     limit = SimilarAnalysisContract.DEFAULT_LIMIT,
                     forceRestart = false,
                 )
-                if (!SimilarAnalysisTaskStatus.isRunning(task.status) && task.status != SimilarAnalysisTaskStatus.COMPLETED) {
-                    _message.value = uiText(R.string.message_similar_detection_failed)
+                if (task.status != SimilarAnalysisTaskStatus.COMPLETED && task.status != SimilarAnalysisTaskStatus.CANCELLED) {
+                    similarAnalysisScheduler.enqueue(SimilarAnalysisWorkMode.AUTO)
                 }
             }
         } else {
             repository.cancelSimilarAnalysis()
+            similarAnalysisScheduler.cancel()
+            repository.markSimilarAnalysisCancelled()
         }
     }
 

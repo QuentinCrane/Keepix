@@ -167,6 +167,8 @@ interface AppRepository {
         forceRestart: Boolean = false,
     ): SimilarAnalysisTaskEntity
     suspend fun cancelSimilarAnalysis()
+    suspend fun markSimilarAnalysisCancelled()
+    suspend fun pauseSimilarAnalysis(stage: String)
     suspend fun runSimilarAnalysis(
         task: SimilarAnalysisTaskEntity,
         onProgress: (processed: Int, total: Int, stage: String) -> Unit = { _, _, _ -> },

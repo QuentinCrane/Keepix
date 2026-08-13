@@ -16,6 +16,12 @@ object SimilarAnalysisTaskStatus {
     const val FAILED = "failed"
 
     fun isRunning(status: String): Boolean = status == QUEUED || status == RUNNING || status == CANCEL_REQUESTED
+
+    fun isCancellable(status: String): Boolean = status == QUEUED ||
+        status == RUNNING ||
+        status == CANCEL_REQUESTED ||
+        status == PAUSED ||
+        status == FAILED
 }
 
 object SimilarAnalysisContract {

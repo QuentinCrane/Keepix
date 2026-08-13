@@ -2,6 +2,8 @@ package com.futureape.kanleme
 
 import android.app.Application
 import android.os.Build
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import coil.disk.DiskCache
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -12,10 +14,19 @@ import com.futureape.kanleme.ui.util.IMAGE_DISK_CACHE_MAX_BYTES
 import com.futureape.kanleme.ui.util.installCrashLogger
 import com.futureape.kanleme.ui.util.trimAppCache
 import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
 import java.io.File
 
 @HiltAndroidApp
-class KanlemeApplication : Application(), ImageLoaderFactory {
+class KanlemeApplication : Application(), ImageLoaderFactory, Configuration.Provider {
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .setMinimumLoggingLevel(if (BuildConfig.DEBUG) android.util.Log.DEBUG else android.util.Log.INFO)
+            .build()
+
     override fun onCreate() {
         super.onCreate()
         installCrashLogger(this)

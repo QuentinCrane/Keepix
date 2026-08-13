@@ -204,12 +204,38 @@ class AppRepositoryImpl @Inject constructor(
 
     override suspend fun cancelSimilarAnalysis() = withContext(Dispatchers.IO) {
         val current = similarDao.analysisTask() ?: return@withContext
-        if (!SimilarAnalysisTaskStatus.isRunning(current.status)) return@withContext
+        if (!SimilarAnalysisTaskStatus.isCancellable(current.status)) return@withContext
         similarDao.upsertAnalysisTask(
             current.copy(
                 status = SimilarAnalysisTaskStatus.CANCEL_REQUESTED,
                 cancelRequested = true,
                 stage = "正在停止检测",
+                updatedAt = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    override suspend fun markSimilarAnalysisCancelled() = withContext(Dispatchers.IO) {
+        val current = similarDao.analysisTask() ?: return@withContext
+        if (!SimilarAnalysisTaskStatus.isCancellable(current.status)) return@withContext
+        similarDao.upsertAnalysisTask(
+            current.copy(
+                status = SimilarAnalysisTaskStatus.CANCELLED,
+                cancelRequested = false,
+                stage = "检测已取消",
+                updatedAt = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    override suspend fun pauseSimilarAnalysis(stage: String) = withContext(Dispatchers.IO) {
+        val current = similarDao.analysisTask() ?: return@withContext
+        if (!SimilarAnalysisTaskStatus.isRunning(current.status)) return@withContext
+        similarDao.upsertAnalysisTask(
+            current.copy(
+                status = SimilarAnalysisTaskStatus.PAUSED,
+                cancelRequested = false,
+                stage = stage,
                 updatedAt = System.currentTimeMillis(),
             )
         )
@@ -846,7 +872,7 @@ class AppRepositoryImpl @Inject constructor(
                 resultCount = currentAtStart?.lastResultCount ?: 0,
             )
         }
-        if (currentAtStart.cancelRequested || currentAtStart.status == SimilarAnalysisTaskStatus.CANCEL_REQUESTED) {
+        if (currentAtStart.status == SimilarAnalysisTaskStatus.CANCELLED || currentAtStart.cancelRequested || currentAtStart.status == SimilarAnalysisTaskStatus.CANCEL_REQUESTED) {
             val cancelled = currentAtStart.copy(
                 status = SimilarAnalysisTaskStatus.CANCELLED,
                 cancelRequested = false,
@@ -889,7 +915,7 @@ class AppRepositoryImpl @Inject constructor(
                         resultCount = current?.lastResultCount ?: 0,
                     )
                 }
-                if (current.cancelRequested || current.status == SimilarAnalysisTaskStatus.CANCEL_REQUESTED) {
+                if (current.status == SimilarAnalysisTaskStatus.CANCELLED || current.cancelRequested || current.status == SimilarAnalysisTaskStatus.CANCEL_REQUESTED) {
                     val cancelled = current.copy(
                         status = SimilarAnalysisTaskStatus.CANCELLED,
                         cancelRequested = false,
