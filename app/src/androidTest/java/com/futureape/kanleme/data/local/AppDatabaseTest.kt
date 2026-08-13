@@ -52,6 +52,41 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun dashboardProjectionPreservesCountsAndTodayAggregates() = runBlocking {
+        database.photoDao().upsertAll(
+            listOf(
+                photo(mediaStoreId = 43L, displayName = "pending.jpg").copy(
+                    processingStatus = KEPT,
+                    deletionStatus = DeletionStatus.TRASHED,
+                    size = 4_096L,
+                ),
+            ),
+        )
+        database.statsDao().insertCleanupEvent(
+            CleanupEventEntity(
+                eventId = "dashboard-event",
+                eventType = "kept",
+                mediaType = "photo",
+                photoDelta = 1,
+                actionCount = 2,
+                localDate = "2026-08-13",
+                occurredAt = 1_700_000_001_000L,
+                sourceType = "test",
+                createdAt = 1_700_000_001_000L,
+            ),
+        )
+
+        val counts = database.statsDao().observeDashboardCounts("2026-08-13").first()
+
+        assertEquals(1, counts.photoCount)
+        assertEquals(1, counts.processedPhotoCount)
+        assertEquals(1, counts.photoPendingDeleteCount)
+        assertEquals(4_096L, counts.photoPendingDeleteBytes)
+        assertEquals(1, counts.todayPhotoCount)
+        assertEquals(2, counts.todayActionCount)
+    }
+
+    @Test
     fun randomQueueOrderIsStableWhenRefreshedWithTheSameSeed() = runBlocking {
         database.photoDao().upsertAll(
             (0 until 12).map { index ->

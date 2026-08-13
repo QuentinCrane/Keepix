@@ -467,8 +467,44 @@ data class CleanupEventFolderAggregate(
     @ColumnInfo(name = "affected_count") val affectedCount: Long,
 )
 
+data class DashboardCountsProjection(
+    @ColumnInfo(name = "photo_count") val photoCount: Int,
+    @ColumnInfo(name = "video_count") val videoCount: Int,
+    @ColumnInfo(name = "processed_photo_count") val processedPhotoCount: Int,
+    @ColumnInfo(name = "processed_video_count") val processedVideoCount: Int,
+    @ColumnInfo(name = "photo_favorite_count") val photoFavoriteCount: Int,
+    @ColumnInfo(name = "video_favorite_count") val videoFavoriteCount: Int,
+    @ColumnInfo(name = "trash_count") val trashCount: Int,
+    @ColumnInfo(name = "photo_pending_delete_count") val photoPendingDeleteCount: Int,
+    @ColumnInfo(name = "video_pending_delete_count") val videoPendingDeleteCount: Int,
+    @ColumnInfo(name = "photo_pending_delete_bytes") val photoPendingDeleteBytes: Long,
+    @ColumnInfo(name = "video_pending_delete_bytes") val videoPendingDeleteBytes: Long,
+    @ColumnInfo(name = "today_photo_count") val todayPhotoCount: Int,
+    @ColumnInfo(name = "today_video_count") val todayVideoCount: Int,
+    @ColumnInfo(name = "today_action_count") val todayActionCount: Int,
+)
+
 @Dao
 interface StatsDao {
+    @Query("""
+        SELECT
+            (SELECT COUNT(*) FROM photos WHERE missing_since IS NULL) AS photo_count,
+            (SELECT COUNT(*) FROM videos WHERE missing_since IS NULL) AS video_count,
+            (SELECT COUNT(*) FROM photos WHERE missing_since IS NULL AND (processing_status != 'unprocessed' OR deletion_status != 'none')) AS processed_photo_count,
+            (SELECT COUNT(*) FROM videos WHERE missing_since IS NULL AND (processing_status != 'unprocessed' OR deletion_status != 'none')) AS processed_video_count,
+            (SELECT COUNT(*) FROM photos WHERE processing_status = 'favorited' AND deletion_status = 'none' AND missing_since IS NULL) AS photo_favorite_count,
+            (SELECT COUNT(*) FROM videos WHERE processing_status = 'favorited' AND deletion_status = 'none' AND missing_since IS NULL) AS video_favorite_count,
+            (SELECT COUNT(*) FROM trash_items) AS trash_count,
+            (SELECT COUNT(*) FROM photos WHERE deletion_status IN ('pending', 'trashed') AND missing_since IS NULL) AS photo_pending_delete_count,
+            (SELECT COUNT(*) FROM videos WHERE deletion_status IN ('pending', 'trashed') AND missing_since IS NULL) AS video_pending_delete_count,
+            COALESCE((SELECT SUM(size) FROM photos WHERE deletion_status IN ('pending', 'trashed') AND missing_since IS NULL), 0) AS photo_pending_delete_bytes,
+            COALESCE((SELECT SUM(size) FROM videos WHERE deletion_status IN ('pending', 'trashed') AND missing_since IS NULL), 0) AS video_pending_delete_bytes,
+            MAX(0, CAST(COALESCE((SELECT SUM(photo_delta) FROM cleanup_events WHERE local_date = :localDate), 0) AS INTEGER)) AS today_photo_count,
+            MAX(0, CAST(COALESCE((SELECT SUM(video_delta) FROM cleanup_events WHERE local_date = :localDate), 0) AS INTEGER)) AS today_video_count,
+            MAX(0, CAST(COALESCE((SELECT SUM(action_count) FROM cleanup_events WHERE local_date = :localDate), 0) AS INTEGER)) AS today_action_count
+    """)
+    fun observeDashboardCounts(localDate: String): Flow<DashboardCountsProjection>
+
     @Query("SELECT * FROM user_stats WHERE id = 1")
     fun observeUserStats(): Flow<UserStatsEntity?>
 

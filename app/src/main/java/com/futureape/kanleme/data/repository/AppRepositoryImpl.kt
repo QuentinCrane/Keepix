@@ -75,45 +75,26 @@ class AppRepositoryImpl @Inject constructor(
     private val mediaSyncStateDao = db.mediaSyncStateDao()
 
     override fun observeDashboard(): Flow<DashboardStats> = combine(
-        photoDao.observeCount().map { it as Any? },
-        videoDao.observeCount().map { it as Any? },
-        photoDao.observeProcessedCount().map { it as Any? },
-        videoDao.observeProcessedCount().map { it as Any? },
-        photoDao.observeCountByStatus(ProcessingStatus.FAVORITED).map { it as Any? },
-        videoDao.observeCountByStatus(ProcessingStatus.FAVORITED).map { it as Any? },
-        trashDao.observeCount().map { it as Any? },
-        photoDao.observeDeleteCount().map { it as Any? },
-        videoDao.observeDeleteCount().map { it as Any? },
-        photoDao.observeDeleteSize().map { it as Any? },
-        videoDao.observeDeleteSize().map { it as Any? },
-        statsDao.observeTodayPhotoCount(todayLocalDate()).map { it as Any? },
-        statsDao.observeTodayVideoCount(todayLocalDate()).map { it as Any? },
-        statsDao.observeTodayActionCount(todayLocalDate()).map { it as Any? },
-        statsDao.observeUserStats().map { it as Any? },
-    ) { values ->
-        val photoFavorites = values[4] as Int
-        val videoFavorites = values[5] as Int
-        val photoPendingDelete = values[7] as Int
-        val videoPendingDelete = values[8] as Int
-        val photoPendingDeleteBytes = values[9] as Long
-        val videoPendingDeleteBytes = values[10] as Long
+        statsDao.observeDashboardCounts(todayLocalDate()),
+        statsDao.observeUserStats(),
+    ) { counts, userStats ->
         DashboardStats(
-            photoCount = values[0] as Int,
-            videoCount = values[1] as Int,
-            processedPhotoCount = values[2] as Int,
-            processedVideoCount = values[3] as Int,
-            favoriteCount = photoFavorites + videoFavorites,
-            trashCount = values[6] as Int,
-            pendingDeleteCount = photoPendingDelete + videoPendingDelete,
-            pendingDeleteBytes = photoPendingDeleteBytes + videoPendingDeleteBytes,
-            photoPendingDeleteCount = photoPendingDelete,
-            videoPendingDeleteCount = videoPendingDelete,
-            photoPendingDeleteBytes = photoPendingDeleteBytes,
-            videoPendingDeleteBytes = videoPendingDeleteBytes,
-            todayPhotoCount = values[11] as Int,
-            todayVideoCount = values[12] as Int,
-            todayActionCount = values[13] as Int,
-            userStats = values[14] as? UserStatsEntity,
+            photoCount = counts.photoCount,
+            videoCount = counts.videoCount,
+            processedPhotoCount = counts.processedPhotoCount,
+            processedVideoCount = counts.processedVideoCount,
+            favoriteCount = counts.photoFavoriteCount + counts.videoFavoriteCount,
+            trashCount = counts.trashCount,
+            pendingDeleteCount = counts.photoPendingDeleteCount + counts.videoPendingDeleteCount,
+            pendingDeleteBytes = counts.photoPendingDeleteBytes + counts.videoPendingDeleteBytes,
+            photoPendingDeleteCount = counts.photoPendingDeleteCount,
+            videoPendingDeleteCount = counts.videoPendingDeleteCount,
+            photoPendingDeleteBytes = counts.photoPendingDeleteBytes,
+            videoPendingDeleteBytes = counts.videoPendingDeleteBytes,
+            todayPhotoCount = counts.todayPhotoCount,
+            todayVideoCount = counts.todayVideoCount,
+            todayActionCount = counts.todayActionCount,
+            userStats = userStats,
         )
     }
 
