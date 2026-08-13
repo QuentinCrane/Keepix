@@ -146,17 +146,17 @@ fun TodayInHistoryScreen(
     ProfileDarkPage {
         Column(Modifier.fillMaxSize().navigationBarsPadding().padding(top = 46.dp)) {
             ProfilePageHeader(
-                title = "那年今日",
-                subtitle = "按年份回看往年今天的照片和视频",
+                title = stringResource(R.string.today_history_title),
+                subtitle = stringResource(R.string.today_history_subtitle),
                 onBack = onBack,
                 modifier = Modifier.padding(horizontal = 22.dp),
             )
             Spacer(Modifier.height(18.dp))
         if (memories.isEmpty()) {
             ProfileEmptyState(
-                "今天暂无往年记忆",
-                "同步媒体库后，会自动按月日匹配往年今日的照片和视频。",
-                "同步媒体库",
+                stringResource(R.string.today_history_empty_title),
+                stringResource(R.string.today_history_empty_body),
+                stringResource(R.string.timeline_sync),
                 { viewModel.refreshLibrary() },
                 modifier = Modifier.padding(horizontal = 22.dp),
             )
@@ -217,17 +217,17 @@ fun PhotoHistoryScreen(
     ProfileDarkPage {
         Column(Modifier.fillMaxSize().padding(top = 46.dp)) {
             ProfilePageHeader(
-                title = "整理历史",
-                subtitle = "最近整理过的照片，方便反悔后再找回",
+                title = stringResource(R.string.photo_history_title),
+                subtitle = stringResource(R.string.photo_history_subtitle),
                 onBack = onBack,
                 modifier = Modifier.padding(horizontal = 22.dp),
             )
             Spacer(Modifier.height(18.dp))
         if (photos.isEmpty()) {
             ProfileEmptyState(
-                "还没有照片整理记录",
-                "开始整理后，保留、收藏和待删操作会自动出现在这里。",
-                "同步媒体库",
+                stringResource(R.string.photo_history_empty_title),
+                stringResource(R.string.photo_history_empty_body),
+                stringResource(R.string.timeline_sync),
                 { viewModel.refreshLibrary() },
                 modifier = Modifier.padding(horizontal = 22.dp),
             )
@@ -250,8 +250,8 @@ private fun TodaySummaryCard(yearCount: Int, photoCount: Int, videoCount: Int) {
                 Icon(Icons.Rounded.CalendarToday, contentDescription = null, tint = ProfileScreenAccent)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("找到 $yearCount 个年份的往年今日", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
-                Text("$photoCount 张照片 · $videoCount 个视频", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.58f))
+                Text(stringResource(R.string.today_history_found_years, yearCount), style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.today_history_photo_video_counts, photoCount, videoCount), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.58f))
             }
         }
     }
@@ -271,9 +271,9 @@ private fun TodayYearHeader(
             Icon(if (expanded) Icons.Rounded.ExpandMore else Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = ProfileScreenAccent)
             Column(Modifier.weight(1f)) {
                 Text(year.toString(), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
-                Text("$count 个媒体 · $photoCount 张照片 · $videoCount 个视频", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.56f))
+                Text(stringResource(R.string.today_history_year_counts, count, photoCount, videoCount), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.56f))
             }
-            Text(if (expanded) "收起" else "展开", style = MaterialTheme.typography.labelLarge, color = ProfileScreenAccent)
+            Text(stringResource(if (expanded) R.string.today_history_collapse else R.string.today_history_expand), style = MaterialTheme.typography.labelLarge, color = ProfileScreenAccent)
         }
     }
 }

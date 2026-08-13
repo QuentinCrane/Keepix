@@ -21,17 +21,19 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import com.futureape.kanleme.ui.i18n.Text
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.i18n.asString
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import com.futureape.kanleme.R
 
 @Composable
 fun SimilarPhotosScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onOpenPhoto: (Long) -> Unit = {}) {
@@ -39,7 +41,7 @@ fun SimilarPhotosScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onOpenP
     val groups = screenState.groups
     val detection = screenState.detection
     Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-        ScreenHeader("相似照片", "后台检测重复、连拍、截图和模糊照片，可离开页面后回来查看进度", onBack)
+        ScreenHeader(stringResource(R.string.similar_title), stringResource(R.string.similar_subtitle), onBack)
         SimilarDetectionProgressCard(
             running = detection.running,
             progress = detection.progress,
@@ -53,13 +55,17 @@ fun SimilarPhotosScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onOpenP
         )
         if (groups.isEmpty()) {
             EmptyState(
-                title = if (detection.running) "正在后台检测" else "还没有相似组",
+                title = stringResource(if (detection.running) R.string.similar_running_empty_title else R.string.similar_empty_title),
                 message = if (detection.running) {
-                    "检测会继续在后台运行，返回首页或锁屏后再回来也能继续看到进度。"
+                    stringResource(R.string.similar_running_empty_body)
                 } else {
-                    "点击后会读取当前相册，计算感知哈希、清晰度评分和连拍 / 截图聚类，生成可批量整理的分组。"
+                    stringResource(R.string.similar_empty_body)
                 },
-                actionText = if (detection.running) "检测中…" else if (detection.progress > 0f && detection.progress < 1f) "继续检测" else "开始检测",
+                actionText = stringResource(
+                    if (detection.running) R.string.similar_action_running
+                    else if (detection.progress > 0f && detection.progress < 1f) R.string.similar_action_continue
+                    else R.string.similar_action_start,
+                ),
                 onAction = { if (!detection.running) viewModel.continueSimilarDetection() },
                 modifier = Modifier.padding(18.dp),
             )
@@ -69,10 +75,10 @@ fun SimilarPhotosScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onOpenP
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("已生成 " + groups.size + " 组候选结果", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.similar_groups_generated, groups.size), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Button(onClick = { if (!detection.running) viewModel.continueSimilarDetection() }, enabled = !detection.running) {
                     if (detection.running) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text("重新检测")
+                    else Text(stringResource(R.string.similar_redetect))
                 }
             }
             LazyColumn(
@@ -90,9 +96,9 @@ fun SimilarPhotosScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onOpenP
                             Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Column(Modifier.weight(1f)) {
                                 Text(group.type.toReadableGroupType(), style = MaterialTheme.typography.titleMedium)
-                                Text("平均相似度 ${(group.averageSimilarity * 100).toInt()}% · 最佳照片 ID ${group.bestPhotoId}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.similar_average_best, (group.averageSimilarity * 100).toInt(), group.bestPhotoId), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Button(onClick = { onOpenPhoto(group.bestPhotoId) }) { Text("查看") }
+                            Button(onClick = { onOpenPhoto(group.bestPhotoId) }) { Text(stringResource(R.string.similar_view)) }
                         }
                     }
                 }
@@ -118,7 +124,7 @@ private fun SimilarDetectionProgressCard(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Column(Modifier.weight(1f)) {
-                    Text(if (running) "后台检测中" else "相似照片检测", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(if (running) R.string.similar_detection_running else R.string.similar_detection_title), style = MaterialTheme.typography.titleMedium)
                     Text(stage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Button(
@@ -129,7 +135,7 @@ private fun SimilarDetectionProgressCard(
                     if (running) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     else {
                         Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text(if (progress > 0f && progress < 1f) "继续" else "开始")
+                        Text(stringResource(if (progress > 0f && progress < 1f) R.string.similar_continue else R.string.similar_start))
                     }
                 }
             }
@@ -138,27 +144,28 @@ private fun SimilarDetectionProgressCard(
                 modifier = Modifier.fillMaxWidth().height(8.dp),
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("约 ${(progress * 100).toInt().coerceIn(0, 100)}%", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.similar_progress_percent, (progress * 100).toInt().coerceIn(0, 100)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 val hint = when {
-                    running && totalHint > 0 -> "约 $processedHint/$totalHint"
-                    lastResultCount > 0 -> "上次生成 $lastResultCount 组"
-                    else -> "可后台运行"
+                    running && totalHint > 0 -> stringResource(R.string.similar_progress_items, processedHint, totalHint)
+                    lastResultCount > 0 -> stringResource(R.string.similar_previous_groups, lastResultCount)
+                    else -> stringResource(R.string.similar_background_capable)
                 }
                 Text(hint, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (running) {
                 Spacer(Modifier.height(2.dp))
-                Text("离开页面不会打断当前检测；再次进入会恢复显示这个进度。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.similar_background_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
+@Composable
 private fun String.toReadableGroupType(): String = when (this) {
-    "similar" -> "相似照片"
-    "screenshot" -> "相似截图"
-    "burst" -> "连拍照片"
-    "duplicate" -> "重复照片"
-    "blur" -> "模糊照片"
+    "similar" -> stringResource(R.string.similar_group_similar)
+    "screenshot" -> stringResource(R.string.similar_group_screenshot)
+    "burst" -> stringResource(R.string.similar_group_burst)
+    "duplicate" -> stringResource(R.string.similar_group_duplicate)
+    "blur" -> stringResource(R.string.similar_group_blur)
     else -> this
 }
