@@ -2,6 +2,7 @@ package com.futureape.kanleme.data.repository
 
 import androidx.room.withTransaction
 import com.futureape.kanleme.data.local.AppDatabase
+import com.futureape.kanleme.data.local.AchievementProgressEntity
 import com.futureape.kanleme.data.local.CleanupEventEntity
 import com.futureape.kanleme.data.local.CleanupEventMetrics
 import com.futureape.kanleme.data.local.CleanupEventSourceType
@@ -1396,18 +1397,34 @@ class AppRepositoryImpl @Inject constructor(
     }
 
     override suspend fun buildAchievements(): List<AchievementUi> = withContext(Dispatchers.IO) {
-        val dashboard = observeDashboard().first()
-        val stats = dashboard.userStats ?: UserStatsEntity()
+        val totals = statsDao.aggregateEvents(0L, Long.MAX_VALUE)
+        val deletionTotals = statsDao.aggregateDeletionEvents(0L, Long.MAX_VALUE)
+        val streak = calculateCleaningStreak(
+            localDates = statsDao.qualifyingCleanupDates(),
+            today = todayLocalDate(),
+        )
+        val now = System.currentTimeMillis()
         achievementSpecs().map { spec ->
             val current = when (spec.metric) {
-                "clear" -> dashboard.processedCount
-                "favorite" -> dashboard.favoriteCount
-                "delete" -> dashboard.pendingDeleteCount
-                "storage" -> ((stats.totalStorageFreed / (1024 * 1024)).coerceAtLeast(0)).toInt()
-                "streak" -> stats.currentStreak
-                "undo" -> stats.totalUndoCount
-                else -> dashboard.processedCount
+                "clear" -> totals.cleanedMediaCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                "favorite" -> totals.favoriteActionCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                "delete" -> deletionTotals.movedToTrashCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                "storage" -> (totals.markedSizeBytes / (1024 * 1024)).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                "streak" -> streak.currentStreak
+                "undo" -> totals.undoCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                else -> totals.cleanedMediaCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             }
+            val persisted = statsDao.achievementProgress(spec.id)
+            val persistedUnlocked = persisted?.unlocked == true
+            val isUnlocked = persistedUnlocked || current >= spec.target
+            val nextProgress = AchievementProgressEntity(
+                achievementId = spec.id,
+                currentValue = current,
+                unlocked = isUnlocked,
+                unlockedAt = persisted?.unlockedAt ?: if (isUnlocked) now else null,
+                updatedAt = now,
+            )
+            if (persisted != nextProgress) statsDao.upsertAchievementProgress(nextProgress)
             AchievementUi(
                 id = spec.id,
                 title = spec.title,
@@ -1419,6 +1436,7 @@ class AppRepositoryImpl @Inject constructor(
                 rarity = spec.rarity,
                 xp = spec.xp,
                 iconKey = spec.iconKey,
+                unlockedOverride = isUnlocked,
             )
         }
     }
@@ -1519,6 +1537,19 @@ class AppRepositoryImpl @Inject constructor(
             now = now,
         )
         statsDao.insertCleanupEvent(event)
+        val streak = calculateCleaningStreak(
+            localDates = statsDao.qualifyingCleanupDates(),
+            today = todayLocalDate(now),
+        )
+        val currentStats = statsDao.userStats() ?: UserStatsEntity()
+        statsDao.upsertUserStats(
+            currentStats.copy(
+                currentStreak = streak.currentStreak,
+                longestStreak = maxOf(currentStats.longestStreak, streak.longestStreak),
+                cleaningDaysCount = streak.activeDays,
+                updatedAt = now,
+            )
+        )
     }
 
     private fun cleanupEvent(

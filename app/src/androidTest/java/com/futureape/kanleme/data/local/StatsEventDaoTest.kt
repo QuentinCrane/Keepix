@@ -123,6 +123,25 @@ class StatsEventDaoTest {
         assertEquals(0L, empty.actionCount)
     }
 
+    @Test
+    fun achievementProgressUpsertKeepsUnlockTimestampIdempotently() = runBlocking {
+        val dao = database.statsDao()
+        val unlocked = AchievementProgressEntity(
+            achievementId = "clear-starter",
+            currentValue = 5,
+            unlocked = true,
+            unlockedAt = 1_700_000_000_000L,
+            updatedAt = 1_700_000_000_000L,
+        )
+        dao.upsertAchievementProgress(unlocked)
+        dao.upsertAchievementProgress(unlocked.copy(currentValue = 8, updatedAt = 1_700_000_001_000L))
+
+        val restored = dao.achievementProgress("clear-starter")
+        assertEquals(8, restored?.currentValue)
+        assertEquals(true, restored?.unlocked)
+        assertEquals(1_700_000_000_000L, restored?.unlockedAt)
+    }
+
     private fun event(
         id: String,
         type: String,

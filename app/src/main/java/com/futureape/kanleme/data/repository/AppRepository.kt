@@ -91,10 +91,11 @@ data class AchievementUi(
     val rarity: String = "普通",
     val xp: Int = 10,
     val iconKey: String = "trophy",
+    val unlockedOverride: Boolean? = null,
 ) {
-    val unlocked: Boolean get() = current >= target
-    val progress: Float get() = if (target == 0) 1f else (current.toFloat() / target).coerceIn(0f, 1f)
-    val remaining: Int get() = (target - current).coerceAtLeast(0)
+    val unlocked: Boolean get() = unlockedOverride ?: (current >= target)
+    val progress: Float get() = if (unlocked || target == 0) 1f else (current.toFloat() / target).coerceIn(0f, 1f)
+    val remaining: Int get() = if (unlocked) 0 else (target - current).coerceAtLeast(0)
 }
 
 data class MediaLibrarySyncOptions(

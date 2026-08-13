@@ -422,9 +422,13 @@ interface OperationDao {
 data class CleanupEventAggregate(
     @ColumnInfo(name = "photo_delta") val photoDelta: Long,
     @ColumnInfo(name = "video_delta") val videoDelta: Long,
+    @ColumnInfo(name = "cleaned_media_count") val cleanedMediaCount: Long,
     @ColumnInfo(name = "favorite_delta") val favoriteDelta: Long,
+    @ColumnInfo(name = "favorite_action_count") val favoriteActionCount: Long,
     @ColumnInfo(name = "size_delta_bytes") val sizeDeltaBytes: Long,
+    @ColumnInfo(name = "marked_size_bytes") val markedSizeBytes: Long,
     @ColumnInfo(name = "action_count") val actionCount: Long,
+    @ColumnInfo(name = "undo_count") val undoCount: Long,
 )
 
 data class CleanupEventDeletionAggregate(
@@ -446,6 +450,9 @@ data class CleanupEventFolderAggregate(
 interface StatsDao {
     @Query("SELECT * FROM user_stats WHERE id = 1")
     fun observeUserStats(): Flow<UserStatsEntity?>
+
+    @Query("SELECT * FROM user_stats WHERE id = 1")
+    suspend fun userStats(): UserStatsEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertUserStats(stats: UserStatsEntity)
@@ -492,9 +499,13 @@ interface StatsDao {
         SELECT
             COALESCE(SUM(photo_delta), 0) AS photo_delta,
             COALESCE(SUM(video_delta), 0) AS video_delta,
+            COALESCE(SUM(CASE WHEN event_type IN ('kept', 'favorited', 'moved_to_app_trash', 'archived_moved') THEN affected_media_count ELSE 0 END), 0) AS cleaned_media_count,
             COALESCE(SUM(favorite_delta), 0) AS favorite_delta,
+            COALESCE(SUM(CASE WHEN event_type = 'favorited' AND favorite_delta > 0 THEN favorite_delta ELSE 0 END), 0) AS favorite_action_count,
             COALESCE(SUM(size_delta_bytes), 0) AS size_delta_bytes,
-            COALESCE(SUM(action_count), 0) AS action_count
+            COALESCE(SUM(CASE WHEN event_type = 'moved_to_app_trash' THEN size_delta_bytes ELSE 0 END), 0) AS marked_size_bytes,
+            COALESCE(SUM(action_count), 0) AS action_count,
+            COALESCE(SUM(CASE WHEN event_type IN ('restored', 'compensated') THEN action_count ELSE 0 END), 0) AS undo_count
         FROM cleanup_events
         WHERE occurred_at >= :startMillis AND occurred_at < :endMillis
     """)
@@ -530,4 +541,13 @@ interface StatsDao {
         LIMIT 1
     """)
     suspend fun topFolderForPeriod(startMillis: Long, endMillis: Long): CleanupEventFolderAggregate?
+
+    @Query("SELECT DISTINCT local_date FROM cleanup_events WHERE event_type IN ('kept', 'favorited', 'moved_to_app_trash', 'archived_moved') AND affected_media_count > 0 AND action_count > 0 ORDER BY local_date")
+    suspend fun qualifyingCleanupDates(): List<String>
+
+    @Query("SELECT * FROM achievement_progress WHERE achievement_id = :achievementId LIMIT 1")
+    suspend fun achievementProgress(achievementId: String): AchievementProgressEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAchievementProgress(progress: AchievementProgressEntity)
 }
