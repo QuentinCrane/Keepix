@@ -72,6 +72,7 @@ docs/*
 !docs/stats_event_contract.md
 !docs/database_table_ownership.md
 !docs/performance_baseline.md
+!docs/baseline_profile_status.md
 !docs/trash_retention_semantics.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md

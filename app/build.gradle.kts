@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    id("androidx.baselineprofile")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.kapt")
@@ -124,6 +125,7 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     implementation("com.google.dagger:hilt-android:2.56.1")
     kapt("com.google.dagger:hilt-compiler:2.56.1")
@@ -135,6 +137,7 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-gif:2.7.0")
+    baselineProfile(project(":benchmark"))
 
     testImplementation("junit:junit:4.13.2")
 
@@ -146,4 +149,8 @@ dependencies {
     androidTestImplementation("androidx.room:room-testing:2.7.1")
     androidTestImplementation("com.google.dagger:hilt-android-testing:2.56.1")
     kaptAndroidTest("com.google.dagger:hilt-compiler:2.56.1")
+}
+
+baselineProfile {
+    saveInSrc = true
 }

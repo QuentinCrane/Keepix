@@ -1,5 +1,6 @@
 plugins {
     id("com.android.test")
+    id("androidx.baselineprofile")
     id("org.jetbrains.kotlin.android")
 }
 
@@ -25,6 +26,14 @@ android {
 }
 
 dependencies {
-    implementation("androidx.benchmark:benchmark-macro-junit4:1.3.4")
+    implementation("androidx.benchmark:benchmark-macro-junit4:1.4.1")
     implementation("androidx.test.ext:junit:1.2.1")
+}
+
+val baselineProfileUseConnectedDevices = providers.gradleProperty("kanleme.baselineProfile.useConnectedDevices")
+    .map { it.toBoolean() }
+    .getOrElse(false)
+
+baselineProfile {
+    useConnectedDevices = baselineProfileUseConnectedDevices
 }
