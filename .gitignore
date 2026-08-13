@@ -79,6 +79,7 @@ docs/*
 !docs/query_plan_contract.md
 !docs/retention_policy.md
 !docs/ui_state_contract.md
+!docs/image_performance_contract.md
 !docs/trash_retention_semantics.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md

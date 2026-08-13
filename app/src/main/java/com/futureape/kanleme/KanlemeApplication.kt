@@ -11,6 +11,9 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.memory.MemoryCache
 import com.futureape.kanleme.ui.util.IMAGE_DISK_CACHE_MAX_BYTES
+import com.futureape.kanleme.ui.util.ImageLoadMetrics
+import com.futureape.kanleme.ui.util.imageMemoryCachePercent
+import com.futureape.kanleme.ui.util.isLowRamDevice
 import com.futureape.kanleme.ui.util.installCrashLogger
 import com.futureape.kanleme.ui.util.trimAppCache
 import com.futureape.kanleme.performance.StartupTrace
@@ -21,6 +24,7 @@ import java.io.File
 @HiltAndroidApp
 class KanlemeApplication : Application(), ImageLoaderFactory, Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    private var sharedImageLoader: ImageLoader? = null
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -36,27 +40,44 @@ class KanlemeApplication : Application(), ImageLoaderFactory, Configuration.Prov
         }
     }
 
-    override fun newImageLoader(): ImageLoader = StartupTrace.section("kanleme.imageLoader.create") {
-        ImageLoader.Builder(this)
-            .crossfade(false)
-            .memoryCache {
-                MemoryCache.Builder(this)
-                    .maxSizePercent(0.30)
-                    .build()
-            }
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(File(cacheDir, "image_cache"))
-                    .maxSizeBytes(IMAGE_DISK_CACHE_MAX_BYTES)
-                    .build()
-            }
-            .components {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    add(ImageDecoderDecoder.Factory())
-                } else {
-                    add(GifDecoder.Factory())
+    @Synchronized
+    override fun newImageLoader(): ImageLoader {
+        sharedImageLoader?.let { return it }
+        return StartupTrace.section("kanleme.imageLoader.create") {
+            val loader = ImageLoader.Builder(this)
+                .crossfade(false)
+                .memoryCache {
+                    MemoryCache.Builder(this)
+                        .maxSizePercent(imageMemoryCachePercent(isLowRamDevice()))
+                        .build()
                 }
-            }
-            .build()
+                .diskCache {
+                    DiskCache.Builder()
+                        .directory(File(cacheDir, "image_cache"))
+                        .maxSizeBytes(IMAGE_DISK_CACHE_MAX_BYTES)
+                        .build()
+                }
+                .eventListenerFactory(ImageLoadMetrics.eventListenerFactory)
+                .components {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        add(ImageDecoderDecoder.Factory())
+                    } else {
+                        add(GifDecoder.Factory())
+                    }
+                }
+                .build()
+            sharedImageLoader = loader
+            loader
+        }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        sharedImageLoader?.memoryCache?.trimMemory(level)
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        sharedImageLoader?.memoryCache?.clear()
     }
 }
