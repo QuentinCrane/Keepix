@@ -28,6 +28,7 @@ import com.futureape.kanleme.data.media.MediaOperationKind
 import com.futureape.kanleme.data.media.MediaOperationResult
 import com.futureape.kanleme.data.media.MediaStoreActions
 import com.futureape.kanleme.data.media.MediaStoreScanner
+import com.futureape.kanleme.data.media.incrementalAfterGeneration
 import com.futureape.kanleme.data.media.SimilarPhotoAnalyzer
 import com.futureape.kanleme.data.settings.AppSettingsRepository
 import com.futureape.kanleme.data.settings.DeleteMode
@@ -252,11 +253,24 @@ class AppRepositoryImpl @Inject constructor(
     override suspend fun refreshMediaLibrary(options: MediaLibrarySyncOptions): Pair<Int, Int> =
         StartupTrace.asyncSection("kanleme.mediaLibrary.refresh") {
             withContext(Dispatchers.IO) {
+        val initialSyncSnapshot = runCatching { scanner.currentSyncSnapshot() }.getOrNull()
+        val previousSyncState = initialSyncSnapshot?.let { snapshot ->
+            mediaSyncStateDao.bySyncKey(snapshot.volumeName)
+        }
+        val incrementalAfterGeneration = initialSyncSnapshot?.incrementalAfterGeneration(
+            previous = previousSyncState,
+            permissionScopeFingerprint = options.permissionScopeFingerprint,
+        )
+        val isIncrementalSync = incrementalAfterGeneration != null
         // Scan images and videos independently. A slow or failing image provider row should not
         // prevent the video library from being discovered, and vice versa. This also protects the
         // first permission sync from showing an empty library just because one MediaStore query failed.
-        val photoScan = runCatching { scanner.scanImages().distinctBy { it.mediaStoreId } }
-        val videoScan = runCatching { scanner.scanVideos().distinctBy { it.mediaStoreId } }
+        val photoScan = runCatching {
+            scanner.scanImages(afterGeneration = incrementalAfterGeneration).distinctBy { it.mediaStoreId }
+        }
+        val videoScan = runCatching {
+            scanner.scanVideos(afterGeneration = incrementalAfterGeneration).distinctBy { it.mediaStoreId }
+        }
         if (photoScan.isFailure && videoScan.isFailure) {
             throw photoScan.exceptionOrNull() ?: videoScan.exceptionOrNull() ?: IllegalStateException("媒体库同步失败")
         }
@@ -326,11 +340,11 @@ class AppRepositoryImpl @Inject constructor(
 
         db.withTransaction {
             if (photoScan.isSuccess) {
-                if (options.markMissingPhotos) photoDao.markAllMissing(now)
+                if (options.markMissingPhotos && !isIncrementalSync) photoDao.markAllMissing(now)
                 if (mergedPhotos.isNotEmpty()) photoDao.upsertAll(mergedPhotos)
             }
             if (videoScan.isSuccess) {
-                if (options.markMissingVideos) videoDao.markAllMissing(now)
+                if (options.markMissingVideos && !isIncrementalSync) videoDao.markAllMissing(now)
                 if (mergedVideos.isNotEmpty()) videoDao.upsertAll(mergedVideos)
             }
             syncSnapshot?.let { snapshot ->

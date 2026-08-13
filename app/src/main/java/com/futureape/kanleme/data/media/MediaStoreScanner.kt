@@ -27,7 +27,7 @@ class MediaStoreScanner @Inject constructor(
         generation = MediaStore.getGeneration(context, MediaStore.VOLUME_EXTERNAL),
     )
 
-    fun scanImages(limit: Int? = null): List<PhotoEntity> {
+    fun scanImages(limit: Int? = null, afterGeneration: Long? = null): List<PhotoEntity> {
         val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
@@ -49,6 +49,7 @@ class MediaStoreScanner @Inject constructor(
             sortColumn = MediaStore.Images.Media.DATE_TAKEN,
             fallbackSortColumn = MediaStore.Images.Media.DATE_ADDED,
             limit = limit,
+            afterGeneration = afterGeneration,
             mediaLabel = context.getString(R.string.media_label_photo),
         )?.use { cursor ->
             val idCol = cursor.require(MediaStore.Images.Media._ID)
@@ -108,7 +109,7 @@ class MediaStoreScanner @Inject constructor(
         return result
     }
 
-    fun scanVideos(limit: Int? = null): List<VideoEntity> {
+    fun scanVideos(limit: Int? = null, afterGeneration: Long? = null): List<VideoEntity> {
         val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Video.Media._ID,
@@ -130,6 +131,7 @@ class MediaStoreScanner @Inject constructor(
             sortColumn = MediaStore.Video.Media.DATE_TAKEN,
             fallbackSortColumn = MediaStore.Video.Media.DATE_ADDED,
             limit = limit,
+            afterGeneration = afterGeneration,
             mediaLabel = context.getString(R.string.media_label_video),
         )?.use { cursor ->
             val idCol = cursor.require(MediaStore.Video.Media._ID)
@@ -170,6 +172,7 @@ class MediaStoreScanner @Inject constructor(
         sortColumn: String,
         fallbackSortColumn: String,
         limit: Int?,
+        afterGeneration: Long?,
         mediaLabel: String,
     ): Cursor? {
         val queryArgs = Bundle().apply {
@@ -177,6 +180,17 @@ class MediaStoreScanner @Inject constructor(
             putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, ContentResolver.QUERY_SORT_DIRECTION_DESCENDING)
             putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_EXCLUDE)
             putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_EXCLUDE)
+            if (afterGeneration != null) {
+                putString(
+                    ContentResolver.QUERY_ARG_SQL_SELECTION,
+                    "(" + MediaStore.MediaColumns.GENERATION_ADDED + " > ? OR " +
+                        MediaStore.MediaColumns.GENERATION_MODIFIED + " > ?)",
+                )
+                putStringArray(
+                    ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,
+                    arrayOf(afterGeneration.toString(), afterGeneration.toString()),
+                )
+            }
             if (limit != null && limit > 0) putInt(ContentResolver.QUERY_ARG_LIMIT, limit)
         }
         return try {
@@ -185,12 +199,23 @@ class MediaStoreScanner @Inject constructor(
             throw MediaStoreAccessException(context.getString(R.string.media_error_read_permission, mediaLabel), security)
         } catch (_: IllegalArgumentException) {
             // Some OEM MediaStore providers are picky about Bundle sort columns.
-            // Fallback to a simple SQL query while still excluding unfinished and trashed rows.
+            // Fallback to SQL while preserving the generation predicate. Never fall back to a
+            // full scan here: doing so would make the incremental path silently expensive.
             val sortOrder = sortColumn + " DESC"
-            val selection = MediaStore.MediaColumns.IS_PENDING + " = 0 AND " +
-                MediaStore.MediaColumns.IS_TRASHED + " = 0"
+            val selection = buildString {
+                append(MediaStore.MediaColumns.IS_PENDING).append(" = 0 AND ")
+                append(MediaStore.MediaColumns.IS_TRASHED).append(" = 0")
+                if (afterGeneration != null) {
+                    append(" AND (")
+                    append(MediaStore.MediaColumns.GENERATION_ADDED).append(" > ? OR ")
+                    append(MediaStore.MediaColumns.GENERATION_MODIFIED).append(" > ?)")
+                }
+            }
+            val selectionArgs = afterGeneration?.let {
+                arrayOf(it.toString(), it.toString())
+            }
             try {
-                resolver.query(collection, projection, selection, null, sortOrder)
+                resolver.query(collection, projection, selection, selectionArgs, sortOrder)
             } catch (security: SecurityException) {
                 throw MediaStoreAccessException(context.getString(R.string.media_error_read_permission, mediaLabel), security)
             }
