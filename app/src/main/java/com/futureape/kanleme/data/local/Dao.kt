@@ -391,6 +391,9 @@ interface SimilarDao {
     @Query("SELECT * FROM photo_fingerprints")
     suspend fun allFingerprints(): List<PhotoFingerprintEntity>
 
+    @Query("SELECT * FROM photo_fingerprints WHERE photo_id IN (:photoIds)")
+    suspend fun fingerprintsByPhotoIds(photoIds: List<Long>): List<PhotoFingerprintEntity>
+
     @Query("""
         DELETE FROM photo_fingerprints
         WHERE photo_id NOT IN (

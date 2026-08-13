@@ -1111,11 +1111,7 @@ class AppRepositoryImpl @Inject constructor(
                 return@withContext SimilarAnalysisRunResult(completed.status, 0)
             }
 
-            val cachedIds = similarDao.allFingerprints()
-                .asSequence()
-                .filter { it.colorHistogram.contains("rgb=") }
-                .map { it.photoId }
-                .toMutableSet()
+            val cachedIds = similarDao.fingerprintedIds().toMutableSet()
             val pendingFingerprints = mutableListOf<com.futureape.kanleme.data.local.PhotoFingerprintEntity>()
             val fingerprintNow = System.currentTimeMillis()
             while (cursor < total) {
@@ -1164,9 +1160,13 @@ class AppRepositoryImpl @Inject constructor(
                 throw SimilarAnalysisInputChangedException()
             }
             val photos = photoDao.similarAnalysisCandidates(limit = total, offset = 0)
-            val activeIds = photos.map { it.id }.toHashSet()
-            val fingerprints = similarDao.allFingerprints()
-                .filter { it.photoId in activeIds && it.colorHistogram.contains("rgb=") }
+            val fingerprints = mutableListOf<com.futureape.kanleme.data.local.PhotoFingerprintEntity>()
+            photos.map { it.id }
+                .chunked(SimilarAnalysisContract.SQLITE_ID_QUERY_CHUNK)
+                .forEach { ids ->
+                    fingerprints += similarDao.fingerprintsByPhotoIds(ids)
+                }
+            val validFingerprints = fingerprints.filter { it.colorHistogram.contains("rgb=") }
             val clustering = similarDao.analysisTask()?.takeIf { it.runToken == task.runToken }
                 ?: return@withContext SimilarAnalysisRunResult(SimilarAnalysisTaskStatus.CANCELLED, 0)
             val clusteringTask = clustering.copy(
@@ -1178,7 +1178,7 @@ class AppRepositoryImpl @Inject constructor(
             )
             similarDao.upsertAnalysisTask(clusteringTask)
             onProgress(total, total, clusteringTask.stage)
-            val result = similarPhotoAnalyzer.buildGroups(photos = photos, fingerprints = fingerprints, now = System.currentTimeMillis())
+            val result = similarPhotoAnalyzer.buildGroups(photos = photos, fingerprints = validFingerprints, now = System.currentTimeMillis())
             currentCoroutineContext().ensureActive()
             cancelledOrStale()?.let { return@withContext it }
             similarDao.clearGroupPhotos()

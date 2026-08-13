@@ -28,5 +28,6 @@ class SimilarAnalysisTaskContractTest {
     fun pageSizeAndAlgorithmVersionAreStableTaskInputs() {
         assertTrue(SimilarAnalysisContract.PAGE_SIZE > 0)
         assertTrue(SimilarAnalysisContract.ALGORITHM_VERSION > 0)
+        assertTrue(SimilarAnalysisContract.SQLITE_ID_QUERY_CHUNK <= 999)
     }
 }

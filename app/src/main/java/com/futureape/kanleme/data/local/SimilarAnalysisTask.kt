@@ -29,6 +29,7 @@ object SimilarAnalysisContract {
     const val ALGORITHM_VERSION = 1
     const val DEFAULT_LIMIT = 3_600
     const val PAGE_SIZE = 24
+    const val SQLITE_ID_QUERY_CHUNK = 900
 }
 
 @Entity(
