@@ -391,6 +391,20 @@ interface SimilarDao {
     @Query("SELECT * FROM photo_fingerprints")
     suspend fun allFingerprints(): List<PhotoFingerprintEntity>
 
+    @Query("""
+        DELETE FROM photo_fingerprints
+        WHERE photo_id NOT IN (
+            SELECT id FROM photos
+            WHERE deletion_status = 'none'
+              AND missing_since IS NULL
+              AND is_raw = 0
+              AND is_gif = 0
+              AND width > 0
+              AND height > 0
+        )
+    """)
+    suspend fun deleteStaleFingerprints(): Int
+
     @Query("SELECT * FROM similar_analysis_tasks WHERE id = 1 LIMIT 1")
     suspend fun analysisTask(): SimilarAnalysisTaskEntity?
 
@@ -453,6 +467,9 @@ interface OperationDao {
 
     @Query("UPDATE operation_history SET is_undone = 1 WHERE id = :id")
     suspend fun markUndone(id: Long)
+
+    @Query("DELETE FROM operation_history WHERE is_undone = 1 AND created_at < :cutoffMillis")
+    suspend fun deleteUndoneBefore(cutoffMillis: Long): Int
 }
 
 @Dao

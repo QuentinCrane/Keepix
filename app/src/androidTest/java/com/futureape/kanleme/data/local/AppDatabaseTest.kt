@@ -131,6 +131,20 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun retentionRemovesOnlyOldUndoneOperations() = runBlocking {
+        val oldUndoneId = database.operationDao().insert(
+            operation(createdAt = 1_000L, isUndone = true),
+        )
+        val oldActiveId = database.operationDao().insert(
+            operation(createdAt = 1_000L, isUndone = false),
+        )
+
+        assertEquals(1, database.operationDao().deleteUndoneBefore(2_000L))
+        assertNull(database.operationDao().undoableById(oldUndoneId))
+        assertEquals(oldActiveId, database.operationDao().undoableById(oldActiveId)?.id)
+    }
+
+    @Test
     fun randomQueueOrderIsStableWhenRefreshedWithTheSameSeed() = runBlocking {
         database.photoDao().upsertAll(
             (0 until 12).map { index ->
@@ -300,6 +314,18 @@ class AppDatabaseTest {
         mimeType = "image/jpeg",
         width = 1200,
         height = 900,
+    )
+
+    private fun operation(createdAt: Long, isUndone: Boolean) = OperationHistoryEntity(
+        mediaId = 77L,
+        mediaType = "photo",
+        previousProcessingStatus = ProcessingStatus.UNPROCESSED,
+        previousDeletionStatus = DeletionStatus.NONE,
+        newProcessingStatus = ProcessingStatus.KEPT,
+        newDeletionStatus = DeletionStatus.NONE,
+        action = "Keep",
+        createdAt = createdAt,
+        isUndone = isUndone,
     )
 
     private fun explainPlan(sql: String): String {

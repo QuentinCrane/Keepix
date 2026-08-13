@@ -9,6 +9,7 @@ import com.futureape.kanleme.data.local.CleanupEventSourceType
 import com.futureape.kanleme.data.local.CleanupEventType
 import com.futureape.kanleme.data.local.DeletionStatus
 import com.futureape.kanleme.data.local.OperationHistoryEntity
+import com.futureape.kanleme.data.local.OperationHistoryRetention
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.ProcessingStatus
 import com.futureape.kanleme.data.local.SimilarGroupEntity
@@ -1051,6 +1052,7 @@ class AppRepositoryImpl @Inject constructor(
         }
 
         try {
+            similarDao.deleteStaleFingerprints()
             if (similarMediaVersion() != task.mediaVersion) {
                 prepareSimilarAnalysis(task.accessKey, task.requestedLimit, forceRestart = false)
                 throw SimilarAnalysisInputChangedException()
@@ -1594,7 +1596,7 @@ class AppRepositoryImpl @Inject constructor(
         newDeletion: String,
         action: String,
     ): Long {
-        return operationDao.insert(
+        val operationId = operationDao.insert(
             OperationHistoryEntity(
                 mediaId = mediaId,
                 mediaType = mediaType,
@@ -1605,6 +1607,8 @@ class AppRepositoryImpl @Inject constructor(
                 action = action,
             )
         )
+        operationDao.deleteUndoneBefore(OperationHistoryRetention.undoneCutoff(System.currentTimeMillis()))
+        return operationId
     }
 
     private suspend fun adjustStatsInTransaction(
