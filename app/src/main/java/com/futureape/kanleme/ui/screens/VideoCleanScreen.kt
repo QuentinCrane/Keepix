@@ -571,6 +571,9 @@ private fun VideoReelPage(
             }.getOrNull()
         }
     }
+    val playbackSession = remember(video.id, player) {
+        player?.let { VideoPlaybackMetrics.startSession() }
+    }
     var shouldPlay by remember(video.id) { mutableStateOf(true) }
     var playbackFailed by remember(video.id) { mutableStateOf(false) }
     var lastTapMillis by remember(video.id) { mutableStateOf(0L) }
@@ -589,7 +592,7 @@ private fun VideoReelPage(
         player?.playWhenReady = isCurrent && shouldPlay
         player?.volume = 1f
     }
-    DisposableEffect(player) {
+    DisposableEffect(player, playbackSession) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 if (currentPlaybackUriIndex < currentPlaybackUris.lastIndex) {
@@ -604,8 +607,10 @@ private fun VideoReelPage(
                 if (playbackState == Player.STATE_READY) playbackFailed = false
             }
         }
+        playbackSession?.let { player?.addListener(it) }
         player?.addListener(listener)
         onDispose {
+            playbackSession?.let { player?.removeListener(it); it.release() }
             player?.removeListener(listener)
             player?.playWhenReady = false
             player?.clearMediaItems()
