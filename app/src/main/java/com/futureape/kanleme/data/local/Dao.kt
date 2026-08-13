@@ -6,6 +6,18 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
+data class SimilarAnalysisInput(
+    val id: Long,
+    @androidx.room.ColumnInfo(name = "media_store_id") val mediaStoreId: Long,
+    @androidx.room.ColumnInfo(name = "stable_media_key") val stableMediaKey: String,
+    val uri: String,
+    val size: Long,
+    @androidx.room.ColumnInfo(name = "date_taken") val dateTaken: Long,
+    @androidx.room.ColumnInfo(name = "date_modified") val dateModified: Long,
+    val width: Int,
+    val height: Int,
+)
+
 @Dao
 interface PhotoDao {
     @Query("SELECT COUNT(*) FROM photos WHERE missing_since IS NULL")
@@ -112,6 +124,43 @@ interface PhotoDao {
 
     @Query("SELECT * FROM photos WHERE deletion_status = 'none' AND missing_since IS NULL ORDER BY date_taken DESC LIMIT :limit")
     suspend fun allActive(limit: Int): List<PhotoEntity>
+
+    @Query("""
+        SELECT COUNT(*) FROM photos
+        WHERE deletion_status = 'none'
+        AND missing_since IS NULL
+        AND is_raw = 0
+        AND is_gif = 0
+        AND width > 0
+        AND height > 0
+    """)
+    suspend fun countSimilarAnalysisCandidates(): Int
+
+    @Query("""
+        SELECT * FROM photos
+        WHERE deletion_status = 'none'
+        AND missing_since IS NULL
+        AND is_raw = 0
+        AND is_gif = 0
+        AND width > 0
+        AND height > 0
+        ORDER BY date_taken DESC, id DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun similarAnalysisCandidates(limit: Int, offset: Int): List<PhotoEntity>
+
+    @Query("""
+        SELECT id, media_store_id, stable_media_key, uri, size, date_taken, date_modified, width, height
+        FROM photos
+        WHERE deletion_status = 'none'
+        AND missing_since IS NULL
+        AND is_raw = 0
+        AND is_gif = 0
+        AND width > 0
+        AND height > 0
+        ORDER BY date_taken DESC, id DESC
+    """)
+    suspend fun similarAnalysisInputs(): List<SimilarAnalysisInput>
 
     @Query("SELECT * FROM photos WHERE id IN (:ids)")
     suspend fun byIds(ids: List<Long>): List<PhotoEntity>
@@ -304,6 +353,18 @@ interface SimilarDao {
 
     @Query("SELECT * FROM photo_fingerprints")
     suspend fun allFingerprints(): List<PhotoFingerprintEntity>
+
+    @Query("SELECT * FROM similar_analysis_tasks WHERE id = 1 LIMIT 1")
+    suspend fun analysisTask(): SimilarAnalysisTaskEntity?
+
+    @Query("SELECT * FROM similar_analysis_tasks WHERE id = 1 LIMIT 1")
+    fun observeAnalysisTask(): Flow<SimilarAnalysisTaskEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAnalysisTask(task: SimilarAnalysisTaskEntity)
+
+    @Query("DELETE FROM photo_fingerprints")
+    suspend fun clearFingerprints()
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertGroups(groups: List<SimilarGroupEntity>)

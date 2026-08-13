@@ -2,6 +2,8 @@ package com.futureape.kanleme.data.repository
 
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.SimilarGroupEntity
+import com.futureape.kanleme.data.local.SimilarAnalysisRunResult
+import com.futureape.kanleme.data.local.SimilarAnalysisTaskEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.UserStatsEntity
 import com.futureape.kanleme.data.local.VideoEntity
@@ -134,6 +136,7 @@ interface AppRepository {
     fun observeFavoriteVideos(limit: Int = 500): Flow<List<VideoEntity>>
     fun observeTrash(): Flow<List<TrashItemEntity>>
     fun observeSimilarGroups(): Flow<List<SimilarGroupEntity>>
+    fun observeSimilarAnalysisTask(): Flow<SimilarAnalysisTaskEntity?>
 
     suspend fun refreshMediaLibrary(options: MediaLibrarySyncOptions = MediaLibrarySyncOptions()): Pair<Int, Int>
     suspend fun loadPhotoDeck(scope: CleaningScope): List<PhotoEntity>
@@ -157,10 +160,17 @@ interface AppRepository {
         targetRelativePath: String,
         writeAuthorized: Boolean = false,
     ): MovePhotoResult
-    suspend fun generateSimilarGroups(
-        limit: Int = 1200,
+    suspend fun similarAnalysisTask(): SimilarAnalysisTaskEntity?
+    suspend fun prepareSimilarAnalysis(
+        accessKey: String,
+        limit: Int = 3600,
+        forceRestart: Boolean = false,
+    ): SimilarAnalysisTaskEntity
+    suspend fun cancelSimilarAnalysis()
+    suspend fun runSimilarAnalysis(
+        task: SimilarAnalysisTaskEntity,
         onProgress: (processed: Int, total: Int, stage: String) -> Unit = { _, _, _ -> },
-    ): Int
+    ): SimilarAnalysisRunResult
     suspend fun similarGroupDetail(groupId: String): SimilarGroupDetail?
     suspend fun restoreTrashItem(trashId: Long)
     suspend fun restoreTrashItemsAfterSystemAuthorization(trashIds: Collection<Long>)

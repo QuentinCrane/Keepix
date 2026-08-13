@@ -104,6 +104,37 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun similarAnalysisTaskPersistsCursorAndCancellationRequest() = runBlocking {
+        val dao = database.similarDao()
+        val queued = SimilarAnalysisTaskEntity(
+            status = SimilarAnalysisTaskStatus.QUEUED,
+            runToken = "run-1",
+            mediaVersion = "media-v1",
+            accessKey = "images=true;videos=true;selected=false",
+            requestedLimit = 3600,
+            totalPhotos = 120,
+            cursor = 24,
+            stage = "正在计算缩略指纹",
+        )
+        dao.upsertAnalysisTask(queued)
+
+        dao.upsertAnalysisTask(
+            queued.copy(
+                status = SimilarAnalysisTaskStatus.CANCEL_REQUESTED,
+                cancelRequested = true,
+                updatedAt = queued.updatedAt + 1,
+            )
+        )
+
+        val restored = dao.analysisTask()
+        assertEquals(SimilarAnalysisTaskStatus.CANCEL_REQUESTED, restored?.status)
+        assertEquals(true, restored?.cancelRequested)
+        assertEquals(24, restored?.cursor)
+        assertEquals("media-v1", restored?.mediaVersion)
+        assertEquals("run-1", restored?.runToken)
+    }
+
+    @Test
     fun todayInHistoryOnlyMatchesTheSameMonthAndDayFromAnotherYear() = runBlocking {
         val today = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 12)

@@ -63,6 +63,7 @@
     <string name="message_similar_detection_background">相似照片偵測正在背景繼續，返回此頁面會自動恢復進度</string>
     <string name="message_similar_detection_no_result">沒有偵測到明顯相似照片，可稍後擴大相簿權限或重新同步媒體庫</string>
     <string name="message_similar_detection_failed">相似照片偵測失敗</string>
+    <string name="message_media_permission_required">請先授予照片存取權限，才能開始相似照片偵測</string>
     <string name="message_restore_success">已還原</string>
     <string name="message_restore_failed">還原失敗</string>
     <string name="message_permanent_delete_success">已永久刪除</string>

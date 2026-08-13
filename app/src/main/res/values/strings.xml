@@ -63,6 +63,7 @@
     <string name="message_similar_detection_background">相似照片检测正在后台继续，返回此页面会自动恢复进度</string>
     <string name="message_similar_detection_no_result">没有检测到明显相似照片，可稍后扩大相册权限或重新同步媒体库</string>
     <string name="message_similar_detection_failed">相似照片检测失败</string>
+    <string name="message_media_permission_required">需要先授予照片访问权限，才能开始相似照片检测</string>
     <string name="message_restore_success">已恢复</string>
     <string name="message_restore_failed">恢复失败</string>
     <string name="message_permanent_delete_success">已永久删除</string>

@@ -3,6 +3,10 @@ package com.futureape.kanleme.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.futureape.kanleme.data.local.PhotoEntity
+import com.futureape.kanleme.data.local.SimilarAnalysisContract
+import com.futureape.kanleme.data.local.SimilarAnalysisInputChangedException
+import com.futureape.kanleme.data.local.SimilarAnalysisTaskEntity
+import com.futureape.kanleme.data.local.SimilarAnalysisTaskStatus
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.media.MediaAccessState
@@ -68,6 +72,29 @@ data class SimilarDetectionUiState(
     val totalHint: Int = 0,
     val lastResultCount: Int = 0,
 )
+
+private fun SimilarAnalysisTaskEntity.toSimilarDetectionUiState(): SimilarDetectionUiState {
+    val safeTotal = totalPhotos.coerceAtLeast(0)
+    val progress = when {
+        status == SimilarAnalysisTaskStatus.COMPLETED -> 1f
+        safeTotal == 0 -> 0f
+        else -> (cursor.toFloat() / safeTotal.toFloat()).coerceIn(0f, 0.99f)
+    }
+    val stageText = when {
+        status == SimilarAnalysisTaskStatus.IDLE -> uiText(R.string.similar_stage_not_started)
+        status == SimilarAnalysisTaskStatus.FAILED && !lastError.isNullOrBlank() -> dynamicUiText(lastError)
+        stage.isBlank() -> uiText(R.string.similar_stage_not_started)
+        else -> dynamicUiText(stage)
+    }
+    return SimilarDetectionUiState(
+        running = SimilarAnalysisTaskStatus.isRunning(status),
+        progress = progress,
+        stage = stageText,
+        processedHint = cursor.coerceAtLeast(0),
+        totalHint = safeTotal,
+        lastResultCount = lastResultCount,
+    )
+}
 
 data class PhotoUndoAnimation(
     val mediaStoreId: Long,
@@ -214,9 +241,10 @@ class KanlemeViewModel @Inject constructor(
     val similarGroups = repository.observeSimilarGroups()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val _similarDetectionState = MutableStateFlow(SimilarDetectionUiState())
-    val similarDetectionState = _similarDetectionState.asStateFlow()
-    val similarDetectionRunning = _similarDetectionState.map { it.running }
+    val similarDetectionState: StateFlow<SimilarDetectionUiState> = repository.observeSimilarAnalysisTask()
+        .map { it?.toSimilarDetectionUiState() ?: SimilarDetectionUiState() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SimilarDetectionUiState())
+    val similarDetectionRunning = similarDetectionState.map { it.running }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val _photoScope = MutableStateFlow(CleaningScope())
@@ -311,7 +339,7 @@ class KanlemeViewModel @Inject constructor(
     private var videoDeckPreviewGeneration = 0L
     private var photoDayMemoryWindowGeneration = 0L
     private var lastGeneratedRandomSeed = 1L
-    private var similarDetectionJob: Job? = null
+    private var similarManualJob: Job? = null
     private val pendingPhotoActionMediaIds = mutableSetOf<Long>()
     private val handledPhotoActionMediaIds = mutableSetOf<Long>()
     private val photoSessionActions = ArrayDeque<PhotoSessionAction>()
@@ -1852,62 +1880,24 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun seedSimilarGroups(limit: Int = 3600) {
-        if (similarDetectionJob?.isActive == true) {
+        if (similarManualJob?.isActive == true || similarDetectionState.value.running) {
             _message.value = uiText(R.string.message_similar_detection_background)
             return
         }
-        similarDetectionJob = viewModelScope.launch {
-            val totalHint = dashboard.value.photoCount.takeIf { it > 0 } ?: limit
-            _similarDetectionState.value = SimilarDetectionUiState(
-                running = true,
-                progress = 0.01f,
-                stage = uiText(R.string.similar_stage_prepare_library),
-                processedHint = 0,
-                totalHint = totalHint,
-                lastResultCount = _similarDetectionState.value.lastResultCount,
-            )
-            try {
-                if (dashboard.value.photoCount == 0) {
-                    _similarDetectionState.value = _similarDetectionState.value.copy(stage = uiText(R.string.similar_stage_syncing_before_first_run))
-                    runCatching { repository.refreshMediaLibrary(currentMediaAccessState.toSyncOptions()) }
-                }
-                runCatching {
-                    repository.generateSimilarGroups(limit = limit) { processed, total, stage ->
-                        val safeTotal = total.coerceAtLeast(1)
-                        val progress = (processed.toFloat() / safeTotal.toFloat()).coerceIn(0f, 0.96f)
-                        _similarDetectionState.value = _similarDetectionState.value.copy(
-                            running = true,
-                            progress = if (processed >= total && total > 0) 0.96f else progress.coerceAtLeast(0.02f),
-                            stage = dynamicUiText(stage),
-                            processedHint = processed.coerceAtLeast(0),
-                            totalHint = total.coerceAtLeast(1),
-                        )
-                    }
-                }
-                    .onSuccess { count ->
-                        val total = _similarDetectionState.value.totalHint.coerceAtLeast(_similarDetectionState.value.processedHint)
-                        _similarDetectionState.value = SimilarDetectionUiState(
-                            running = false,
-                            progress = 1f,
-                            stage = if (count > 0) uiText(R.string.similar_stage_done_with_groups) else uiText(R.string.similar_stage_done_empty),
-                            processedHint = total,
-                            totalHint = total,
-                            lastResultCount = count,
-                        )
-                        _message.value = if (count > 0) UiText.Plural(R.plurals.similar_group_count, count) else uiText(R.string.message_similar_detection_no_result)
-                    }
-                    .onFailure { throwable ->
-                        _similarDetectionState.value = _similarDetectionState.value.copy(
-                            running = false,
-                            stage = throwable.message?.let(::dynamicUiText) ?: uiText(R.string.similar_stage_failed_retry),
-                        )
-                        _message.value = throwable.message?.let(::dynamicUiText) ?: uiText(R.string.message_similar_detection_failed)
-                    }
-            } finally {
-                if (_similarDetectionState.value.running) {
-                    _similarDetectionState.value = _similarDetectionState.value.copy(running = false)
-                }
+        similarManualJob = viewModelScope.launch {
+            val accessKey = currentMediaAccessState?.key
+            if (accessKey == null) {
+                _message.value = uiText(R.string.message_media_permission_required)
+                return@launch
             }
+            if (dashboard.value.photoCount == 0) {
+                runCatching { repository.refreshMediaLibrary(currentMediaAccessState.toSyncOptions()) }
+            }
+            runSimilarAnalysis(
+                accessKey = accessKey,
+                limit = limit,
+                forceRestart = true,
+            )
         }
     }
 
@@ -1916,7 +1906,61 @@ class KanlemeViewModel @Inject constructor(
             dashboard.value.photoCount > 0 -> dashboard.value.photoCount.coerceAtMost(8000)
             else -> 4800
         }
-        seedSimilarGroups(limit = nextLimit)
+        if (similarManualJob?.isActive == true || similarDetectionState.value.running) {
+            _message.value = uiText(R.string.message_similar_detection_background)
+            return
+        }
+        similarManualJob = viewModelScope.launch {
+            val accessKey = currentMediaAccessState?.key
+            if (accessKey == null) {
+                _message.value = uiText(R.string.message_media_permission_required)
+                return@launch
+            }
+            runSimilarAnalysis(
+                accessKey = accessKey,
+                limit = nextLimit,
+                forceRestart = similarDetectionState.value.progress >= 1f,
+            )
+        }
+    }
+
+    private suspend fun runSimilarAnalysis(
+        accessKey: String,
+        limit: Int,
+        forceRestart: Boolean,
+    ) {
+        val task = runCatching {
+            repository.prepareSimilarAnalysis(
+                accessKey = accessKey,
+                limit = limit.coerceIn(2, SimilarAnalysisContract.DEFAULT_LIMIT * 3),
+                forceRestart = forceRestart,
+            )
+        }.getOrElse { throwable ->
+            _message.value = throwable.message?.let(::dynamicUiText) ?: uiText(R.string.message_similar_detection_failed)
+            return
+        }
+        if (task.status == SimilarAnalysisTaskStatus.COMPLETED && !forceRestart) {
+            return
+        }
+        runCatching {
+            repository.runSimilarAnalysis(task) { _, _, _ -> }
+        }.onSuccess { result ->
+            when (result.status) {
+                SimilarAnalysisTaskStatus.COMPLETED -> {
+                    _message.value = if (result.resultCount > 0) {
+                        UiText.Plural(R.plurals.similar_group_count, result.resultCount)
+                    } else {
+                        uiText(R.string.message_similar_detection_no_result)
+                    }
+                }
+                SimilarAnalysisTaskStatus.CANCELLED -> Unit
+            }
+        }.onFailure { throwable ->
+            _message.value = when (throwable) {
+                is SimilarAnalysisInputChangedException -> throwable.message?.let(::dynamicUiText)
+                else -> throwable.message?.let(::dynamicUiText) ?: uiText(R.string.message_similar_detection_failed)
+            }
+        }
     }
 
     fun restoreTrash(id: Long) {
@@ -2098,7 +2142,21 @@ class KanlemeViewModel @Inject constructor(
 
     fun setSimilarDetection(value: Boolean) = viewModelScope.launch {
         settingsRepository.setSimilarDetection(value)
-        if (value) seedSimilarGroups()
+        if (value) {
+            val accessKey = currentMediaAccessState?.key
+            if (accessKey != null) {
+                val task = repository.prepareSimilarAnalysis(
+                    accessKey = accessKey,
+                    limit = SimilarAnalysisContract.DEFAULT_LIMIT,
+                    forceRestart = false,
+                )
+                if (!SimilarAnalysisTaskStatus.isRunning(task.status) && task.status != SimilarAnalysisTaskStatus.COMPLETED) {
+                    _message.value = uiText(R.string.message_similar_detection_failed)
+                }
+            }
+        } else {
+            repository.cancelSimilarAnalysis()
+        }
     }
 
     fun cycleSwipeSensitivity() = viewModelScope.launch {

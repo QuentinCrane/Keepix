@@ -22,8 +22,9 @@ import androidx.room.RoomDatabase
         BackupImportAuditLogEntity::class,
         DeviceModelCacheEntity::class,
         OperationHistoryEntity::class,
+        SimilarAnalysisTaskEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

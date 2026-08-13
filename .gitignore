@@ -61,6 +61,7 @@ docs/*
 !docs/cleanup_session_targets.md
 !docs/cleanup_action_contract.md
 !docs/navigation_route_contract.md
+!docs/similar_analysis_task_contract.md
 !docs/trash_retention_semantics.md
 !docs/web_development_experience.md
 !docs/AI_HANDOFF.md

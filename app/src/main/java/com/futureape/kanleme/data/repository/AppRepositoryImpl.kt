@@ -8,6 +8,11 @@ import com.futureape.kanleme.data.local.OperationHistoryEntity
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.ProcessingStatus
 import com.futureape.kanleme.data.local.SimilarGroupEntity
+import com.futureape.kanleme.data.local.SimilarAnalysisContract
+import com.futureape.kanleme.data.local.SimilarAnalysisInputChangedException
+import com.futureape.kanleme.data.local.SimilarAnalysisRunResult
+import com.futureape.kanleme.data.local.SimilarAnalysisTaskEntity
+import com.futureape.kanleme.data.local.SimilarAnalysisTaskStatus
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.TrashRetentionPolicy
 import com.futureape.kanleme.data.local.UserStatsEntity
@@ -25,6 +30,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import java.text.SimpleDateFormat
@@ -33,6 +41,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.Random
 import java.util.UUID
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -135,6 +144,76 @@ class AppRepositoryImpl @Inject constructor(
     override fun observeFavoriteVideos(limit: Int): Flow<List<VideoEntity>> = videoDao.observeFavorites(limit)
     override fun observeTrash(): Flow<List<TrashItemEntity>> = trashDao.observeTrash()
     override fun observeSimilarGroups(): Flow<List<SimilarGroupEntity>> = similarDao.observeGroups()
+    override fun observeSimilarAnalysisTask(): Flow<SimilarAnalysisTaskEntity?> = similarDao.observeAnalysisTask()
+
+    override suspend fun similarAnalysisTask(): SimilarAnalysisTaskEntity? = withContext(Dispatchers.IO) {
+        similarDao.analysisTask()
+    }
+
+    override suspend fun prepareSimilarAnalysis(
+        accessKey: String,
+        limit: Int,
+        forceRestart: Boolean,
+    ): SimilarAnalysisTaskEntity = withContext(Dispatchers.IO) {
+        val normalizedLimit = limit.coerceIn(2, 10_000)
+        val now = System.currentTimeMillis()
+        val mediaVersion = similarMediaVersion()
+        val existing = similarDao.analysisTask()
+        val compatibleInput = existing != null &&
+            existing.runToken.isNotBlank() &&
+            existing.mediaVersion == mediaVersion &&
+            existing.accessKey == accessKey &&
+            existing.algorithmVersion == SimilarAnalysisContract.ALGORITHM_VERSION
+
+        if (compatibleInput && !forceRestart) {
+            val resumed = when (existing!!.status) {
+                SimilarAnalysisTaskStatus.COMPLETED,
+                SimilarAnalysisTaskStatus.RUNNING,
+                SimilarAnalysisTaskStatus.QUEUED,
+                -> existing.copy(requestedLimit = maxOf(existing.requestedLimit, normalizedLimit))
+                else -> existing.copy(
+                    status = SimilarAnalysisTaskStatus.QUEUED,
+                    cancelRequested = false,
+                    lastError = null,
+                    requestedLimit = maxOf(existing.requestedLimit, normalizedLimit),
+                    updatedAt = now,
+                )
+            }
+            if (resumed != existing) similarDao.upsertAnalysisTask(resumed)
+            return@withContext resumed
+        }
+
+        // A new media/permission/algorithm input invalidates cached fingerprints.
+        // Existing groups remain visible until the replacement run completes.
+        similarDao.clearFingerprints()
+        val next = SimilarAnalysisTaskEntity(
+            status = SimilarAnalysisTaskStatus.QUEUED,
+            runToken = UUID.randomUUID().toString(),
+            mediaVersion = mediaVersion,
+            accessKey = accessKey,
+            algorithmVersion = SimilarAnalysisContract.ALGORITHM_VERSION,
+            requestedLimit = normalizedLimit,
+            stage = "准备读取媒体库",
+            lastResultCount = existing?.lastResultCount ?: 0,
+            createdAt = existing?.createdAt ?: now,
+            updatedAt = now,
+        )
+        similarDao.upsertAnalysisTask(next)
+        next
+    }
+
+    override suspend fun cancelSimilarAnalysis() = withContext(Dispatchers.IO) {
+        val current = similarDao.analysisTask() ?: return@withContext
+        if (!SimilarAnalysisTaskStatus.isRunning(current.status)) return@withContext
+        similarDao.upsertAnalysisTask(
+            current.copy(
+                status = SimilarAnalysisTaskStatus.CANCEL_REQUESTED,
+                cancelRequested = true,
+                stage = "正在停止检测",
+                updatedAt = System.currentTimeMillis(),
+            )
+        )
+    }
 
     override suspend fun refreshMediaLibrary(options: MediaLibrarySyncOptions): Pair<Int, Int> = withContext(Dispatchers.IO) {
         // Scan images and videos independently. A slow or failing image provider row should not
@@ -756,59 +835,229 @@ class AppRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun generateSimilarGroups(
-        limit: Int,
+    override suspend fun runSimilarAnalysis(
+        task: SimilarAnalysisTaskEntity,
         onProgress: (processed: Int, total: Int, stage: String) -> Unit,
-    ): Int = withContext(Dispatchers.IO) {
-        val rawPhotos = photoDao.allActive(limit)
-        val photos = rawPhotos.filter { photo ->
-            photo.deletionStatus == DeletionStatus.NONE &&
-                !photo.isRaw &&
-                !photo.isGif &&
-                photo.width > 0 &&
-                photo.height > 0
+    ): SimilarAnalysisRunResult = withContext(Dispatchers.IO) {
+        val currentAtStart = similarDao.analysisTask()
+        if (currentAtStart?.runToken != task.runToken) {
+            return@withContext SimilarAnalysisRunResult(
+                status = currentAtStart?.status ?: SimilarAnalysisTaskStatus.CANCELLED,
+                resultCount = currentAtStart?.lastResultCount ?: 0,
+            )
         }
-        val total = photos.size
-        onProgress(0, total, if (rawPhotos.size == photos.size) "读取照片索引" else "已跳过 RAW/GIF 等不适合快速检测的文件")
-        if (total < 2) return@withContext 0
+        if (currentAtStart.cancelRequested || currentAtStart.status == SimilarAnalysisTaskStatus.CANCEL_REQUESTED) {
+            val cancelled = currentAtStart.copy(
+                status = SimilarAnalysisTaskStatus.CANCELLED,
+                cancelRequested = false,
+                stage = "检测已取消",
+                updatedAt = System.currentTimeMillis(),
+            )
+            similarDao.upsertAnalysisTask(cancelled)
+            return@withContext SimilarAnalysisRunResult(cancelled.status, cancelled.lastResultCount)
+        }
+        if (currentAtStart.status == SimilarAnalysisTaskStatus.COMPLETED && !currentAtStart.cancelRequested) {
+            return@withContext SimilarAnalysisRunResult(currentAtStart.status, currentAtStart.lastResultCount)
+        }
 
-        val activeIds = photos.map { it.id }.toHashSet()
-        val cachedFingerprints = similarDao.allFingerprints()
-            .filter { it.photoId in activeIds && it.colorHistogram.contains("rgb=") }
-            .associateBy { it.photoId }
-        val missingPhotos = photos.filterNot { it.id in cachedFingerprints }
-        val now = System.currentTimeMillis()
-        val pendingFingerprints = mutableListOf<com.futureape.kanleme.data.local.PhotoFingerprintEntity>()
-
-        onProgress(cachedFingerprints.size.coerceAtMost(total), total, "复用已完成的缩略指纹")
-        missingPhotos.forEachIndexed { index, photo ->
-            val fp = similarPhotoAnalyzer.fingerprintOrNull(photo, now)
-            if (fp != null) pendingFingerprints += fp
-            if (pendingFingerprints.size >= 24) {
-                similarDao.upsertFingerprints(pendingFingerprints.toList())
-                pendingFingerprints.clear()
+        try {
+            if (similarMediaVersion() != task.mediaVersion) {
+                prepareSimilarAnalysis(task.accessKey, task.requestedLimit, forceRestart = false)
+                throw SimilarAnalysisInputChangedException()
             }
-            val processed = (cachedFingerprints.size + index + 1).coerceAtMost(total)
-            if (index % 2 == 0 || index == missingPhotos.lastIndex) {
-                onProgress(processed, total, "正在计算缩略指纹")
-            }
-            yield()
-        }
-        if (pendingFingerprints.isNotEmpty()) {
-            similarDao.upsertFingerprints(pendingFingerprints.toList())
-            pendingFingerprints.clear()
-        }
 
-        val fingerprints = similarDao.allFingerprints().filter { it.photoId in activeIds && it.colorHistogram.contains("rgb=") }
-        onProgress(total, total, "正在聚类相似照片")
-        yield()
-        val result = similarPhotoAnalyzer.buildGroups(photos = photos, fingerprints = fingerprints, now = now)
-        onProgress(total, total, "正在保存检测结果")
-        similarDao.clearGroupPhotos()
-        similarDao.clearGroups()
-        result.groups.chunked(80).forEach { similarDao.upsertGroups(it) }
-        result.members.chunked(240).forEach { similarDao.upsertGroupPhotos(it) }
-        result.groups.size
+            val total = photoDao.countSimilarAnalysisCandidates().coerceAtMost(task.requestedLimit)
+            var cursor = task.cursor.coerceIn(0, total)
+            val running = currentAtStart.copy(
+                status = SimilarAnalysisTaskStatus.RUNNING,
+                totalPhotos = total,
+                cursor = cursor,
+                cancelRequested = false,
+                lastError = null,
+                stage = if (cursor > 0) "继续计算缩略指纹" else "读取照片索引",
+                updatedAt = System.currentTimeMillis(),
+            )
+            similarDao.upsertAnalysisTask(running)
+            onProgress(cursor, total, running.stage)
+
+            suspend fun cancelledOrStale(): SimilarAnalysisRunResult? {
+                currentCoroutineContext().ensureActive()
+                val current = similarDao.analysisTask()
+                if (current?.runToken != task.runToken) {
+                    return SimilarAnalysisRunResult(
+                        status = current?.status ?: SimilarAnalysisTaskStatus.CANCELLED,
+                        resultCount = current?.lastResultCount ?: 0,
+                    )
+                }
+                if (current.cancelRequested || current.status == SimilarAnalysisTaskStatus.CANCEL_REQUESTED) {
+                    val cancelled = current.copy(
+                        status = SimilarAnalysisTaskStatus.CANCELLED,
+                        cancelRequested = false,
+                        stage = "检测已取消",
+                        updatedAt = System.currentTimeMillis(),
+                    )
+                    similarDao.upsertAnalysisTask(cancelled)
+                    return SimilarAnalysisRunResult(cancelled.status, cancelled.lastResultCount)
+                }
+                return null
+            }
+
+            if (total < 2) {
+                cancelledOrStale()?.let { return@withContext it }
+                similarDao.clearGroupPhotos()
+                similarDao.clearGroups()
+                val completed = running.copy(
+                    status = SimilarAnalysisTaskStatus.COMPLETED,
+                    cursor = total,
+                    totalPhotos = total,
+                    stage = "检测完成，未发现明显相似照片",
+                    lastResultCount = 0,
+                    updatedAt = System.currentTimeMillis(),
+                )
+                similarDao.upsertAnalysisTask(completed)
+                onProgress(total, total, completed.stage)
+                return@withContext SimilarAnalysisRunResult(completed.status, 0)
+            }
+
+            val cachedIds = similarDao.allFingerprints()
+                .asSequence()
+                .filter { it.colorHistogram.contains("rgb=") }
+                .map { it.photoId }
+                .toMutableSet()
+            val pendingFingerprints = mutableListOf<com.futureape.kanleme.data.local.PhotoFingerprintEntity>()
+            val fingerprintNow = System.currentTimeMillis()
+            while (cursor < total) {
+                cancelledOrStale()?.let { return@withContext it }
+                val page = photoDao.similarAnalysisCandidates(
+                    limit = SimilarAnalysisContract.PAGE_SIZE,
+                    offset = cursor,
+                )
+                if (page.isEmpty()) break
+                page.forEach { photo ->
+                    if (photo.id !in cachedIds) {
+                        similarPhotoAnalyzer.fingerprintOrNull(photo, fingerprintNow)?.let { fingerprint ->
+                            pendingFingerprints += fingerprint
+                            cachedIds += photo.id
+                        }
+                    }
+                }
+                if (pendingFingerprints.isNotEmpty()) {
+                    similarDao.upsertFingerprints(pendingFingerprints.toList())
+                    pendingFingerprints.clear()
+                }
+                cursor = (cursor + page.size).coerceAtMost(total)
+                val updated = similarDao.analysisTask()?.takeIf { it.runToken == task.runToken }
+                    ?: return@withContext SimilarAnalysisRunResult(SimilarAnalysisTaskStatus.CANCELLED, 0)
+                val progressTask = updated.copy(
+                    status = SimilarAnalysisTaskStatus.RUNNING,
+                    cursor = cursor,
+                    totalPhotos = total,
+                    stage = "正在计算缩略指纹",
+                    updatedAt = System.currentTimeMillis(),
+                )
+                similarDao.upsertAnalysisTask(progressTask)
+                onProgress(cursor, total, progressTask.stage)
+                if (cursor % (SimilarAnalysisContract.PAGE_SIZE * 8) == 0 || cursor >= total) {
+                    if (similarMediaVersion() != task.mediaVersion) {
+                        prepareSimilarAnalysis(task.accessKey, task.requestedLimit, forceRestart = false)
+                        throw SimilarAnalysisInputChangedException()
+                    }
+                }
+                yield()
+            }
+
+            cancelledOrStale()?.let { return@withContext it }
+            if (similarMediaVersion() != task.mediaVersion) {
+                prepareSimilarAnalysis(task.accessKey, task.requestedLimit, forceRestart = false)
+                throw SimilarAnalysisInputChangedException()
+            }
+            val photos = photoDao.similarAnalysisCandidates(limit = total, offset = 0)
+            val activeIds = photos.map { it.id }.toHashSet()
+            val fingerprints = similarDao.allFingerprints()
+                .filter { it.photoId in activeIds && it.colorHistogram.contains("rgb=") }
+            val clustering = similarDao.analysisTask()?.takeIf { it.runToken == task.runToken }
+                ?: return@withContext SimilarAnalysisRunResult(SimilarAnalysisTaskStatus.CANCELLED, 0)
+            val clusteringTask = clustering.copy(
+                status = SimilarAnalysisTaskStatus.RUNNING,
+                cursor = total,
+                totalPhotos = total,
+                stage = "正在聚类相似照片",
+                updatedAt = System.currentTimeMillis(),
+            )
+            similarDao.upsertAnalysisTask(clusteringTask)
+            onProgress(total, total, clusteringTask.stage)
+            val result = similarPhotoAnalyzer.buildGroups(photos = photos, fingerprints = fingerprints, now = System.currentTimeMillis())
+            currentCoroutineContext().ensureActive()
+            cancelledOrStale()?.let { return@withContext it }
+            similarDao.clearGroupPhotos()
+            similarDao.clearGroups()
+            result.groups.chunked(80).forEach { similarDao.upsertGroups(it) }
+            result.members.chunked(240).forEach { similarDao.upsertGroupPhotos(it) }
+            val completed = similarDao.analysisTask()?.takeIf { it.runToken == task.runToken }
+                ?: return@withContext SimilarAnalysisRunResult(SimilarAnalysisTaskStatus.CANCELLED, 0)
+            val finalTask = completed.copy(
+                status = SimilarAnalysisTaskStatus.COMPLETED,
+                cursor = total,
+                totalPhotos = total,
+                stage = if (result.groups.isEmpty()) "检测完成，未发现明显相似照片" else "检测完成，已生成候选分组",
+                cancelRequested = false,
+                lastResultCount = result.groups.size,
+                lastError = null,
+                updatedAt = System.currentTimeMillis(),
+            )
+            similarDao.upsertAnalysisTask(finalTask)
+            onProgress(total, total, finalTask.stage)
+            SimilarAnalysisRunResult(finalTask.status, finalTask.lastResultCount)
+        } catch (changed: SimilarAnalysisInputChangedException) {
+            throw changed
+        } catch (cancelled: CancellationException) {
+            val current = similarDao.analysisTask()
+            if (current?.runToken == task.runToken && SimilarAnalysisTaskStatus.isRunning(current.status)) {
+                similarDao.upsertAnalysisTask(
+                    current.copy(
+                        status = if (current.cancelRequested) SimilarAnalysisTaskStatus.CANCELLED else SimilarAnalysisTaskStatus.PAUSED,
+                        cancelRequested = false,
+                        stage = if (current.cancelRequested) "检测已取消" else "检测已暂停，可继续检测",
+                        updatedAt = System.currentTimeMillis(),
+                    )
+                )
+            }
+            throw cancelled
+        } catch (throwable: Throwable) {
+            val current = similarDao.analysisTask()
+            if (current?.runToken == task.runToken) {
+                similarDao.upsertAnalysisTask(
+                    current.copy(
+                        status = SimilarAnalysisTaskStatus.FAILED,
+                        cancelRequested = false,
+                        stage = "相似照片检测失败，可继续检测重试",
+                        lastError = throwable.message,
+                        updatedAt = System.currentTimeMillis(),
+                    )
+                )
+            }
+            throw throwable
+        }
+    }
+
+    private suspend fun similarMediaVersion(): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        photoDao.similarAnalysisInputs().forEach { input ->
+            digest.update(
+                (
+                    input.id.toString() + "|" +
+                        input.mediaStoreId + "|" +
+                        input.stableMediaKey + "|" +
+                        input.uri + "|" +
+                        input.size + "|" +
+                        input.dateTaken + "|" +
+                        input.dateModified + "|" +
+                        input.width + "|" +
+                        input.height + "\n"
+                    ).toByteArray(Charsets.UTF_8)
+            )
+        }
+        return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
     }
 
     override suspend fun similarGroupDetail(groupId: String): SimilarGroupDetail? = withContext(Dispatchers.IO) {

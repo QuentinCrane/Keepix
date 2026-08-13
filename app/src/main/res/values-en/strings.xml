@@ -63,6 +63,7 @@
     <string name="message_similar_detection_background">Similar photo detection is continuing in the background. Return here to resume progress</string>
     <string name="message_similar_detection_no_result">No obvious similar photos found. You can expand photo access or sync the library again later</string>
     <string name="message_similar_detection_failed">Similar photo detection failed</string>
+    <string name="message_media_permission_required">Grant photo access before starting similar photo detection</string>
     <string name="message_restore_success">Restored</string>
     <string name="message_restore_failed">Restore failed</string>
     <string name="message_permanent_delete_success">Permanently deleted</string>
