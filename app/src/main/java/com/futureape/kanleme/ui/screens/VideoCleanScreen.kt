@@ -62,6 +62,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -125,7 +126,6 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import com.futureape.kanleme.ui.i18n.Text
 
 private fun AudioManager.isMusicStreamMuted(): Boolean =
     runCatching { isStreamMute(AudioManager.STREAM_MUSIC) }.getOrDefault(false)
@@ -247,19 +247,19 @@ fun VideoCleanScreen(
 
     if (videos.isEmpty()) {
         Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-            ScreenHeader("视频整理", "单击播放/暂停，左右滑切换沉浸", ::leaveCleaning)
+            ScreenHeader(stringResource(R.string.video_clean_title), stringResource(R.string.video_clean_subtitle), ::leaveCleaning)
             Box(Modifier.fillMaxSize().padding(18.dp), contentAlignment = Alignment.Center) {
                 if (deckPreparing) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         CircularProgressIndicator()
-                        Text("正在准备整理队列", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text("会直接进入当前随机 / 最新顺序，不再先闪出暂无队列", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.video_queue_preparing), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(R.string.video_queue_preparing_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
                     EmptyState(
-                        title = "当前筛选下暂无待整理视频",
-                        message = "连续整理不会按轮次停止；这里为空通常表示当前筛选、排除文件夹或相册权限下已经没有可整理内容。",
-                        actionText = "重新读取队列",
+                        title = stringResource(R.string.video_queue_empty_title),
+                        message = stringResource(R.string.video_queue_empty_body),
+                        actionText = stringResource(R.string.video_queue_reload),
                         onAction = { haptics.success(); if (dashboard.videoCount == 0) viewModel.refreshLibrary() else viewModel.loadVideoDeck(scope) },
                     )
                 }
@@ -353,7 +353,7 @@ fun VideoCleanScreen(
         }
         OrganizerDatePickerAnimatedOverlay(
             visible = showDatePicker,
-            title = "视频时间筛选",
+            title = stringResource(R.string.video_date_filter_title),
             currentMode = scope.dateMode,
             onApply = { mode -> haptics.tick(); viewModel.setVideoSessionDateMode(mode) },
             onDismiss = { showDatePicker = false },
@@ -361,7 +361,7 @@ fun VideoCleanScreen(
         if (currentVideo != null) {
             OrganizerFolderPickerOverlay(
                 visible = showFolderPicker,
-                title = "归档当前视频",
+                title = stringResource(R.string.video_archive_current_title),
                 folders = folders.ifEmpty { listOf("DCIM/Camera/", "Movies/", "Download/") },
                 onArchive = { path -> haptics.keep(); viewModel.archiveVideoToFolder(currentVideo, path) },
                 onDismiss = { showFolderPicker = false },
@@ -372,8 +372,8 @@ fun VideoCleanScreen(
 
 
 private data class VideoPositionGuideStep(
-    val title: String,
-    val body: String,
+    @androidx.annotation.StringRes val title: Int,
+    @androidx.annotation.StringRes val body: Int,
     val targetAlignment: Alignment,
     val cardAlignment: Alignment,
     val targetWidth: androidx.compose.ui.unit.Dp,
@@ -386,8 +386,8 @@ private fun VideoPositionGuideOverlay(onDismiss: () -> Unit) {
     var stepIndex by remember { mutableIntStateOf(0) }
     val steps = listOf(
         VideoPositionGuideStep(
-            title = "顶部视频状态栏",
-            body = "当前进度、待删数量和重新随机都在第一行，竖屏平板也不会被左侧 Dock 挤开。",
+            title = R.string.video_guide_status_title,
+            body = R.string.video_guide_status_body,
             targetAlignment = Alignment.TopCenter,
             cardAlignment = Alignment.BottomCenter,
             targetWidth = 340.dp,
@@ -395,16 +395,16 @@ private fun VideoPositionGuideOverlay(onDismiss: () -> Unit) {
             targetPadding = androidx.compose.foundation.layout.PaddingValues(top = 42.dp),
         ),
         VideoPositionGuideStep(
-            title = "中间视频区域",
-            body = "单击视频区域可播放 / 暂停，左右滑切换沉浸观看和显示按钮；当前页才创建播放器，降低闪退和卡顿概率。",
+            title = R.string.video_guide_player_title,
+            body = R.string.video_guide_player_body,
             targetAlignment = Alignment.Center,
             cardAlignment = Alignment.BottomCenter,
             targetWidth = 320.dp,
             targetHeight = 500.dp,
         ),
         VideoPositionGuideStep(
-            title = "侧边操作栏",
-            body = "播放 / 暂停只保留在侧边栏，保留、收藏、待删和分享集中在同一列，避免底部按钮与信息区重叠。",
+            title = R.string.video_guide_actions_title,
+            body = R.string.video_guide_actions_body,
             targetAlignment = Alignment.CenterEnd,
             cardAlignment = Alignment.CenterStart,
             targetWidth = 92.dp,
@@ -430,12 +430,12 @@ private fun VideoPositionGuideOverlay(onDismiss: () -> Unit) {
             contentColor = Color.Black,
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("步骤 " + (stepIndex + 1) + "/" + steps.size, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Text(step.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(step.body, style = MaterialTheme.typography.bodyMedium, color = Color.Black.copy(alpha = 0.70f))
+                Text(stringResource(R.string.photo_guide_step, stepIndex + 1, steps.size), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(step.title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(stringResource(step.body), style = MaterialTheme.typography.bodyMedium, color = Color.Black.copy(alpha = 0.70f))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    if (stepIndex > 0) Button(onClick = { stepIndex -= 1 }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text("上一步") }
-                    Button(onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text(if (stepIndex < steps.lastIndex) "下一步" else "知道了") }
+                    if (stepIndex > 0) Button(onClick = { stepIndex -= 1 }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text(stringResource(R.string.onboarding_previous)) }
+                    Button(onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text(stringResource(if (stepIndex < steps.lastIndex) R.string.onboarding_next else R.string.photo_guide_done)) }
                 }
             }
         }
@@ -467,7 +467,7 @@ private fun VideoOrganizerTopRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         VideoTopPill(
-            label = if (displayMode == VideoDisplayMode.FIT_SCREEN) "原比例" else "全屏",
+            label = stringResource(if (displayMode == VideoDisplayMode.FIT_SCREEN) R.string.video_display_original else R.string.video_display_fullscreen),
             onClick = onToggleDisplayMode,
         )
         VideoTopPill(
@@ -478,7 +478,7 @@ private fun VideoOrganizerTopRow(
         )
         if (showFolderChips) {
             VideoTopPill(
-                label = "指定归档",
+                label = stringResource(R.string.video_archive_label),
                 icon = Icons.Rounded.Folder,
                 onClick = onFolderClick,
             )
@@ -486,15 +486,15 @@ private fun VideoOrganizerTopRow(
         OrganizerProgressPill(
             progressPercent = progressPercent,
             remainingCount = remainingCount,
-            remainingLabel = "个",
+            remainingLabel = stringResource(R.string.video_count_unit),
             releasableBytes = deletedSizeBytes,
             modifier = Modifier.width(94.dp),
             compact = true,
-            progressLabel = "目标",
+            progressLabel = stringResource(R.string.video_progress_target),
         )
         if (showShuffle) {
             ShuffleSessionButton(
-                label = "重新随机",
+                label = stringResource(R.string.photo_shuffle_title),
                 lightContent = true,
                 onClick = onShuffle,
             )
@@ -578,8 +578,9 @@ private fun VideoReelPage(
     var playbackFailed by remember(video.id) { mutableStateOf(false) }
     var lastTapMillis by remember(video.id) { mutableStateOf(0L) }
     var actionOffsetY by remember(video.id) { mutableStateOf(0f) }
-    val videoInfo = remember(video.id, video.dateTaken, video.duration, video.size, video.folderName) {
-        videoInfoLine(video)
+    val localAlbumLabel = stringResource(R.string.video_local_album)
+    val videoInfo = remember(video.id, video.dateTaken, video.duration, video.size, video.folderName, localAlbumLabel) {
+        videoInfoLine(video, localAlbumLabel)
     }
     val currentPlaybackUris by rememberUpdatedState(playbackUris)
     val currentPlaybackUriIndex by rememberUpdatedState(playbackUriIndex)
@@ -728,7 +729,7 @@ private fun VideoReelPage(
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
             ) {
                 Text(
-                    "无法播放，点按重试",
+                    stringResource(R.string.video_playback_error),
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
@@ -813,7 +814,7 @@ private fun VideoReelPage(
                 if (settings.videoShowInfoPanel) {
                     Column {
                         Text(
-                            if (chromeVisible) video.folderName.ifBlank { "本地相册" } else simpleAgeLabel(video.dateTaken),
+                            if (chromeVisible) video.folderName.ifBlank { localAlbumLabel } else simpleAgeLabel(video.dateTaken),
                             style = MaterialTheme.typography.headlineSmall,
                             color = Color.White,
                             fontWeight = FontWeight.Black,
@@ -920,24 +921,25 @@ private fun ThinVideoScrubber(
     }
 }
 
+@Composable
 private fun simpleAgeLabel(timeMillis: Long): String {
     val normalized = if (timeMillis in 1L..10_000_000_000L) timeMillis * 1000L else timeMillis
-    if (normalized <= 0L) return "本地视频"
+    if (normalized <= 0L) return stringResource(R.string.video_local_label)
     val days = ((System.currentTimeMillis() - normalized).coerceAtLeast(0L) / (24L * 60L * 60L * 1000L)).toInt()
     return when {
-        days <= 0 -> "今天"
-        days < 30 -> days.toString() + " 天前"
-        days < 365 -> (days / 30).coerceAtLeast(1).toString() + " 个月前"
-        else -> (days / 365).coerceAtLeast(1).toString() + " 年前"
+        days <= 0 -> stringResource(R.string.video_age_today)
+        days < 30 -> stringResource(R.string.video_age_days_ago, days)
+        days < 365 -> stringResource(R.string.video_age_months_ago, (days / 30).coerceAtLeast(1))
+        else -> stringResource(R.string.video_age_years_ago, (days / 365).coerceAtLeast(1))
     }
 }
 
-private fun videoInfoLine(video: VideoEntity): String {
+private fun videoInfoLine(video: VideoEntity, localAlbumLabel: String): String {
     return listOf(
         detailedVideoDate(video.dateTaken),
         formatDuration(video.duration).takeIf { video.duration > 0L },
         formatSize(video.size).takeIf { video.size > 0L },
-        video.folderName.ifBlank { "本地相册" },
+        video.folderName.ifBlank { localAlbumLabel },
     ).filterNotNull().joinToString(" · ")
 }
 
@@ -976,11 +978,11 @@ private fun ReelActionRail(
                 count = sessionActionCount,
                 onClick = onUndo,
             )
-            ReelRailButton(if (chromeVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (chromeVisible) "隐藏" else "显示", onToggleChrome)
-            ReelRailButton(if (muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp, if (muted) "静音" else "声音", onMute)
-            ReelRailButton(Icons.Rounded.FavoriteBorder, "收藏", onFavorite)
-            ReelRailButton(Icons.Rounded.Delete, "待删", onDelete)
-            ReelRailButton(Icons.Rounded.Share, "分享", onShare)
+            ReelRailButton(if (chromeVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, stringResource(if (chromeVisible) R.string.video_action_hide else R.string.video_action_show), onToggleChrome)
+            ReelRailButton(if (muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp, stringResource(if (muted) R.string.video_action_mute else R.string.video_action_sound), onMute)
+            ReelRailButton(Icons.Rounded.FavoriteBorder, stringResource(R.string.swipe_action_favorite), onFavorite)
+            ReelRailButton(Icons.Rounded.Delete, stringResource(R.string.swipe_action_delete), onDelete)
+            ReelRailButton(Icons.Rounded.Share, stringResource(R.string.a11y_share), onShare)
         }
     }
 }
