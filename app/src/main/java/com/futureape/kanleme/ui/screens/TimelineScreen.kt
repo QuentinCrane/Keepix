@@ -25,7 +25,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import com.futureape.kanleme.ui.i18n.Text
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -34,11 +34,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.VideoEntity
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.openVideoInSystemGallery
@@ -68,8 +70,8 @@ fun TimelineScreen(
     ) {
         item {
             ScreenHeader(
-                title = if (showingVideos) "全视频时间轴" else "全相册时间轴",
-                subtitle = if (showingVideos) "按拍摄时间浏览已同步视频，点开后用系统播放器查看。" else "按拍摄时间浏览已同步照片，点开后左右滑动查看。",
+                title = stringResource(if (showingVideos) R.string.timeline_all_videos_title else R.string.timeline_all_photos_title),
+                subtitle = stringResource(if (showingVideos) R.string.timeline_videos_subtitle else R.string.timeline_photos_subtitle),
                 onBack = onBack,
             )
         }
@@ -83,14 +85,14 @@ fun TimelineScreen(
                     ) {
                         Icon(Icons.Rounded.PhotoLibrary, contentDescription = null)
                         Spacer(Modifier.height(10.dp))
-                        Text("还没有照片索引", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.timeline_empty_photos_title), style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "请先同步本机媒体库。Android 14 如果只授予部分照片，这里只会显示已授权内容。",
+                            stringResource(R.string.timeline_empty_photos_body),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(12.dp))
-                        Button(onClick = { viewModel.refreshLibrary() }) { Text("同步本机媒体库") }
+                        Button(onClick = { viewModel.refreshLibrary() }) { Text(stringResource(R.string.timeline_sync)) }
                     }
                 }
             }
@@ -103,22 +105,22 @@ fun TimelineScreen(
                     ) {
                         Icon(Icons.Rounded.Movie, contentDescription = null)
                         Spacer(Modifier.height(10.dp))
-                        Text("还没有视频索引", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.timeline_empty_videos_title), style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "请先同步本机媒体库。这里只显示已授权访问的视频。",
+                            stringResource(R.string.timeline_empty_videos_body),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(12.dp))
-                        Button(onClick = { viewModel.refreshLibrary() }) { Text("同步本机媒体库") }
+                        Button(onClick = { viewModel.refreshLibrary() }) { Text(stringResource(R.string.timeline_sync)) }
                     }
                 }
             }
         } else if (showingVideos) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = {}, label = { Text("共 " + videos.size + " 个") })
-                    AssistChip(onClick = {}, label = { Text(groupedVideos.size.toString() + " 天") })
+                    AssistChip(onClick = {}, label = { Text(stringResource(R.string.timeline_count_items, videos.size)) })
+                    AssistChip(onClick = {}, label = { Text(stringResource(R.string.timeline_count_days, groupedVideos.size)) })
                 }
             }
             groupedVideos.forEach { (title, dayVideos) ->
@@ -150,8 +152,8 @@ fun TimelineScreen(
         } else {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = {}, label = { Text("共 " + photos.size + " 张") })
-                    AssistChip(onClick = {}, label = { Text(groupedPhotos.size.toString() + " 天") })
+                    AssistChip(onClick = {}, label = { Text(stringResource(R.string.timeline_count_photos, photos.size)) })
+                    AssistChip(onClick = {}, label = { Text(stringResource(R.string.timeline_count_days, groupedPhotos.size)) })
                 }
             }
             groupedPhotos.forEach { (title, dayPhotos) ->
@@ -239,7 +241,7 @@ private fun TimelineThumb(
         )
         if (photo.processingStatus == "favorited") {
             Text(
-                text = "已收藏",
+                text = stringResource(R.string.timeline_favorited),
                 color = androidx.compose.ui.graphics.Color.White,
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier

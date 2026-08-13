@@ -49,6 +49,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -95,7 +96,6 @@ import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-import com.futureape.kanleme.ui.i18n.Text
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -142,7 +142,7 @@ fun PhotoViewerScreen(
 
     if (photos.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("没有可查看的照片")
+            Text(stringResource(R.string.photo_viewer_empty))
         }
         return
     }
@@ -230,11 +230,11 @@ fun PhotoViewerScreen(
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    ViewerAction(icon = Icons.Rounded.FavoriteBorder, label = "收藏照片", modifier = Modifier.weight(1f)) { viewModel.onPhotoAction(photo, SwipeAction.Favorite) }
-                    ViewerAction(icon = Icons.Rounded.Folder, label = "移动", modifier = Modifier.weight(1f)) { showMoveSheet = true }
-                    ViewerAction(icon = Icons.Rounded.Delete, label = "加入待删区", modifier = Modifier.weight(1f)) { viewModel.onPhotoAction(photo, SwipeAction.Delete) }
-                    ViewerAction(icon = Icons.Rounded.Info, label = "EXIF信息", modifier = Modifier.weight(1f)) { showExifSheet = true }
-                    ViewerAction(icon = Icons.Rounded.PhotoLibrary, label = "回到整理照片", modifier = Modifier.weight(1f)) { onBack() }
+                    ViewerAction(icon = Icons.Rounded.FavoriteBorder, label = stringResource(R.string.viewer_action_favorite), modifier = Modifier.weight(1f)) { viewModel.onPhotoAction(photo, SwipeAction.Favorite) }
+                    ViewerAction(icon = Icons.Rounded.Folder, label = stringResource(R.string.viewer_action_move), modifier = Modifier.weight(1f)) { showMoveSheet = true }
+                    ViewerAction(icon = Icons.Rounded.Delete, label = stringResource(R.string.viewer_action_pending_delete), modifier = Modifier.weight(1f)) { viewModel.onPhotoAction(photo, SwipeAction.Delete) }
+                    ViewerAction(icon = Icons.Rounded.Info, label = stringResource(R.string.viewer_action_exif), modifier = Modifier.weight(1f)) { showExifSheet = true }
+                    ViewerAction(icon = Icons.Rounded.PhotoLibrary, label = stringResource(R.string.viewer_action_back_to_clean), modifier = Modifier.weight(1f)) { onBack() }
                 }
             }
         }
@@ -272,20 +272,20 @@ private fun PhotoExifSheet(photo: PhotoEntity, onDismiss: () -> Unit) {
                 .padding(horizontal = 22.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("EXIF 信息", style = MaterialTheme.typography.headlineSmall)
-            ExifLine("文件名", photo.displayName)
-            ExifLine("相册", photo.folderName)
-            ExifLine("路径", viewerPhotoDisplayPath(photo))
-            ExifLine("内容 URI", photo.uri)
-            ExifLine("类型", photoMediaKindLabel(photo))
-            ExifLine("尺寸", photo.width.toString() + " x " + photo.height.toString())
-            ExifLine("大小", formatSize(photo.size))
-            ExifLine("设备", listOfNotNull(photo.exifMake, photo.exifModel).joinToString(" ").ifBlank { "未知" })
-            ExifLine("镜头", photo.exifLensModel ?: "未知")
-            ExifLine("焦距", photo.exifFocalLength ?: "未知")
-            ExifLine("光圈", photo.exifAperture ?: "未知")
-            ExifLine("ISO", photo.exifIso ?: "未知")
-            ExifLine("快门", photo.exifExposureTime ?: "未知")
+            Text(stringResource(R.string.exif_title), style = MaterialTheme.typography.headlineSmall)
+            ExifLine(stringResource(R.string.exif_filename), photo.displayName)
+            ExifLine(stringResource(R.string.exif_album), photo.folderName)
+            ExifLine(stringResource(R.string.exif_path), viewerPhotoDisplayPath(photo))
+            ExifLine(stringResource(R.string.exif_content_uri), photo.uri)
+            ExifLine(stringResource(R.string.exif_type), photoMediaKindLabel(photo))
+            ExifLine(stringResource(R.string.exif_dimensions), photo.width.toString() + " x " + photo.height.toString())
+            ExifLine(stringResource(R.string.exif_size), formatSize(photo.size))
+            ExifLine(stringResource(R.string.exif_device), listOfNotNull(photo.exifMake, photo.exifModel).joinToString(" "))
+            ExifLine(stringResource(R.string.exif_lens), photo.exifLensModel.orEmpty())
+            ExifLine(stringResource(R.string.exif_focal_length), photo.exifFocalLength.orEmpty())
+            ExifLine(stringResource(R.string.exif_aperture), photo.exifAperture.orEmpty())
+            ExifLine(stringResource(R.string.exif_iso), photo.exifIso.orEmpty())
+            ExifLine(stringResource(R.string.exif_shutter), photo.exifExposureTime.orEmpty())
             Spacer(Modifier.height(12.dp))
         }
     }
@@ -295,7 +295,7 @@ private fun PhotoExifSheet(photo: PhotoEntity, onDismiss: () -> Unit) {
 private fun ExifLine(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.28f))
-        Text(value.ifBlank { "未知" }, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(0.72f))
+        Text(value.ifBlank { stringResource(R.string.value_unknown) }, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(0.72f))
     }
 }
 
@@ -468,7 +468,7 @@ private fun ZoomableViewerPhoto(
                     ) {
                         if (motionLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Text("正在准备实况", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.motion_preparing), style = MaterialTheme.typography.labelMedium)
                         } else {
                             FilledTonalIconButton(
                                 onClick = {
@@ -486,7 +486,7 @@ private fun ZoomableViewerPhoto(
                             ) {
                                 Icon(Icons.Rounded.PlayArrow, contentDescription = stringResource(R.string.a11y_play_motion))
                             }
-                            Text("长按图片或点此播放实况", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.motion_play_hint), style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -599,9 +599,9 @@ private fun MoveFolderSheet(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("移动到文件夹", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.move_folder_title), style = MaterialTheme.typography.headlineSmall)
             Text(
-                "目标路径使用相册相对路径，例如 Pictures/Kanleme/Favorites/。系统可能会要求照片写入授权。",
+                stringResource(R.string.move_folder_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -614,14 +614,14 @@ private fun MoveFolderSheet(
                 value = customPath,
                 onValueChange = { customPath = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("自定义相册路径") },
+                label = { Text(stringResource(R.string.move_folder_custom_path)) },
                 singleLine = true,
             )
             Button(
                 onClick = { onMove(customPath) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("移动到该文件夹")
+                Text(stringResource(R.string.move_folder_action))
             }
             Spacer(Modifier.height(16.dp))
         }
