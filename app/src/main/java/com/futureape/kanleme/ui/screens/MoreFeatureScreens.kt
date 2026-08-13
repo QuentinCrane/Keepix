@@ -74,7 +74,10 @@ import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.ui.components.MetricPill
+import com.futureape.kanleme.ui.util.executeIfNotCached
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.imagePrefetchPolicy
+import com.futureape.kanleme.ui.util.isLowRamDevice
 import com.futureape.kanleme.ui.util.mediaImageRequest
 import com.futureape.kanleme.ui.util.openVideoInSystemGallery
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
@@ -351,13 +354,14 @@ private fun TodayMemoryTile(
 @Composable
 private fun TodayMemoryPrefetch(memories: List<TodayMemoryItem>) {
     val context = LocalContext.current
+    val imagePolicy = remember { imagePrefetchPolicy(context.isLowRamDevice()) }
     LaunchedEffect(memories) {
         memories
-            .take(48)
+            .take(imagePolicy.initialGridCount)
             .chunked(12)
             .forEach { chunk ->
                 chunk.forEach { item ->
-                    context.imageLoader.execute(todayMemoryImageRequest(context, item, "today_tile", 560, 760))
+                    context.imageLoader.executeIfNotCached(todayMemoryImageRequest(context, item, "today_tile", 560, 760))
                 }
                 delay(45)
             }

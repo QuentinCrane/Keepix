@@ -90,6 +90,9 @@ import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.executeIfNotCached
+import com.futureape.kanleme.ui.util.imagePrefetchPolicy
+import com.futureape.kanleme.ui.util.isLowRamDevice
 import com.futureape.kanleme.ui.util.openMediaInSystemGallery
 import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
 import com.futureape.kanleme.ui.util.shareMedia
@@ -337,13 +340,14 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit, onDelete
 @Composable
 private fun TrashThumbnailPrefetch(items: List<TrashItemEntity>) {
     val context = LocalContext.current
+    val imagePolicy = remember { imagePrefetchPolicy(context.isLowRamDevice()) }
     LaunchedEffect(items) {
         items
-            .take(48)
+            .take(imagePolicy.initialGridCount)
             .chunked(12)
             .forEach { chunk ->
                 chunk.forEach { item ->
-                    context.imageLoader.execute(trashThumbnailImageRequest(context, item))
+                    context.imageLoader.executeIfNotCached(trashThumbnailImageRequest(context, item))
                 }
                 delay(45)
             }

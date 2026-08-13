@@ -102,8 +102,11 @@ import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.EmptyState
 import com.futureape.kanleme.ui.util.PhotoSwipeSoundPlayer
+import com.futureape.kanleme.ui.util.executeIfNotCached
 import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.imagePrefetchPolicy
+import com.futureape.kanleme.ui.util.isLowRamDevice
 import com.futureape.kanleme.ui.util.photoImageRequest
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.util.rememberHapticKit
@@ -290,10 +293,11 @@ fun PhotoCleanScreen(
         kotlinx.coroutines.delay(420)
         emptyStateVisible = true
     }
-    LaunchedEffect(deck, settings.photoGuideShown, runtimePolicy.prefetchCount) {
+    val imagePolicy = remember { imagePrefetchPolicy(context.isLowRamDevice()) }
+    LaunchedEffect(deck, settings.photoGuideShown, runtimePolicy.prefetchCount, imagePolicy) {
         showGuide = false
-        deck.take(runtimePolicy.prefetchCount).forEach { photo ->
-            context.imageLoader.enqueue(
+        deck.take(runtimePolicy.prefetchCount.coerceAtMost(imagePolicy.deckHighResolutionCount)).forEach { photo ->
+            context.imageLoader.executeIfNotCached(
                 photoImageRequest(context, photo, "clean_prefetch", 1280, 1280)
             )
         }

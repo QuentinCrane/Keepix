@@ -4,6 +4,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
+import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.size.Precision
 import com.futureape.kanleme.data.local.PhotoEntity
@@ -127,6 +128,17 @@ fun mediaImageRequest(
     .precision(Precision.INEXACT)
     .crossfade(false)
     .build()
+
+/**
+ * Prefetch one image without synchronously repeating a memory-cache hit.
+ * The suspend call remains cancellable when the hosting Compose effect leaves.
+ */
+suspend fun ImageLoader.executeIfNotCached(request: ImageRequest): Boolean {
+    val key = request.memoryCacheKey
+    if (key != null && memoryCache?.get(key) != null) return false
+    execute(request)
+    return true
+}
 
 private fun photoThumbnailCacheKey(photo: PhotoEntity): String =
     photoCacheKey(photo, PHOTO_THUMB_CACHE_SUFFIX)

@@ -95,8 +95,11 @@ import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.data.settings.TodayInHistoryEntryMode
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
+import com.futureape.kanleme.ui.util.executeIfNotCached
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
+import com.futureape.kanleme.ui.util.imagePrefetchPolicy
+import com.futureape.kanleme.ui.util.isLowRamDevice
 import com.futureape.kanleme.ui.util.photoDisplayAspectRatio
 import com.futureape.kanleme.ui.util.photoImageRequest
 import com.futureape.kanleme.ui.util.photoThumbnailImageRequest
@@ -476,13 +479,14 @@ private fun FavoritePhotoPrefetch(
     gridState: LazyStaggeredGridState,
 ) {
     val context = LocalContext.current
+    val imagePolicy = remember { imagePrefetchPolicy(context.isLowRamDevice()) }
     LaunchedEffect(photos) {
         photos
-            .take(42)
+            .take(minOf(42, imagePolicy.initialGridCount))
             .chunked(12)
             .forEach { chunk ->
                 chunk.forEach { photo ->
-                    context.imageLoader.execute(photoThumbnailImageRequest(context, photo))
+                    context.imageLoader.executeIfNotCached(photoThumbnailImageRequest(context, photo))
                 }
                 delay(45)
             }
@@ -498,11 +502,11 @@ private fun FavoritePhotoPrefetch(
             .collectLatest { (firstIndex, lastIndex) ->
                 if (lastIndex < 0 || photos.isEmpty()) return@collectLatest
                 delay(80)
-                val start = (firstIndex - 12).coerceAtLeast(0).coerceAtMost(photos.size)
-                val end = (lastIndex + 48).coerceAtLeast(start).coerceAtMost(photos.size)
+                val start = (firstIndex - imagePolicy.visibleBeforeCount).coerceAtLeast(0).coerceAtMost(photos.size)
+                val end = (lastIndex + minOf(48, imagePolicy.visibleAfterCount)).coerceAtLeast(start).coerceAtMost(photos.size)
                 photos.subList(start, end).chunked(8).forEach { chunk ->
                     chunk.forEach { photo ->
-                        context.imageLoader.execute(photoThumbnailImageRequest(context, photo))
+                        context.imageLoader.executeIfNotCached(photoThumbnailImageRequest(context, photo))
                     }
                     delay(24)
                 }
