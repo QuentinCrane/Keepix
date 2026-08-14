@@ -348,7 +348,7 @@ private fun TodayMemoryTile(
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.88f),
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ) {
-                Text(todayStatusText(item.status), modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall)
+                Text(localizedTodayStatus(item.status), modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall)
             }
         }
     }
@@ -424,12 +424,7 @@ private fun todayMemoryContentUri(item: TodayMemoryItem): Uri {
 
 @Composable
 private fun TodayStatusPill(status: String, isVideo: Boolean) {
-    val readable = when (status) {
-        ProcessingStatus.KEPT -> "已保留"
-        ProcessingStatus.FAVORITED -> "已收藏"
-        ProcessingStatus.UNPROCESSED -> "未整理"
-        else -> status
-    }
+    val readable = localizedTodayStatus(status)
     val icon = when (status) {
         ProcessingStatus.KEPT -> Icons.Rounded.CheckCircle
         ProcessingStatus.FAVORITED -> Icons.Rounded.Favorite
@@ -444,10 +439,11 @@ private fun TodayStatusPill(status: String, isVideo: Boolean) {
 private fun yearOf(timeMillis: Long): Int = Calendar.getInstance().apply { timeInMillis = timeMillis }.get(Calendar.YEAR)
 private fun formatTodayMemoryDate(timeMillis: Long): String = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timeMillis))
 private fun formatTodayMemoryDateShort(timeMillis: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timeMillis))
-private fun todayStatusText(status: String): String = when (status) {
-    ProcessingStatus.KEPT -> "已保留"
-    ProcessingStatus.FAVORITED -> "已收藏"
-    ProcessingStatus.UNPROCESSED -> "未整理"
+@Composable
+private fun localizedTodayStatus(status: String): String = when (status) {
+    ProcessingStatus.KEPT -> stringResource(R.string.status_kept)
+    ProcessingStatus.FAVORITED -> stringResource(R.string.status_favorited)
+    ProcessingStatus.UNPROCESSED -> stringResource(R.string.status_unprocessed)
     else -> status
 }
 
@@ -460,13 +456,13 @@ fun AnnualReportScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
     val availableYears = remember(currentYear) { (currentYear downTo (currentYear - 5)).toList() }
     LaunchedEffect(selectedYear) { viewModel.buildAnnualReport(selectedYear) }
     Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-        ScreenHeader("年度报告", "生成本地整理总结，不上传任何数据", onBack)
+        ScreenHeader(stringResource(R.string.annual_report_screen_title), stringResource(R.string.annual_report_screen_subtitle), onBack)
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("报告年份", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.annual_report_year_label), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             Box {
                 Surface(
                     modifier = Modifier
@@ -479,14 +475,14 @@ fun AnnualReportScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Text("${selectedYear}年", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.annual_report_year, selectedYear), style = MaterialTheme.typography.labelLarge)
                         Icon(Icons.Rounded.ExpandMore, contentDescription = null)
                     }
                 }
                 DropdownMenu(expanded = yearMenuExpanded, onDismissRequest = { yearMenuExpanded = false }) {
                     availableYears.forEach { year ->
                         DropdownMenuItem(
-                            text = { Text("${year}年") },
+                            text = { Text(stringResource(R.string.annual_report_year, year)) },
                             onClick = {
                                 selectedYear = year
                                 yearMenuExpanded = false
@@ -498,7 +494,13 @@ fun AnnualReportScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
         }
         val r = report
         if (r == null) {
-            EmptyState("正在生成年度报告", "正在读取 ${selectedYear} 年的本地事件。", "刷新", { viewModel.buildAnnualReport(selectedYear) }, modifier = Modifier.padding(18.dp))
+            EmptyState(
+                stringResource(R.string.annual_report_generating_title),
+                stringResource(R.string.annual_report_generating_body, selectedYear),
+                stringResource(R.string.annual_report_refresh),
+                { viewModel.buildAnnualReport(selectedYear) },
+                modifier = Modifier.padding(18.dp),
+            )
         } else {
             LazyColumn(contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 item {
@@ -513,27 +515,27 @@ fun AnnualReportScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                 }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                        MetricPill("照片", r.photoCount.toString(), Modifier.weight(1f))
-                        MetricPill("视频", r.videoCount.toString(), Modifier.weight(1f))
-                        MetricPill("已处理", r.clearedCount.toString(), Modifier.weight(1f))
+                        MetricPill(stringResource(R.string.annual_report_photos), r.photoCount.toString(), Modifier.weight(1f))
+                        MetricPill(stringResource(R.string.annual_report_videos), r.videoCount.toString(), Modifier.weight(1f))
+                        MetricPill(stringResource(R.string.annual_report_processed), r.clearedCount.toString(), Modifier.weight(1f))
                     }
                 }
                 item {
                     GlassSurface(modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            ReportLine(Icons.Rounded.AutoGraph, "整理动作", r.actionCount.toString())
-                            ReportLine(Icons.Rounded.Favorite, "收藏", r.favoriteCount.toString())
-                            ReportLine(Icons.Rounded.Delete, "放入回收站", r.deletedCount.toString())
-                            ReportLine(Icons.Rounded.CheckCircle, "恢复", r.restoredCount.toString())
-                            ReportLine(Icons.Rounded.Storage, "释放空间", formatSize(r.freedBytes))
-                            ReportLine(Icons.Rounded.Folder, "最常整理文件夹", r.topFolder)
+                            ReportLine(Icons.Rounded.AutoGraph, stringResource(R.string.annual_report_actions), r.actionCount.toString())
+                            ReportLine(Icons.Rounded.Favorite, stringResource(R.string.annual_report_favorites), r.favoriteCount.toString())
+                            ReportLine(Icons.Rounded.Delete, stringResource(R.string.annual_report_deleted), r.deletedCount.toString())
+                            ReportLine(Icons.Rounded.CheckCircle, stringResource(R.string.annual_report_restored), r.restoredCount.toString())
+                            ReportLine(Icons.Rounded.Storage, stringResource(R.string.annual_report_space_freed), formatSize(r.freedBytes))
+                            ReportLine(Icons.Rounded.Folder, stringResource(R.string.annual_report_top_folder), r.topFolder)
                         }
                     }
                 }
                 item {
                     GlassSurface(modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("月度整理趋势", style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.annual_report_monthly_trend), style = MaterialTheme.typography.titleMedium)
                             val maxMonthly = r.monthlyClearedCounts.maxOrNull()?.coerceAtLeast(1) ?: 1
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(
@@ -551,7 +553,7 @@ fun AnnualReportScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = if (count == 0) 0.16f else 0.82f)),
                                         )
-                                        Text("${index + 1}月", style = MaterialTheme.typography.labelSmall)
+                                        Text(stringResource(R.string.annual_report_month, index + 1), style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
                             }
@@ -575,23 +577,27 @@ private fun ReportLine(icon: androidx.compose.ui.graphics.vector.ImageVector, la
 @Composable
 fun AchievementsScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
     val achievements by viewModel.achievements.collectAsStateWithLifecycle()
-    var selectedFilter by remember { mutableStateOf("全部") }
+    var selectedFilter by remember { mutableStateOf(ACHIEVEMENT_FILTER_ALL) }
     LaunchedEffect(Unit) { viewModel.loadAchievements() }
     val unlocked = achievements.count { it.unlocked }
     val totalXp = achievements.filter { it.unlocked }.sumOf { it.xp }
     val completion = if (achievements.isEmpty()) 0f else unlocked.toFloat() / achievements.size.toFloat()
-    val filters = remember(achievements) { listOf("全部", "已解锁", "未完成") + achievements.map { it.category }.distinct() }
+    val filters = listOf(
+        ACHIEVEMENT_FILTER_ALL to stringResource(R.string.achievement_filter_all),
+        ACHIEVEMENT_FILTER_UNLOCKED to stringResource(R.string.achievement_filter_unlocked),
+        ACHIEVEMENT_FILTER_INCOMPLETE to stringResource(R.string.achievement_filter_incomplete),
+    ) + remember(achievements) { achievements.map { it.category }.distinct().map { it to it } }
     val visibleAchievements = remember(achievements, selectedFilter) {
         when (selectedFilter) {
-            "已解锁" -> achievements.filter { it.unlocked }
-            "未完成" -> achievements.filterNot { it.unlocked }
-            "全部" -> achievements
+            ACHIEVEMENT_FILTER_UNLOCKED -> achievements.filter { it.unlocked }
+            ACHIEVEMENT_FILTER_INCOMPLETE -> achievements.filterNot { it.unlocked }
+            ACHIEVEMENT_FILTER_ALL -> achievements
             else -> achievements.filter { it.category == selectedFilter }
         }.sortedWith(compareByDescending<AchievementUi> { it.unlocked }.thenByDescending { it.progress }.thenBy { it.target })
     }
 
     Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
-        ScreenHeader("成就库", "像 Steam 一样记录整理进度、稀有度和解锁状态", onBack)
+        ScreenHeader(stringResource(R.string.achievements_screen_title), stringResource(R.string.achievements_screen_subtitle), onBack)
         LazyColumn(contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 AchievementHeroCard(
@@ -603,11 +609,11 @@ fun AchievementsScreen(viewModel: KanlemeViewModel, onBack: () -> Unit) {
             }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(filters, key = { it }) { filter ->
+                    items(filters, key = { it.first }) { filter ->
                         AchievementFilterChip(
-                            label = filter,
-                            selected = filter == selectedFilter,
-                            onClick = { selectedFilter = filter },
+                            label = filter.second,
+                            selected = filter.first == selectedFilter,
+                            onClick = { selectedFilter = filter.first },
                         )
                     }
                 }
@@ -639,8 +645,8 @@ private fun AchievementHeroCard(
                     Icon(Icons.Rounded.EmojiEvents, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Keepix 成就陈列柜", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("$unlocked / $total 已解锁 · $totalXp XP", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.achievements_hero_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.achievements_hero_summary, unlocked, total, totalXp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text("${(completion * 100).toInt()}%", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
@@ -651,9 +657,9 @@ private fun AchievementHeroCard(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MetricPill("已解锁", unlocked.toString(), modifier = Modifier.weight(1f))
-                MetricPill("未完成", (total - unlocked).coerceAtLeast(0).toString(), modifier = Modifier.weight(1f))
-                MetricPill("总 XP", totalXp.toString(), modifier = Modifier.weight(1f))
+                MetricPill(stringResource(R.string.achievements_unlocked), unlocked.toString(), modifier = Modifier.weight(1f))
+                MetricPill(stringResource(R.string.achievements_incomplete), (total - unlocked).coerceAtLeast(0).toString(), modifier = Modifier.weight(1f))
+                MetricPill(stringResource(R.string.achievements_total_xp), totalXp.toString(), modifier = Modifier.weight(1f))
             }
         }
     }
@@ -692,7 +698,12 @@ private fun AchievementRow(item: AchievementUi) {
                         Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("${item.category} · ${item.rarity} · ${item.xp} XP", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
-                    Text(if (item.unlocked) "已解锁" else "还差 ${item.remaining}", style = MaterialTheme.typography.labelMedium, color = if (item.unlocked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (item.unlocked) stringResource(R.string.achievement_status_unlocked)
+                        else stringResource(R.string.achievement_status_remaining, item.remaining),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (item.unlocked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Text(item.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 LinearProgressIndicator(
@@ -716,3 +727,7 @@ private fun achievementIcon(key: String, unlocked: Boolean): ImageVector = when 
     key == "undo" -> Icons.Rounded.CheckCircle
     else -> Icons.Rounded.EmojiEvents
 }
+
+private const val ACHIEVEMENT_FILTER_ALL = "__all__"
+private const val ACHIEVEMENT_FILTER_UNLOCKED = "__unlocked__"
+private const val ACHIEVEMENT_FILTER_INCOMPLETE = "__incomplete__"
