@@ -118,14 +118,22 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
         ProfileDarkPage {
             Column(Modifier.fillMaxSize().padding(top = 46.dp)) {
                 ProfilePageHeader(
-                    title = if (selectedMediaType == "video") "视频回收站" else "照片回收站",
+                    title = stringResource(
+                        if (selectedMediaType == "video") R.string.trash_video_title else R.string.trash_photo_title,
+                    ),
                     subtitle = stringResource(R.string.trash_review_subtitle),
                     onBack = onBack,
                     modifier = Modifier.padding(horizontal = 22.dp),
                 )
                 Spacer(Modifier.height(18.dp))
             if (trashItems.isEmpty()) {
-                ProfileEmptyState("回收站为空", "上滑待删或删除视频后，会先进入这里；你可以恢复或永久删除。", "返回整理", onBack, modifier = Modifier.padding(horizontal = 22.dp))
+                ProfileEmptyState(
+                    stringResource(R.string.trash_empty_title),
+                    stringResource(R.string.trash_empty_body),
+                    stringResource(R.string.trash_back_to_clean),
+                    onBack,
+                    modifier = Modifier.padding(horizontal = 22.dp),
+                )
             } else {
                 TrashGalleryHeader(
                     items = trashItems,
@@ -150,9 +158,9 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                     val typedItems = if (type == "video") videoTrashItems else photoTrashItems
                     if (typedItems.isEmpty()) {
                         ProfileEmptyState(
-                            if (type == "video") "视频回收站为空" else "照片回收站为空",
-                            if (type == "video") "待删视频会单独显示在这里，不会和照片混在一起。" else "待删照片会单独显示在这里，不会和视频混在一起。",
-                            "切换类别",
+                            stringResource(if (type == "video") R.string.trash_video_empty_title else R.string.trash_photo_empty_title),
+                            stringResource(if (type == "video") R.string.trash_video_empty_body else R.string.trash_photo_empty_body),
+                            stringResource(R.string.trash_switch_type),
                             { selectedMediaType = if (type == "video") "photo" else "video" },
                             modifier = Modifier.fillMaxSize().padding(18.dp),
                         )
@@ -244,17 +252,31 @@ private fun TrashGalleryHeader(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (selectedMediaType == "video") "视频安全回收" else "照片安全回收", style = MaterialTheme.typography.labelLarge, color = ProfileScreenAccent, fontWeight = FontWeight.Bold)
-                    Text(selectedCount.toString() + " 个项目等待确认", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Black)
-                    Text("预计可释放 " + formatSize(selectedSize), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.58f))
+                    Text(
+                        stringResource(if (selectedMediaType == "video") R.string.trash_video_safe else R.string.trash_photo_safe),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = ProfileScreenAccent,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        stringResource(R.string.trash_pending_count, selectedCount),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Text(
+                        stringResource(R.string.trash_releasable, formatSize(selectedSize)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.58f),
+                    )
                 }
                 Surface(shape = RoundedCornerShape(999.dp), color = ProfileScreenAccent.copy(alpha = 0.16f), contentColor = ProfileScreenAccent) {
                     Text(stringResource(R.string.trash_review_badge), modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TrashFilterPill("照片 " + photoCount, selected = selectedMediaType != "video", onClick = { onTypeSelected("photo") })
-                TrashFilterPill("视频 " + videoCount, selected = selectedMediaType == "video", onClick = { onTypeSelected("video") })
+                TrashFilterPill(stringResource(R.string.trash_photo_filter, photoCount), selected = selectedMediaType != "video", onClick = { onTypeSelected("photo") })
+                TrashFilterPill(stringResource(R.string.trash_video_filter, videoCount), selected = selectedMediaType == "video", onClick = { onTypeSelected("video") })
             }
         }
     }
@@ -321,7 +343,7 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit, onDelete
         ) {
             Icon(
                 Icons.Rounded.DeleteForever,
-                contentDescription = "永久删除",
+                contentDescription = stringResource(R.string.trash_permanent_delete),
                 tint = Color.White,
                 modifier = Modifier.size(20.dp),
             )
@@ -405,14 +427,14 @@ private fun TrashBottomBar(
     ) {
         Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             TrashBottomAction(
-                text = "恢复全部",
+                text = stringResource(R.string.trash_restore_all),
                 icon = Icons.Rounded.Restore,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f),
                 onClick = onRestoreAll,
             )
             TrashBottomAction(
-                text = "永久删除",
+                text = stringResource(R.string.trash_permanent_delete),
                 icon = Icons.Rounded.DeleteForever,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.weight(1f),
@@ -525,7 +547,7 @@ private fun TrashPreviewOverlay(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Icon(Icons.Rounded.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text("在相册中查看", style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                    Text(stringResource(R.string.trash_view_in_gallery), style = MaterialTheme.typography.titleMedium, maxLines = 1)
                 }
             }
         }
@@ -571,7 +593,7 @@ private fun TrashPreviewOverlay(
                     maxLines = 1,
                 )
                 TrashPreviewWideAction(
-                    text = "那年今日",
+                    text = stringResource(R.string.trash_today),
                     icon = Icons.Rounded.CalendarToday,
                     color = Color.White,
                     modifier = Modifier.fillMaxWidth(),
@@ -587,21 +609,21 @@ private fun TrashPreviewOverlay(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     TrashPreviewWideAction(
-                        text = "分享",
+                        text = stringResource(R.string.trash_share),
                         icon = Icons.Rounded.Share,
                         color = Color.White,
                         modifier = Modifier.weight(1f),
                         onClick = { shareMedia(context, Uri.parse(currentItem.uri), currentItem.mimeType, currentItem.displayName) },
                     )
                     TrashPreviewWideAction(
-                        text = "恢复",
+                        text = stringResource(R.string.trash_restore),
                         icon = Icons.Rounded.Restore,
                         color = Color.White,
                         modifier = Modifier.weight(1f),
                         onClick = { onRestore(currentItem) },
                     )
                     TrashPreviewWideAction(
-                        text = "永久删除",
+                        text = stringResource(R.string.trash_permanent_delete),
                         icon = Icons.Rounded.DeleteForever,
                         color = Color(0xFFC7332F),
                         filled = true,
