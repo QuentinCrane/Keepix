@@ -546,6 +546,9 @@
     <string name="immersive_date_recent_year">最近 1 年</string>
     <string name="immersive_no_pending_photos">目前沒有待整理照片</string>
     <string name="immersive_no_pending_videos">目前沒有待整理影片</string>
+    <string name="immersive_progress_target">目標 %1$d%%</string>
+    <string name="immersive_day_memory_return">回到那天</string>
+    <string name="immersive_yesterday">昨天</string>
     <string name="permission_title">需要存取相簿</string>
     <string name="permission_intro">看了麼的核心功能是全相簿整理，所以需要讀取照片和影片。所有掃描都在本機完成，不上傳媒體檔案。</string>
     <string name="permission_platform_notice">Android 14 及以上如果選擇「選擇照片和影片」，只能整理你選取的部分內容；若要整理完整相簿，請在系統對話框中選擇允許存取所有照片和影片。</string>

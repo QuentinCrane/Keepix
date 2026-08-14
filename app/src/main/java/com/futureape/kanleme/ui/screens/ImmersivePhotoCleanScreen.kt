@@ -77,6 +77,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -127,7 +128,6 @@ import com.futureape.kanleme.ui.util.photoImageRequest
 import com.futureape.kanleme.ui.util.photoThumbnailImageRequest
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
-import com.futureape.kanleme.ui.i18n.Text
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -253,7 +253,7 @@ internal fun ImmersivePhotoCleanContent(
                                 horizontalArrangement = Arrangement.spacedBy(7.dp),
                             ) {
                                 Text(
-                                    "目标 " + progressPercent + "%",
+                                    stringResource(R.string.immersive_progress_target, progressPercent),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color.White.copy(alpha = 0.82f),
                                     fontWeight = FontWeight.SemiBold,
@@ -756,7 +756,12 @@ internal fun KeepixDayMemoryOverlay(
                     onClick = onDismiss,
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("回到那天", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.72f), fontWeight = FontWeight.Bold)
+                    Text(
+                        stringResource(R.string.immersive_day_memory_return),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontWeight = FontWeight.Bold,
+                    )
                     Text(selectedDayKey.replace("-", "/"), style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Black)
                 }
                 KeepixRoundButton(
@@ -1278,7 +1283,7 @@ private fun KeepixTopPill(label: String, trailing: String, onClick: () -> Unit) 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            Text(label.ifBlank { "照片" }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(label.ifBlank { stringResource(R.string.immersive_photo_label) }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.22f), contentColor = Color.White) {
                 Text(
                     trailing,
@@ -1340,7 +1345,7 @@ private fun KeepixBottomInfoBar(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val place = photo.locationName?.takeIf { it.isNotBlank() } ?: photo.folderName.ifBlank { "本地相册" }
+    val place = photo.locationName?.takeIf { it.isNotBlank() } ?: photo.folderName.ifBlank { stringResource(R.string.video_local_album) }
     val clickModifier = if (showFolder) Modifier.clickable(onClick = onClick) else Modifier
     Surface(
         modifier = modifier.height(66.dp).then(clickModifier),
@@ -1373,15 +1378,16 @@ private fun KeepixBottomInfoBar(
     }
 }
 
+@Composable
 private fun keepixRelativeDateLabel(timeMillis: Long): String {
-    if (timeMillis <= 0L) return "未知时间"
+    if (timeMillis <= 0L) return stringResource(R.string.value_unknown)
     val days = ((System.currentTimeMillis() - timeMillis).coerceAtLeast(0L) / 86_400_000L).toInt()
     return when {
-        days == 0 -> "今天"
-        days == 1 -> "昨天"
-        days < 30 -> days.toString() + " 天前"
-        days < 365 -> (days / 30).coerceAtLeast(1).toString() + " 个月前"
-        else -> (days / 365).coerceAtLeast(1).toString() + " 年前"
+        days == 0 -> stringResource(R.string.video_age_today)
+        days == 1 -> stringResource(R.string.immersive_yesterday)
+        days < 30 -> stringResource(R.string.video_age_days_ago, days)
+        days < 365 -> stringResource(R.string.video_age_months_ago, (days / 30).coerceAtLeast(1))
+        else -> stringResource(R.string.video_age_years_ago, (days / 365).coerceAtLeast(1))
     }
 }
 

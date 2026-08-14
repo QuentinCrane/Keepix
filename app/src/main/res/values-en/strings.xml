@@ -546,6 +546,9 @@
     <string name="immersive_date_recent_year">Last year</string>
     <string name="immersive_no_pending_photos">No photos waiting to be cleaned</string>
     <string name="immersive_no_pending_videos">No videos waiting to be cleaned</string>
+    <string name="immersive_progress_target">Target %1$d%%</string>
+    <string name="immersive_day_memory_return">Back to that day</string>
+    <string name="immersive_yesterday">Yesterday</string>
     <string name="permission_title">Photo library access required</string>
     <string name="permission_intro">Keepix organizes your full photo library, so it needs access to photos and videos. Scanning stays on this device and media files are never uploaded.</string>
     <string name="permission_platform_notice">On Android 14 and later, choosing “Select photos and videos” only allows Keepix to clean the selected items. Choose all photos and videos in the system dialog for full-library cleaning.</string>
