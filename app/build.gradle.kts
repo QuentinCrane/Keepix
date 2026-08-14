@@ -131,7 +131,7 @@ dependencies {
     kapt("androidx.room:room-compiler:2.8.4")
 
     implementation("androidx.datastore:datastore-preferences:1.2.1")
-    implementation("androidx.work:work-runtime-ktx:2.10.1")
+    implementation("androidx.work:work-runtime-ktx:2.11.2")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     implementation("com.google.dagger:hilt-android:2.56.1")
