@@ -590,6 +590,8 @@
     <string name="a11y_delete">待删</string>
     <string name="a11y_shuffle">重新随机</string>
     <string name="a11y_more_actions">更多操作</string>
+    <string name="a11y_apply_day_memory">应用这一天</string>
+    <string name="a11y_memory_jump">回到刚才删除的位置</string>
     <string name="action_undo">撤销上一步</string>
     <string name="a11y_refresh">刷新</string>
     <string name="a11y_back_to_previous_photo">回到上一张照片</string>

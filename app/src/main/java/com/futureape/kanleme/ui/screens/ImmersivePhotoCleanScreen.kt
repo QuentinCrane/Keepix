@@ -290,7 +290,9 @@ internal fun ImmersivePhotoCleanContent(
                         }
                         KeepixRoundButton(
                             icon = if (focusMode) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                            contentDescription = null,
+                            contentDescription = stringResource(
+                                if (focusMode) R.string.photo_show_controls else R.string.photo_hide_controls,
+                            ),
                             onClick = onToggleFocus,
                         )
                     }
@@ -421,7 +423,7 @@ internal fun ImmersivePhotoCleanContent(
                 ) {
                     KeepixRoundButton(
                         icon = Icons.AutoMirrored.Rounded.Undo,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.action_undo),
                         enabled = sessionActionCount > 0,
                         onClick = onUndo,
                     )
@@ -766,7 +768,7 @@ internal fun KeepixDayMemoryOverlay(
                 }
                 KeepixRoundButton(
                     icon = Icons.Rounded.Check,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.a11y_apply_day_memory),
                     onClick = { onApply("d:" + selectedDayKey) },
                 )
             }
@@ -887,7 +889,7 @@ internal fun KeepixDayMemoryOverlay(
                     ) {
                         KeepixRoundButton(
                             icon = Icons.Rounded.Swipe,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.a11y_memory_jump),
                             onClick = {
                                 requestedMemoryScrollIndex = lastDeletedMemory
                                     ?.index
@@ -926,7 +928,7 @@ internal fun KeepixDayMemoryOverlay(
                         }
                         KeepixRoundButton(
                             icon = Icons.AutoMirrored.Rounded.Undo,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.action_undo),
                             onClick = {
                                 val deleted = lastDeletedMemory
                                 if (deleted != null && memoryPhotos.none { it.id == deleted.photo.id }) {
