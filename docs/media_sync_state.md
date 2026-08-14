@@ -5,7 +5,7 @@
 - Room 新增 `media_sync_state` 表，按 MediaStore volume 保存：volume 名称、MediaStore version、最近一次完整扫描后的 generation，以及本次扫描对应的权限范围指纹
 - 图片和视频扫描都成功，并且能读取 MediaStore 同步快照时，Repository 才会在同一个 Room transaction 中写入状态
 - 任意一个媒体类型扫描失败，或系统无法读取 version/generation 时，会保留上一次状态，避免把不完整扫描误记为可增量续接的检查点
-- 权限范围指纹来自当前 `MediaAccessState.key`；当前块只持久化它，尚未用它决定增量扫描或删除
+- 权限范围指纹来自当前 `MediaAccessState.key`；后续 D04b 使用它参与增量身份判断，D04c 仅在完整权限且条件满足时执行有限缺失探测，不把部分权限下的不可见媒体当作删除
 
 ## D04b 已落地内容
 
@@ -14,8 +14,6 @@
 - 增量路径不会执行 `markAllMissing`；未发生变化的 Room 媒体记录保持原状，删除 reconciliation 留给后续块
 - OEM Bundle 查询失败时使用带相同 generation 条件的 SQL fallback，不会静默退回昂贵的全量查询
 - 首次同步、MediaStore version 变化、volume 变化、权限范围变化或 generation 回退，都会回到全量扫描
-
-## 当前边界
 
 ## D04c 已落地内容
 
@@ -30,4 +28,4 @@
 ## 验证
 
 - `AppDatabaseTest` 覆盖同步状态的写入和读取
-- 设备上的 MediaStore version/generation、SD 卡 volume、部分相册权限以及进程重启场景仍需在 D04 后续块接入后进行设备验收
+- 设备上的 MediaStore version/generation、SD 卡 volume、部分相册权限以及进程重启场景仍需真机验收；代码路径与 JVM/Room 合同已接入，不把 AndroidTest 编译当作设备执行证据

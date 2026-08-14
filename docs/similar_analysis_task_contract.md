@@ -39,6 +39,6 @@ idle -> queued -> running -> completed
 ## 当前验证
 
 - JVM：活动状态集合、分页常量和算法版本合同
-- Room AndroidTest：任务 token、权限/媒体版本、游标和取消标记可写入并恢复
+- Room AndroidTest 源码覆盖：任务 token、权限/媒体版本、游标和取消标记可写入并恢复；当前门禁只完成 AndroidTest Kotlin 编译，真实设备执行仍待连接设备
 - JVM：自动/手动约束、唯一工作名、KEEP/REPLACE 策略和退避合同
 - 构建：Debug/KAPT/Room schema 已通过；WorkManager 的强杀、重启、低电量和真实权限对话框仍需设备验收

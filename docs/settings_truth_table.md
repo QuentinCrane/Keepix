@@ -14,7 +14,7 @@
 | `photoBatchSize` | `30` | `photo_batch_size` / `setPhotoBatchSize` | 照片本次整理目标、目标进度与目标完成总结 | ACTIVE | 修改后新会话使用目标；队列不足时按可处理数量收敛 |
 | `videoBatchSize` | `20` | `video_batch_size` / `setVideoBatchSize` | 视频本次整理目标与目标进度 | ACTIVE | 修改后新会话使用目标；达到目标后仍可连续整理 |
 | `autoMoveOnKeepFavorite` | `true` | `auto_move_on_keep_favorite` / `setAutoMoveOnKeepFavorite` | 保留/收藏后的归档移动入口 | ACTIVE | 开关关闭时不发起移动授权 |
-| `similarDetection` | `false` | `similar_detection` / `setSimilarDetection` | 相似照片开关触发当前 ViewModel 任务 | ACTIVE（待 C08 持久化） | 开关、关闭、进程重建行为有明确定义 |
+| `similarDetection` | `false` | `similar_detection` / `setSimilarDetection` | 相似照片设置触发本地持久化任务与唯一 WorkManager 工作 | ACTIVE | 开关关闭、进程重建、取消和输入版本变化行为有明确定义 |
 | `swipeSensitivity` | `STANDARD` | `swipe_sensitivity` / `setSwipeSensitivity` | 卡片阈值、视频快进阈值 | ACTIVE | 三档阈值与手势方向均可复现 |
 | `gestureDirection` | `DEFAULT` | `gesture_direction` / `setGestureDirection` | 照片卡片上下动作映射 | ACTIVE | 反向后 UI 提示和实际动作一致 |
 | `quickActionButtons` | `true` | `quick_action_buttons` / `setQuickActionButtons` | 照片整理页底部保留/收藏/待删快捷按钮 | ACTIVE | 关闭后仍可用滑动手势和其他入口 |
@@ -66,4 +66,4 @@
 
 ## 当前结论
 
-照片与视频整理页的设置消费缺口已闭合；C04 的具体视觉与模式决策记录在 `docs/photo_clean_modes.md`。后续 C05 继续澄清连续 Deck 的“每批数量”语义，不把设置页预览截图单独作为功能完成证据。
+照片与视频整理页的设置消费缺口已闭合；C04 的具体视觉与模式决策记录在 `docs/photo_clean_modes.md`，C05 的会话目标与连续 Deck 语义记录在 `docs/cleanup_session_targets.md`。后续只需按最小验收表补充设备操作证据，不把设置页预览截图单独作为功能完成证据。
