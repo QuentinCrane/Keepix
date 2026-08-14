@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
+import com.futureape.kanleme.R
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -31,10 +32,10 @@ fun shareCrashLogs(context: Context): Boolean {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_STREAM, uri)
-        clipData = ClipData.newUri(context.contentResolver, "看了么闪退日志", uri)
+        clipData = ClipData.newUri(context.contentResolver, context.getString(R.string.crash_log_clip_label), uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(intent, "导出闪退日志"))
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.crash_log_share_title)))
     return true
 }
 

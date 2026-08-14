@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.media.DynamicPhotoDetector
+import com.futureape.kanleme.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -23,7 +24,7 @@ suspend fun resolveMotionPhotoPlaybackSource(
     photo: PhotoEntity,
 ): MotionPhotoPlaybackSource = withContext(Dispatchers.IO) {
     if (photo.isGif) {
-        return@withContext MotionPhotoPlaybackSource.Unavailable("GIF 已由图片组件直接播放")
+        return@withContext MotionPhotoPlaybackSource.Unavailable(context.getString(R.string.motion_unavailable_gif))
     }
     val shouldTryResolve = photo.isMotionPhoto ||
         photo.motionPhotoNeedsDetection ||
@@ -32,7 +33,7 @@ suspend fun resolveMotionPhotoPlaybackSource(
         photo.motionVideoOffset > 0L ||
         photo.motionVideoSize > 0L
     if (!shouldTryResolve) {
-        return@withContext MotionPhotoPlaybackSource.Unavailable("这不是可播放的实况照片")
+        return@withContext MotionPhotoPlaybackSource.Unavailable(context.getString(R.string.motion_unavailable_not_playable))
     }
 
     trimMotionPreviewCache(context)
@@ -41,20 +42,20 @@ suspend fun resolveMotionPhotoPlaybackSource(
         ?.takeIf { photo.isSeparateVideo && it.isNotBlank() }
         ?.let { runCatching { Uri.parse(it) }.getOrNull() }
     if (companionUri != null) {
-        return@withContext MotionPhotoPlaybackSource.Ready(companionUri, "实况视频段")
+        return@withContext MotionPhotoPlaybackSource.Ready(companionUri, context.getString(R.string.motion_ready_video_segment))
     }
 
     val cached = embeddedMotionCacheFile(context, photo)
     if (cached.exists() && cached.length() > MIN_VIDEO_BYTES) {
-        return@withContext MotionPhotoPlaybackSource.Ready(Uri.fromFile(cached), "实况片段")
+        return@withContext MotionPhotoPlaybackSource.Ready(Uri.fromFile(cached), context.getString(R.string.motion_ready_segment))
     }
 
     val extracted = withTimeoutOrNull(4200L) { extractEmbeddedMotionVideo(context, photo, cached) }
     if (extracted != null && extracted.exists() && extracted.length() > MIN_VIDEO_BYTES) {
-        MotionPhotoPlaybackSource.Ready(Uri.fromFile(extracted), "实况片段")
+        MotionPhotoPlaybackSource.Ready(Uri.fromFile(extracted), context.getString(R.string.motion_ready_segment))
     } else {
         MotionPhotoPlaybackSource.Unavailable(
-            "这张照片被识别为实况，但当前文件没有可直接提取的标准 MP4 片段。部分厂商会把动态数据放在私有容器里，只能由系统相册播放。"
+            context.getString(R.string.motion_unavailable_no_extractable_segment),
         )
     }
 }

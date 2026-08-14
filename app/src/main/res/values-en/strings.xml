@@ -53,6 +53,9 @@
     <string name="daily_report_motto_active">Small cleaning steps make room for life</string>
     <string name="daily_report_motto_empty">Start with a small batch of photos</string>
     <string name="daily_report_export_error">Export failed. Please try again</string>
+    <string name="daily_report_share_title">Daily cleaning report</string>
+    <string name="daily_report_date_pattern">MMM d, HH:mm</string>
+    <string name="daily_report_local_only">Local statistics · No photos or videos uploaded</string>
     <string name="a11y_export">Export image</string>
     <string name="photo_filter_all">All</string>
     <string name="photo_filter_normal">Regular</string>
@@ -134,6 +137,11 @@
     <string name="value_unknown">Unknown</string>
     <string name="motion_preparing">Preparing motion playback</string>
     <string name="motion_play_hint">Long-press the image or tap here to play motion</string>
+    <string name="motion_unavailable_gif">GIFs are played directly by the image component</string>
+    <string name="motion_unavailable_not_playable">This is not a playable motion photo</string>
+    <string name="motion_ready_video_segment">Motion video segment</string>
+    <string name="motion_ready_segment">Motion segment</string>
+    <string name="motion_unavailable_no_extractable_segment">This photo was detected as a motion photo, but no standard MP4 segment could be extracted. Some vendors store motion data in a private container that only the system gallery can play.</string>
     <string name="move_folder_title">Move to folder</string>
     <string name="move_folder_body">Use a relative album path such as Pictures/Kanleme/Favorites/. The system may ask for photo write access.</string>
     <string name="move_folder_custom_path">Custom album path</string>
@@ -344,6 +352,8 @@
     <string name="media_default_album">Album</string>
     <string name="media_default_video_folder">Videos</string>
     <string name="share_chooser_title">Share %1$s</string>
+    <string name="crash_log_clip_label">Keepix crash log</string>
+    <string name="crash_log_share_title">Export crash log</string>
     <string name="gallery_chooser_title">Open in gallery</string>
     <string name="media_file_title">Media file</string>
     <string name="motion_clip_title">%1$s motion clip</string>

@@ -50,9 +50,9 @@ suspend fun shareDailyReportImage(
     todayVideos: Int,
     todayActions: Int,
 ) {
-    val title = "今日整理日报"
+    val title = context.getString(R.string.daily_report_share_title)
     val uri = withContext(Dispatchers.IO) {
-        val bitmap = createDailyReportBitmap(todayPhotos, todayVideos, todayActions)
+        val bitmap = createDailyReportBitmap(context, todayPhotos, todayVideos, todayActions)
         val reportsDir = File(context.cacheDir, "daily-reports").apply { mkdirs() }
         val file = File(reportsDir, "kanleme-daily-report.png")
         file.outputStream().use { output ->
@@ -180,7 +180,12 @@ fun openMediaInSystemGallery(
     }
 }
 
-private fun createDailyReportBitmap(todayPhotos: Int, todayVideos: Int, todayActions: Int): Bitmap {
+private fun createDailyReportBitmap(
+    context: Context,
+    todayPhotos: Int,
+    todayVideos: Int,
+    todayActions: Int,
+): Bitmap {
     val width = 1080
     val height = 1440
     val total = todayPhotos + todayVideos
@@ -207,16 +212,21 @@ private fun createDailyReportBitmap(todayPhotos: Int, todayVideos: Int, todayAct
     paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     paint.color = primary
     paint.textSize = 42f
-    canvas.drawText("看了么", 154f, 192f, paint)
+    canvas.drawText(context.getString(R.string.app_name), 154f, 192f, paint)
 
     paint.color = ink
     paint.textSize = 76f
-    canvas.drawText("今日整理", 154f, 286f, paint)
+    canvas.drawText(context.getString(R.string.daily_report_heading), 154f, 286f, paint)
 
     paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
     paint.color = muted
     paint.textSize = 32f
-    canvas.drawText(SimpleDateFormat("M月d日 HH:mm", Locale.getDefault()).format(Date()), 154f, 344f, paint)
+    canvas.drawText(
+        SimpleDateFormat(context.getString(R.string.daily_report_date_pattern), Locale.getDefault()).format(Date()),
+        154f,
+        344f,
+        paint,
+    )
 
     paint.textAlign = Paint.Align.CENTER
     paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
@@ -228,15 +238,15 @@ private fun createDailyReportBitmap(todayPhotos: Int, todayVideos: Int, todayAct
     paint.color = muted
     paint.textSize = 36f
     val summary = if (total > 0) {
-        "今天已处理 " + total + " 个媒体文件"
+        context.getString(R.string.daily_report_processed, total)
     } else {
-        "今天还没有开始整理"
+        context.getString(R.string.daily_report_not_started)
     }
     canvas.drawText(summary, width / 2f, 684f, paint)
 
-    drawReportMetric(canvas, 120f, 770f, "照片", todayPhotos, primary, ink, muted, line, paint)
-    drawReportMetric(canvas, 390f, 770f, "视频", todayVideos, primary, ink, muted, line, paint)
-    drawReportMetric(canvas, 660f, 770f, "动作", todayActions, primary, ink, muted, line, paint)
+    drawReportMetric(canvas, 120f, 770f, context.getString(R.string.daily_report_photo), todayPhotos, primary, ink, muted, line, paint)
+    drawReportMetric(canvas, 390f, 770f, context.getString(R.string.daily_report_video), todayVideos, primary, ink, muted, line, paint)
+    drawReportMetric(canvas, 660f, 770f, context.getString(R.string.daily_report_action), todayActions, primary, ink, muted, line, paint)
 
     paint.color = line
     canvas.drawRoundRect(RectF(132f, 1064f, width - 132f, 1070f), 3f, 3f, paint)
@@ -244,17 +254,22 @@ private fun createDailyReportBitmap(todayPhotos: Int, todayVideos: Int, todayAct
     paint.color = ink
     paint.textSize = 42f
     paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-    canvas.drawText(if (total > 0) "小步整理，也是在腾出生活空间" else "开一小局，从几张照片开始", width / 2f, 1160f, paint)
+    canvas.drawText(
+        context.getString(if (total > 0) R.string.daily_report_motto_active else R.string.daily_report_motto_empty),
+        width / 2f,
+        1160f,
+        paint,
+    )
 
     paint.color = muted
     paint.textSize = 30f
     paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-    canvas.drawText("本地统计 · 不上传照片或视频", width / 2f, 1240f, paint)
+    canvas.drawText(context.getString(R.string.daily_report_local_only), width / 2f, 1240f, paint)
 
     paint.color = primary
     paint.textSize = 34f
     paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-    canvas.drawText("kanleme", width / 2f, 1322f, paint)
+    canvas.drawText(context.getString(R.string.app_name), width / 2f, 1322f, paint)
     return bitmap
 }
 

@@ -53,6 +53,9 @@
     <string name="daily_report_motto_active">小步整理，也是在腾出生活空间</string>
     <string name="daily_report_motto_empty">开一小局，从几张照片开始</string>
     <string name="daily_report_export_error">导出失败，请稍后再试</string>
+    <string name="daily_report_share_title">今日整理日报</string>
+    <string name="daily_report_date_pattern">M月d日 HH:mm</string>
+    <string name="daily_report_local_only">本地统计 · 不上传照片或视频</string>
     <string name="a11y_export">导出图片</string>
     <string name="photo_filter_all">全部</string>
     <string name="photo_filter_normal">普通</string>
@@ -134,6 +137,11 @@
     <string name="value_unknown">未知</string>
     <string name="motion_preparing">正在准备实况</string>
     <string name="motion_play_hint">长按图片或点此播放实况</string>
+    <string name="motion_unavailable_gif">GIF 已由图片组件直接播放</string>
+    <string name="motion_unavailable_not_playable">这不是可播放的实况照片</string>
+    <string name="motion_ready_video_segment">实况视频段</string>
+    <string name="motion_ready_segment">实况片段</string>
+    <string name="motion_unavailable_no_extractable_segment">这张照片被识别为实况，但当前文件没有可直接提取的标准 MP4 片段。部分厂商会把动态数据放在私有容器里，只能由系统相册播放。</string>
     <string name="move_folder_title">移动到文件夹</string>
     <string name="move_folder_body">目标路径使用相册相对路径，例如 Pictures/Kanleme/Favorites/。系统可能会要求照片写入授权。</string>
     <string name="move_folder_custom_path">自定义相册路径</string>
@@ -344,6 +352,8 @@
     <string name="media_default_album">相册</string>
     <string name="media_default_video_folder">视频</string>
     <string name="share_chooser_title">分享 %1$s</string>
+    <string name="crash_log_clip_label">看了么闪退日志</string>
+    <string name="crash_log_share_title">导出闪退日志</string>
     <string name="gallery_chooser_title">用相册查看</string>
     <string name="media_file_title">媒体文件</string>
     <string name="motion_clip_title">%1$s 动态片段</string>
