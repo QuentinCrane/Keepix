@@ -92,6 +92,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -1033,8 +1038,18 @@ private fun CompactControlPill(
 ) {
     val background = if (selected) Color.White.copy(alpha = 0.26f) else Color.Black.copy(alpha = 0.24f)
     val content = Color.White
+    val selectionDescription = stringResource(
+        if (selected) R.string.a11y_selected else R.string.a11y_not_selected,
+    )
     Surface(
-        modifier = Modifier.height(42.dp).clickable(onClick = onClick),
+        modifier = Modifier
+            .height(42.dp)
+            .semantics {
+                role = Role.Button
+                this.selected = selected
+                stateDescription = selectionDescription
+            }
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(999.dp),
         color = background,
         contentColor = content,

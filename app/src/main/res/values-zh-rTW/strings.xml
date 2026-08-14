@@ -600,6 +600,8 @@
     <string name="a11y_play_motion">播放原況照片</string>
     <string name="a11y_close_motion">關閉原況照片</string>
     <string name="a11y_back_to_previous_video">回到上一部影片</string>
+    <string name="a11y_selected">已選取</string>
+    <string name="a11y_not_selected">未選取</string>
     <string name="a11y_video_surface">影片播放區域：%1$s</string>
     <string name="a11y_video_play">播放影片</string>
     <string name="a11y_video_pause">暫停影片</string>
