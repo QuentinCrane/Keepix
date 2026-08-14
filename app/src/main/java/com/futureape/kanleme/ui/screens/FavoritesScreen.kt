@@ -130,10 +130,19 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: ()
     Box(Modifier.fillMaxSize()) {
         ProfileDarkPage {
             Column(Modifier.fillMaxSize().padding(top = 46.dp, start = 22.dp, end = 22.dp)) {
-                ProfilePageHeader("我的收藏", "照片 " + photos.size + " 张 · 视频 " + videos.size + " 个", onBack)
+                ProfilePageHeader(
+                    stringResource(R.string.favorites_title),
+                    stringResource(R.string.favorites_header_summary, photos.size, videos.size),
+                    onBack,
+                )
                 Spacer(Modifier.height(18.dp))
             if (photos.isEmpty() && videos.isEmpty()) {
-                ProfileEmptyState("暂无收藏", "在整理时下滑照片或点击视频收藏按钮，就会出现在这里。", "去同步媒体库", { viewModel.refreshLibrary() })
+                ProfileEmptyState(
+                    stringResource(R.string.favorites_empty_title),
+                    stringResource(R.string.favorites_empty_body),
+                    stringResource(R.string.favorites_sync),
+                    { viewModel.refreshLibrary() },
+                )
             } else {
                 FavoriteMediaSelector(
                     selectedType = selectedType,
@@ -160,9 +169,9 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: ()
                     if (type == "video") {
                         if (videos.isEmpty()) {
                             ProfileEmptyState(
-                                "暂无收藏视频",
-                                "收藏的视频会单独显示在这里。",
-                                "刷新媒体库",
+                                stringResource(R.string.favorites_empty_videos_title),
+                                stringResource(R.string.favorites_empty_videos_body),
+                                stringResource(R.string.favorites_refresh),
                                 { viewModel.refreshLibrary() },
                                 modifier = Modifier.fillMaxWidth(),
                             )
@@ -190,9 +199,9 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: ()
                         }
                     } else {
                         ProfileEmptyState(
-                            "暂无收藏照片",
-                            "收藏的照片会单独显示在这里。",
-                            "刷新媒体库",
+                            stringResource(R.string.favorites_empty_photos_title),
+                            stringResource(R.string.favorites_empty_photos_body),
+                            stringResource(R.string.favorites_refresh),
                             { viewModel.refreshLibrary() },
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -231,7 +240,10 @@ private fun FavoriteMediaSelector(
     onSelected: (String) -> Unit,
 ) {
     ProfileSegmentedControl(
-        options = listOf("photo" to ("照片 " + photoCount), "video" to ("视频 " + videoCount)),
+        options = listOf(
+            "photo" to stringResource(R.string.favorites_photo_count, photoCount),
+            "video" to stringResource(R.string.favorites_video_count, videoCount),
+        ),
         selectedValue = selectedType,
         onSelected = onSelected,
     )
@@ -245,9 +257,14 @@ private fun FavoriteVideosHeader(videoCount: Int) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text("收藏视频 " + videoCount + " 个", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
             Text(
-                "沉浸卡片 · 点击在相册查看",
+                stringResource(R.string.favorites_video_title, videoCount),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                stringResource(R.string.favorites_video_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.56f),
             )
@@ -258,7 +275,12 @@ private fun FavoriteVideosHeader(videoCount: Int) {
             contentColor = ProfileScreenAccent,
             border = androidx.compose.foundation.BorderStroke(1.dp, ProfileScreenAccent.copy(alpha = 0.26f)),
         ) {
-            Text("视频", modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text(
+                stringResource(R.string.favorites_video_badge),
+                modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+            )
         }
     }
 }
@@ -391,9 +413,14 @@ private fun FavoritePhotosHeader(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text("收藏照片 " + photoCount + " 张", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
             Text(
-                "照片墙 · " + columnCount + " 列",
+                stringResource(R.string.favorites_photo_title, photoCount),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            )
+            Text(
+                stringResource(R.string.favorites_photo_subtitle, columnCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.56f),
             )
@@ -411,7 +438,10 @@ private fun FavoriteColumnSelector(
     onSelected: (Int) -> Unit,
 ) {
     ProfileSegmentedControl(
-        options = listOf(2 to "2 列", 3 to "3 列").map { it.first.toString() to it.second },
+        options = listOf(
+            2 to stringResource(R.string.favorites_column_count, 2),
+            3 to stringResource(R.string.favorites_column_count, 3),
+        ).map { it.first.toString() to it.second },
         selectedValue = selectedColumnCount.toString(),
         onSelected = { onSelected(it.toIntOrNull() ?: selectedColumnCount) },
         modifier = Modifier.width(136.dp),
@@ -616,7 +646,11 @@ private fun FavoritePhotoPreviewOverlay(
             Column(Modifier.weight(1f)) {
                 Text(photo.displayName, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                 Text(
-                    photo.folderName + " · " + formatSize(photo.size) + " · 双击或双指缩放",
+                    stringResource(
+                        R.string.favorites_preview_details,
+                        photo.folderName,
+                        formatSize(photo.size),
+                    ),
                     color = Color.White.copy(alpha = 0.72f),
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
@@ -640,16 +674,24 @@ private fun FavoritePhotoPreviewOverlay(
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 if (canPlayMotion) {
-                    FavoritePreviewAction(if (motionLoading) "准备中" else "播放实况", Icons.Rounded.PhotoLibrary, ::playMotion)
+                    FavoritePreviewAction(
+                        if (motionLoading) {
+                            stringResource(R.string.favorites_prepare)
+                        } else {
+                            stringResource(R.string.favorites_play_motion)
+                        },
+                        Icons.Rounded.PhotoLibrary,
+                        ::playMotion,
+                    )
                 } else {
-                    FavoritePreviewAction("相册查看", Icons.Rounded.PhotoLibrary) {
+                    FavoritePreviewAction(stringResource(R.string.favorites_view_gallery), Icons.Rounded.PhotoLibrary) {
                         openPhotoInSystemGallery(context, photo)
                     }
                 }
-                FavoritePreviewAction("分享", Icons.Rounded.Share) {
+                FavoritePreviewAction(stringResource(R.string.favorites_share), Icons.Rounded.Share) {
                     shareMedia(context, Uri.parse(photo.uri), photo.mimeType, photo.displayName)
                 }
-                FavoritePreviewAction("那年今日", Icons.Rounded.CalendarToday) {
+                FavoritePreviewAction(stringResource(R.string.favorites_today), Icons.Rounded.CalendarToday) {
                     if (todayEntryMode == TodayInHistoryEntryMode.PINCH_MEMORY) {
                         onOpenDayMemory(photo)
                         showDayMemory = true
@@ -657,7 +699,7 @@ private fun FavoritePhotoPreviewOverlay(
                         onToday()
                     }
                 }
-                FavoritePreviewAction("待删", Icons.Rounded.Delete, onDelete)
+                FavoritePreviewAction(stringResource(R.string.favorites_pending_delete), Icons.Rounded.Delete, onDelete)
             }
         }
         KeepixDayMemoryOverlay(
