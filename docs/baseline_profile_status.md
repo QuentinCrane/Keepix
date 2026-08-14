@@ -7,6 +7,16 @@
 - `:app` 使用 Profile Installer `1.4.1`，并通过 `baselineProfile(project(":benchmark"))` 消费生成结果
 - Release 仍保持 R8 与资源压缩；未开启每次 Release 自动启动设备测试
 
+## 本机配置构建验证（2026-08-14）
+
+在未连接设备的当前环境执行：
+
+```powershell
+.\gradlew.bat :benchmark:assembleBenchmarkRelease :benchmark:assembleNonMinifiedRelease --offline --configuration-cache --console=plain --no-daemon --max-workers=1
+```
+
+结果：明确返回 `Exit code: 0`，`BUILD SUCCESSFUL in 1m 59s`，62 个 actionable tasks 中 52 个执行、10 个 up-to-date。该结果证明 benchmark 测试 APK 的两个 Release 变体和当前依赖配置可编译打包，不证明 Baseline Profile 已在设备上生成或带来启动收益。
+
 ## 生成与验收
 
 连接固定的 Android 设备后，在仓库根目录执行：
@@ -22,4 +32,4 @@
 
 ## 当前限制
 
-本机当前没有连接 Android 设备，D02 的设备生成、profile 打包检查和 TTID/TTFD 对照尚未运行。构建验证只能证明 Gradle 配置和生成器可编译，不能替代设备收益验证。
+本机当前没有连接 Android 设备，D02 的设备生成、profile 打包检查和 TTID/TTFD 对照尚未运行。上面的构建验证只能证明 Gradle 配置和生成器可编译，不能替代设备收益验证。

@@ -1,6 +1,14 @@
 # 性能实验室基线记录
 
-本文件是可重复记录模板，不是估算结果。D01 已创建 `:benchmark`、确定性元数据 fixture 和冷启动测量入口；当前工作环境没有连接 Android 设备，因此真实指标保持 `not-run`。
+本文件是可重复记录模板，不是估算结果。D01 已创建 `:benchmark`、确定性元数据 fixture 和冷启动测量入口；2026-08-14 已在本机完成两个 benchmark Release 变体的配置构建，但当前工作环境没有连接 Android 设备，因此真实指标仍保持 `not-run`。
+
+本机配置构建命令：
+
+```powershell
+.\gradlew.bat :benchmark:assembleBenchmarkRelease :benchmark:assembleNonMinifiedRelease --offline --configuration-cache --console=plain --no-daemon --max-workers=1
+```
+
+结果：明确返回 `Exit code: 0`，`BUILD SUCCESSFUL in 1m 59s`；这不是设备性能数据，也不填充下面的 Baseline CSV。
 
 ## Fixture scales
 
