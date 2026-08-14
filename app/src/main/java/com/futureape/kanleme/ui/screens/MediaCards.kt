@@ -56,6 +56,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -134,7 +135,6 @@ import androidx.media3.ui.PlayerView
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
-import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun ScreenHeader(title: String, subtitle: String? = null, onBack: (() -> Unit)? = null) {
@@ -167,9 +167,9 @@ fun OrganizerTopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        GlassPill(text = "全部时间", icon = Icons.Rounded.CalendarToday, contentColor = contentColor)
+        GlassPill(text = stringResource(R.string.organizer_date_all), icon = Icons.Rounded.CalendarToday, contentColor = contentColor)
         GlassCircleIcon(Icons.Rounded.Folder, contentColor = contentColor)
-        GlassPill(text = "随机", icon = Icons.Rounded.Swipe, contentColor = contentColor)
+        GlassPill(text = stringResource(R.string.photo_shuffle_disabled), icon = Icons.Rounded.Swipe, contentColor = contentColor)
         GlassPill(text = deletedCount.toString(), icon = Icons.Rounded.Delete, contentColor = contentColor)
         GlassPill(text = "$current/$total", minWidth = 118.dp, contentColor = contentColor, emphasized = true)
     }
@@ -177,12 +177,13 @@ fun OrganizerTopBar(
 
 @Composable
 fun ShuffleSessionButton(
-    label: String = "重新随机",
+    label: String? = null,
     modifier: Modifier = Modifier,
     lightContent: Boolean = false,
     onClick: () -> Unit,
 ) {
     val contentColor = if (lightContent) Color.White else MaterialTheme.colorScheme.primary
+    val resolvedLabel = label ?: stringResource(R.string.photo_shuffle_title)
     Surface(
         modifier = modifier.height(44.dp).clickable(onClick = onClick),
         shape = RoundedCornerShape(999.dp),
@@ -196,7 +197,7 @@ fun ShuffleSessionButton(
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             Icon(Icons.Rounded.Swipe, contentDescription = null, modifier = Modifier.size(18.dp), tint = contentColor)
-            Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(resolvedLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }
@@ -205,15 +206,21 @@ fun ShuffleSessionButton(
 fun FilterChipRail(
     modifier: Modifier = Modifier,
     selectedIndex: Int = 0,
-    chips: List<Pair<String, String>> = listOf("全部" to "20807", "普通照片" to "17246", "截图" to "3230", "长图" to "401"),
+    chips: List<Pair<String, String>>? = null,
     onSelected: (Int) -> Unit = {},
 ) {
+    val resolvedChips = chips ?: listOf(
+        stringResource(R.string.photo_filter_all) to "20807",
+        stringResource(R.string.photo_filter_normal) to "17246",
+        stringResource(R.string.photo_filter_screenshot) to "3230",
+        stringResource(R.string.photo_filter_long_image) to "401",
+    )
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        chips.forEachIndexed { index, chip ->
+        resolvedChips.forEachIndexed { index, chip ->
             Surface(
                 modifier = Modifier.height(44.dp).clickable { onSelected(index) },
                 shape = RoundedCornerShape(999.dp),
@@ -1011,13 +1018,15 @@ private fun InlineMotionStatusPill(
     modifier: Modifier = Modifier,
 ) {
     if (!isVisible) return
-    val text = when {
-        isPlaying -> "实况播放 · 一次"
-        isLoading -> "准备实况"
-        isUnavailable -> "实况 · 系统查看"
-        manualHint -> "长按实况"
-        else -> "实况"
-    }
+    val text = stringResource(
+        when {
+            isPlaying -> R.string.motion_status_playing_once
+            isLoading -> R.string.motion_status_preparing
+            isUnavailable -> R.string.motion_status_system_viewer
+            manualHint -> R.string.motion_status_long_press
+            else -> R.string.media_badge_motion
+        },
+    )
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(999.dp),
@@ -1051,9 +1060,9 @@ private fun InlineMotionStatusPill(
 @Composable
 private fun EdgeSwipeHint(action: SwipeAction?) {
     val (label, tint) = when (action) {
-        SwipeAction.Delete -> "松手待删" to Color(0xFFE66A6A)
-        SwipeAction.Favorite -> "松手收藏" to Color(0xFFE6A63E)
-        SwipeAction.Keep -> "松手保留" to Color(0xFF68A7D8)
+        SwipeAction.Delete -> stringResource(R.string.swipe_release_delete) to Color(0xFFE66A6A)
+        SwipeAction.Favorite -> stringResource(R.string.swipe_release_favorite) to Color(0xFFE6A63E)
+        SwipeAction.Keep -> stringResource(R.string.swipe_release_keep) to Color(0xFF68A7D8)
         null -> "" to MaterialTheme.colorScheme.primary
     }
     Surface(
@@ -1139,7 +1148,7 @@ fun BottomPhotoInfoBar(
         ) {
             Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.Center) {
                 Text(formatDate(photo.dateTaken), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(photo.folderName + " · " + formatSize(photo.size) + " · 点按查看大图", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.photo_info_details, photo.folderName, formatSize(photo.size), stringResource(R.string.photo_view_hint)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         if (!shareLeft) ShareCircle(onShare)
@@ -1175,9 +1184,9 @@ fun PhotoActionMiniRail(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
-            RailIconCompact(Icons.Rounded.Close, "保留", Color(0xFF68A7D8), onKeep)
-            RailIconCompact(Icons.Rounded.FavoriteBorder, "收藏", Color(0xFFE6A63E), onFavorite)
-            RailIconCompact(Icons.Rounded.Delete, "待删", Color(0xFFE66A6A), onDelete)
+            RailIconCompact(Icons.Rounded.Close, stringResource(R.string.swipe_action_keep), Color(0xFF68A7D8), onKeep)
+            RailIconCompact(Icons.Rounded.FavoriteBorder, stringResource(R.string.swipe_action_favorite), Color(0xFFE6A63E), onFavorite)
+            RailIconCompact(Icons.Rounded.Delete, stringResource(R.string.swipe_action_delete), Color(0xFFE66A6A), onDelete)
         }
     }
 }
@@ -1219,9 +1228,9 @@ fun MediaActionRail(
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
             ProgressBubble(deletedCount)
-            RailIcon(Icons.Rounded.FavoriteBorder, "收藏", onFavorite)
-            RailIcon(Icons.Rounded.Delete, "待删", onDelete)
-            RailIcon(Icons.Rounded.Share, "保留", onKeep)
+            RailIcon(Icons.Rounded.FavoriteBorder, stringResource(R.string.swipe_action_favorite), onFavorite)
+            RailIcon(Icons.Rounded.Delete, stringResource(R.string.swipe_action_delete), onDelete)
+            RailIcon(Icons.Rounded.Share, stringResource(R.string.swipe_action_keep), onKeep)
         }
     }
 }
@@ -1261,18 +1270,18 @@ fun PhotoGuideDialog(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
         shadowElevation = 28.dp,
     ) {
         Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("操作提示", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.guide_title), style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(22.dp))
-            GuideRow(Icons.Rounded.Visibility, "单击图片", "进入大图查看模式")
-            GuideRow(Icons.Rounded.Visibility, "双击屏幕", "切换导航栏显示或隐藏")
-            GuideRow(Icons.Rounded.MoreHoriz, "左下角进度圈", "点击可撤回查看上一张")
-            GuideRow(Icons.Rounded.Folder, "指定归档", "选择目标文件夹后，保留和收藏会自动归档")
+            GuideRow(Icons.Rounded.Visibility, stringResource(R.string.photo_guide_card_title), stringResource(R.string.photo_guide_card_body))
+            GuideRow(Icons.Rounded.Visibility, stringResource(R.string.guide_double_tap), stringResource(R.string.guide_toggle_chrome))
+            GuideRow(Icons.Rounded.MoreHoriz, stringResource(R.string.guide_undo_title), stringResource(R.string.guide_undo_body))
+            GuideRow(Icons.Rounded.Folder, stringResource(R.string.photo_guide_album_title), stringResource(R.string.photo_guide_album_body))
             Spacer(Modifier.height(16.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onDismiss),
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.48f),
-            ) { Box(contentAlignment = Alignment.Center) { Text("知道了（4）", color = Color.White, style = MaterialTheme.typography.titleMedium) } }
+            ) { Box(contentAlignment = Alignment.Center) { Text(stringResource(R.string.photo_guide_done), color = Color.White, style = MaterialTheme.typography.titleMedium) } }
         }
     }
 }
@@ -1286,18 +1295,18 @@ fun VideoGuideDialog(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
         shadowElevation = 28.dp,
     ) {
         Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("操作提示", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.guide_title), style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(22.dp))
-            GuideRow(Icons.Rounded.Swipe, "上下滑动", "切换到上一个或下一个视频")
-            GuideRow(Icons.Rounded.Swipe, "左右滑动", "快进或快退调节播放进度")
-            GuideRow(Icons.Rounded.MoreHoriz, "长按屏幕", "2 倍速播放，松开恢复正常")
-            GuideRow(Icons.Rounded.Visibility, "双击屏幕", "切换导航栏显示或隐藏")
+            GuideRow(Icons.Rounded.Swipe, stringResource(R.string.video_guide_swipe_vertical), stringResource(R.string.video_guide_swipe_vertical_body))
+            GuideRow(Icons.Rounded.Swipe, stringResource(R.string.video_guide_swipe_horizontal), stringResource(R.string.video_guide_swipe_horizontal_body))
+            GuideRow(Icons.Rounded.MoreHoriz, stringResource(R.string.video_guide_long_press), stringResource(R.string.video_guide_long_press_body))
+            GuideRow(Icons.Rounded.Visibility, stringResource(R.string.guide_double_tap), stringResource(R.string.guide_toggle_chrome))
             Spacer(Modifier.height(16.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onDismiss),
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.48f),
-            ) { Box(contentAlignment = Alignment.Center) { Text("知道了（4）", color = Color.White, style = MaterialTheme.typography.titleMedium) } }
+            ) { Box(contentAlignment = Alignment.Center) { Text(stringResource(R.string.video_guide_done), color = Color.White, style = MaterialTheme.typography.titleMedium) } }
         }
     }
 }
@@ -1479,7 +1488,7 @@ private fun PhotoDynamicBadgeRow(
     ) {
         if (hasMotion) MotionPhotoTinyIcon()
         val visibleLabels = if (compact) {
-            labels.filterNot { it.contains("实况") || it.contains("Live", ignoreCase = true) || it.contains("Motion", ignoreCase = true) }.take(1)
+            labels.filterNot { it.contains(stringResource(R.string.media_badge_motion)) || it.contains("Live", ignoreCase = true) || it.contains("Motion", ignoreCase = true) }.take(1)
         } else {
             labels.take(2)
         }
@@ -1516,7 +1525,7 @@ private fun MotionPhotoTinyIcon(modifier: Modifier = Modifier) {
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.PlayCircle, contentDescription = "实况照片", modifier = Modifier.size(15.dp), tint = Color.White)
+            Icon(Icons.Rounded.PlayCircle, contentDescription = stringResource(R.string.media_kind_motion), modifier = Modifier.size(15.dp), tint = Color.White)
         }
     }
 }
