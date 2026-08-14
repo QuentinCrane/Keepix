@@ -64,8 +64,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import coil.imageLoader
+import coil3.compose.AsyncImage
+import coil3.imageLoader
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.ProcessingStatus
 import com.futureape.kanleme.data.local.TrashItemEntity

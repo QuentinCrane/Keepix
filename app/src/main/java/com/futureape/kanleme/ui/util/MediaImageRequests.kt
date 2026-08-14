@@ -4,9 +4,11 @@ import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
-import coil.ImageLoader
-import coil.request.ImageRequest
-import coil.size.Precision
+import coil3.ImageLoader
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import coil3.memory.MemoryCache
+import coil3.size.Precision
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.VideoEntity
@@ -135,7 +137,7 @@ fun mediaImageRequest(
  */
 suspend fun ImageLoader.executeIfNotCached(request: ImageRequest): Boolean {
     val key = request.memoryCacheKey
-    if (key != null && memoryCache?.get(key) != null) return false
+    if (key != null && memoryCache?.get(MemoryCache.Key(key)) != null) return false
     execute(request)
     return true
 }

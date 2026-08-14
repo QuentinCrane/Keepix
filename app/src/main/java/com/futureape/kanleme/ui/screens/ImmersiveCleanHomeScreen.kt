@@ -88,8 +88,9 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.CleaningScope

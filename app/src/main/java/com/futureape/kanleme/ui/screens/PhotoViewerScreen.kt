@@ -75,7 +75,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.R

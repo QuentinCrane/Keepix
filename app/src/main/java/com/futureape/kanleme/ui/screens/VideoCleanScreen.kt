@@ -114,7 +114,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.SwipeAction
 import com.futureape.kanleme.data.settings.AppSettings

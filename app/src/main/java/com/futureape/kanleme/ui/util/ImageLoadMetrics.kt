@@ -1,14 +1,14 @@
 package com.futureape.kanleme.ui.util
 
-import android.graphics.drawable.BitmapDrawable
 import android.util.Log
-import coil.EventListener
-import coil.decode.DataSource
-import coil.request.ErrorResult
-import coil.request.ImageRequest
-import coil.request.SuccessResult
-import coil.size.Dimension
-import coil.size.Size
+import coil3.EventListener
+import coil3.Image
+import coil3.decode.DataSource
+import coil3.request.ErrorResult
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import coil3.size.Dimension
+import coil3.size.Size
 import java.util.concurrent.atomic.AtomicLong
 
 /** Process-local, media-free image loading counters for debug diagnostics. */
@@ -53,16 +53,15 @@ internal object ImageLoadMetrics {
         }
     }
 
-    private fun recordDecodedSize(drawable: android.graphics.drawable.Drawable) {
-        val bitmap = (drawable as? BitmapDrawable)?.bitmap
-        val width = bitmap?.width ?: drawable.intrinsicWidth
-        val height = bitmap?.height ?: drawable.intrinsicHeight
+    private fun recordDecodedSize(image: Image) {
+        val width = image.width
+        val height = image.height
         if (width > 0 && height > 0) {
             decodedPixels.addAndGet(width.toLong() * height.toLong())
         }
     }
 
-    private object MetricsEventListener : EventListener {
+    private object MetricsEventListener : EventListener() {
         override fun onStart(request: ImageRequest) {
             started.incrementAndGet()
         }
@@ -77,11 +76,11 @@ internal object ImageLoadMetrics {
                 DataSource.DISK -> {
                     diskHits.incrementAndGet()
                     decoded.incrementAndGet()
-                    recordDecodedSize(result.drawable)
+                    recordDecodedSize(result.image)
                 }
                 else -> {
                     decoded.incrementAndGet()
-                    recordDecodedSize(result.drawable)
+                    recordDecodedSize(result.image)
                 }
             }
             maybeLog()
