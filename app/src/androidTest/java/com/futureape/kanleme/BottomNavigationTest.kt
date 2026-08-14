@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -21,10 +22,11 @@ class BottomNavigationTest {
 
     @Test
     fun primaryDestinationsAreVisible() {
+        val selectedIndex = mutableIntStateOf(0)
         composeRule.setContent {
             KanlemeTheme {
                 FloatingGlassNav(
-                    selectedIndex = 0,
+                    selectedIndex = selectedIndex.intValue,
                     items = listOf(
                         "照片" to Icons.Rounded.PhotoLibrary,
                         "视频" to Icons.Rounded.Movie,
@@ -37,18 +39,8 @@ class BottomNavigationTest {
 
         composeRule.onNodeWithText("照片").assertIsDisplayed()
 
-        composeRule.setContent {
-            KanlemeTheme {
-                FloatingGlassNav(
-                    selectedIndex = 2,
-                    items = listOf(
-                        "照片" to Icons.Rounded.PhotoLibrary,
-                        "视频" to Icons.Rounded.Movie,
-                        "我的" to Icons.Rounded.Person,
-                    ),
-                    onSelected = {},
-                )
-            }
+        composeRule.runOnIdle {
+            selectedIndex.intValue = 2
         }
         composeRule.onNodeWithText("我的").assertIsDisplayed()
     }
