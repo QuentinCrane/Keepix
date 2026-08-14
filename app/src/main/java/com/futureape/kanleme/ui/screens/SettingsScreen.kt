@@ -74,6 +74,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -121,7 +122,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.futureape.kanleme.ui.i18n.Text
 
 private enum class SettingsPage(@StringRes val titleRes: Int) {
     HOME(R.string.settings_page_home),
