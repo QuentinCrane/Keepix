@@ -94,6 +94,11 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -172,6 +177,9 @@ internal fun ImmersivePhotoCleanContent(
     onFolderClick: () -> Unit,
 ) {
     val context = LocalContext.current
+    val keepActionLabel = stringResource(R.string.a11y_keep)
+    val favoriteActionLabel = stringResource(R.string.a11y_favorite)
+    val deleteActionLabel = stringResource(R.string.a11y_delete)
     val focusMode = settings.photoFocusMode
     val runtimePolicy = settings.toPhotoCleanRuntimePolicy()
     var entered by remember { mutableStateOf(false) }
@@ -333,6 +341,23 @@ internal fun ImmersivePhotoCleanContent(
                             scaleX = enterScale
                             scaleY = enterScale
                             translationY = enterOffsetY
+                        }
+                        .semantics(mergeDescendants = true) {
+                            role = Role.Button
+                            customActions = listOf(
+                                CustomAccessibilityAction(keepActionLabel) {
+                                    onQuickAction(SwipeAction.Keep)
+                                    true
+                                },
+                                CustomAccessibilityAction(favoriteActionLabel) {
+                                    onQuickAction(SwipeAction.Favorite)
+                                    true
+                                },
+                                CustomAccessibilityAction(deleteActionLabel) {
+                                    onQuickAction(SwipeAction.Delete)
+                                    true
+                                },
+                            )
                         }
                         .zIndex(1f),
                     onOpen = onOpenPhoto,
