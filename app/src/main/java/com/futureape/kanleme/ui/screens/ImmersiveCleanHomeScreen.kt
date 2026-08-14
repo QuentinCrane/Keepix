@@ -58,8 +58,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.futureape.kanleme.ui.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,6 +78,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -94,6 +95,7 @@ import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.repository.CleaningScope
 import com.futureape.kanleme.data.repository.DashboardStats
 import com.futureape.kanleme.data.settings.AppSettings
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.components.AdaptiveWidthInfo
 import com.futureape.kanleme.ui.components.GlassSurface
@@ -342,7 +344,7 @@ private fun KeepixQueueSelector(
             Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(19.dp), tint = Color.White.copy(alpha = 0.84f))
             Icon(if (selectedIsPhoto) Icons.Rounded.PhotoLibrary else Icons.Rounded.Movie, contentDescription = null, modifier = Modifier.size(22.dp), tint = Color.White)
             Text(
-                if (selectedIsPhoto) photoTypeMenuLabel(mediaType) else "视频",
+                if (selectedIsPhoto) photoTypeMenuLabel(mediaType) else stringResource(R.string.immersive_video_label),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Black,
             )
@@ -398,21 +400,21 @@ private fun KeepixQueueMenu(
                 Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(19.dp), tint = Color.White.copy(alpha = 0.84f))
                 Icon(if (selectedIsPhoto) Icons.Rounded.PhotoLibrary else Icons.Rounded.Movie, contentDescription = null, modifier = Modifier.size(22.dp), tint = Color.White)
                 Text(
-                    if (selectedIsPhoto) photoTypeMenuLabel(mediaType) else "视频",
+                    if (selectedIsPhoto) photoTypeMenuLabel(mediaType) else stringResource(R.string.immersive_video_label),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Black,
                 )
             }
             Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp).height(1.dp).background(Color.White.copy(alpha = 0.10f)))
-            KeepixMenuRow("照片", selectedIsPhoto && photoScope.mediaType == "all", Icons.Rounded.PhotoLibrary) { onPhotoType("all") }
-            KeepixMenuRow("截屏", selectedIsPhoto && photoScope.mediaType == "screenshot", Icons.Rounded.Image) { onPhotoType("screenshot") }
-            KeepixMenuRow("自拍", selectedIsPhoto && photoScope.mediaType == "selfie", Icons.Rounded.Image) { onPhotoType("selfie") }
-            KeepixMenuRow("实况", selectedIsPhoto && photoScope.mediaType == "motion", Icons.Rounded.PlayCircle) { onPhotoType("motion") }
-            KeepixMenuRow("动图", selectedIsPhoto && photoScope.mediaType == "gif", Icons.Rounded.Image) { onPhotoType("gif") }
-            KeepixMenuRow("视频", !selectedIsPhoto, Icons.Rounded.Movie, onClick = onVideoTab)
+            KeepixMenuRow(stringResource(R.string.immersive_photo_label), selectedIsPhoto && photoScope.mediaType == "all", Icons.Rounded.PhotoLibrary) { onPhotoType("all") }
+            KeepixMenuRow(stringResource(R.string.immersive_photo_screenshot), selectedIsPhoto && photoScope.mediaType == "screenshot", Icons.Rounded.Image) { onPhotoType("screenshot") }
+            KeepixMenuRow(stringResource(R.string.immersive_photo_selfie), selectedIsPhoto && photoScope.mediaType == "selfie", Icons.Rounded.Image) { onPhotoType("selfie") }
+            KeepixMenuRow(stringResource(R.string.immersive_photo_motion), selectedIsPhoto && photoScope.mediaType == "motion", Icons.Rounded.PlayCircle) { onPhotoType("motion") }
+            KeepixMenuRow(stringResource(R.string.immersive_photo_gif), selectedIsPhoto && photoScope.mediaType == "gif", Icons.Rounded.Image) { onPhotoType("gif") }
+            KeepixMenuRow(stringResource(R.string.immersive_video_label), !selectedIsPhoto, Icons.Rounded.Movie, onClick = onVideoTab)
             Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp).height(1.dp).background(Color.White.copy(alpha = 0.12f)))
             KeepixMenuRow(
-                title = "整理范围",
+                title = stringResource(R.string.immersive_scope_title),
                 selected = false,
                 icon = Icons.Rounded.CalendarToday,
                 value = dateModeMenuLabel(activeDateMode),
@@ -428,23 +430,30 @@ private fun KeepixQueueMenu(
                 )
             }
             KeepixMenuRow(
-                title = "排序",
+                title = stringResource(R.string.immersive_sort_title),
                 selected = false,
                 icon = Icons.Rounded.Share,
-                value = if (activeSortOrder == "newest") "最新在前" else "随机",
+                value = if (activeSortOrder == "newest") {
+                    stringResource(R.string.immersive_sort_newest)
+                } else {
+                    stringResource(R.string.immersive_sort_random)
+                },
                 showChevron = true,
                 expanded = panel == KeepixMenuPanel.SORT,
                 onClick = { togglePanel(KeepixMenuPanel.SORT) },
             )
             AnimatedVisibility(visible = panel == KeepixMenuPanel.SORT) {
                 KeepixChoiceList(
-                    options = listOf("random" to "随机", "newest" to "最新在前"),
+                    options = listOf(
+                        "random" to stringResource(R.string.immersive_sort_random),
+                        "newest" to stringResource(R.string.immersive_sort_newest),
+                    ),
                     selected = activeSortOrder,
                     onSelect = { if (selectedIsPhoto) onPhotoSort(it) else onVideoSort(it) },
                 )
             }
             KeepixMenuRow(
-                title = "本次整理目标",
+                title = stringResource(R.string.immersive_batch_title),
                 selected = false,
                 icon = Icons.Rounded.Tune,
                 value = activeBatch.toString(),
@@ -467,7 +476,7 @@ private fun KeepixBatchSlider(value: Int, onSelect: (Int) -> Unit) {
     var localValue by remember(value) { mutableStateOf(value.coerceIn(1, 100).toFloat()) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("本次整理目标", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.62f))
+            Text(stringResource(R.string.immersive_batch_title), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.62f))
             Text((localValue + 0.5f).toInt().coerceIn(1, 100).toString(), style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
         }
         Slider(
@@ -486,7 +495,7 @@ private fun KeepixSubMenuHeader(title: String, onBack: () -> Unit) {
         title = title,
         selected = false,
         icon = Icons.Rounded.KeyboardArrowDown,
-        value = "返回",
+        value = stringResource(R.string.immersive_back),
         onClick = onBack,
     )
     Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp).height(1.dp).background(Color.White.copy(alpha = 0.12f)))
@@ -545,23 +554,24 @@ private fun KeepixMenuRow(
     }
 }
 
+@Composable
 private fun photoTypeMenuLabel(type: String): String = when (type) {
-    "screenshot" -> "截屏"
-    "selfie" -> "自拍"
-    "motion" -> "实况"
-    "gif" -> "动图"
-    "raw" -> "RAW"
-    "long" -> "长图"
-    "normal" -> "照片"
-    else -> "照片"
+    "screenshot" -> stringResource(R.string.immersive_photo_screenshot)
+    "selfie" -> stringResource(R.string.immersive_photo_selfie)
+    "motion" -> stringResource(R.string.immersive_photo_motion)
+    "gif" -> stringResource(R.string.immersive_photo_gif)
+    "raw" -> stringResource(R.string.immersive_photo_raw)
+    "long" -> stringResource(R.string.immersive_photo_long)
+    else -> stringResource(R.string.immersive_photo_label)
 }
 
+@Composable
 private fun dateModeMenuLabel(mode: String): String = when (mode) {
-    "seven_days" -> "最近 7 天"
-    "month" -> "最近 1 个月"
-    "year" -> "最近 1 年"
-    "today_history" -> "那年今日"
-    else -> if (mode.startsWith("d:")) mode.removePrefix("d:").replace("-", "/") else "全部"
+    "seven_days" -> stringResource(R.string.organizer_date_recent_days, 7)
+    "month" -> stringResource(R.string.immersive_date_recent_month)
+    "year" -> stringResource(R.string.immersive_date_recent_year)
+    "today_history" -> stringResource(R.string.organizer_date_today_history)
+    else -> if (mode.startsWith("d:")) mode.removePrefix("d:").replace("-", "/") else stringResource(R.string.organizer_date_all)
 }
 
 private fun nextDateMode(mode: String): String = when (mode) {
@@ -664,7 +674,11 @@ private fun KeepixHomeDeck(
                     )
                 } else if (!canOpen) {
                     Text(
-                        if (selectedIsPhoto) "当前没有待整理照片" else "当前没有待整理视频",
+                        if (selectedIsPhoto) {
+                            stringResource(R.string.immersive_no_pending_photos)
+                        } else {
+                            stringResource(R.string.immersive_no_pending_videos)
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White.copy(alpha = 0.62f),
                         textAlign = TextAlign.Center,
