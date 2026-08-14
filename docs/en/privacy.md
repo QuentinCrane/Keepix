@@ -20,7 +20,6 @@ These records are stored mainly in the device's Room database and DataStore, not
 - `READ_MEDIA_IMAGES` and `READ_MEDIA_VIDEO`: read user-authorized photo and video lists.
 - `READ_MEDIA_VISUAL_USER_SELECTED`: support partial media access on Android 14 and later.
 - `READ_EXTERNAL_STORAGE`: compatibility for Android 12 and earlier.
-- `ACCESS_MEDIA_LOCATION`: read location metadata when the user allows it.
 - Media write or delete permissions: only when the user moves, restores, sends to system trash, or permanently deletes media.
 - `VIBRATE`: feedback for cleanup actions, navigation, and bottom dock switching.
 
@@ -37,6 +36,8 @@ These records are stored mainly in the device's Room database and DataStore, not
 
 Items marked for deletion should go through the app trash or the system trash flow first. Permanent deletion triggers Android's system confirmation and may make recovery impossible through Keepix afterward.
 
+The 30-day date shown for app-trash items is a local review reminder, not an automatic deletion deadline. Items remain until the user restores them or explicitly starts permanent deletion.
+
 The estimated "space to free" shown on the home screen, cleanup screens, and trash screen comes from file-size estimates for items marked for deletion. Actual freed space depends on the final storage state after the system completes deletion.
 
 ## Development and Release Notes
@@ -44,4 +45,3 @@ The estimated "space to free" shown on the home screen, cleanup screens, and tra
 - Do not commit real media, signing keys, passwords, `local.properties`, or private local folders.
 - Use your own release keystore for publishing APKs.
 - Keep privacy boundaries visible in release notes and store listings.
-

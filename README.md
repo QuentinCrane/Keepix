@@ -8,7 +8,7 @@
 
 <p align="center">
   <img alt="Android" src="https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white">
-  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white">
+  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-2.2.21-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Jetpack Compose" src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4">
   <img alt="Local First" src="https://img.shields.io/badge/privacy-local--first-111827">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
@@ -26,7 +26,7 @@ Official Website:[Keepix — Organize your gallery like swiping short videos](ht
 
 ### Start here
 
-1. Open the app（Download in release or the official website） and grant photo or video access.
+1. Open the app from a release or the official website and grant photo or video access.
 2. Pick the cleanup flow you want to work through.
 3. Swipe to keep, favorite, or delete.
 4. Return later for trash, favorites, similar shots, and history views.
@@ -94,7 +94,7 @@ Official Website:[Keepix — Organize your gallery like swiping short videos](ht
 </p>
 
 <p align="center">
-  <em>Favorites &amp; Trash — 30-day recovery window before permanent deletion</em>
+  <em>Favorites &amp; Trash — a 30-day review reminder; no automatic permanent deletion</em>
 </p>
 
 <br>
@@ -167,19 +167,20 @@ app/build/outputs/apk/debug/app-debug.apk
 Version requirements:
 
 - `minSdk = 30`
-- `targetSdk = 35`
-- `compileSdk = 35`
+- `targetSdk = 36`
+- `compileSdk = 36`
 - JDK 17
 
 Stack:
 
-- Kotlin `2.0.21`
-- Jetpack Compose `1.8.2`
-- Material 3 `1.3.2`
-- Room `2.7.1`
-- DataStore `1.1.7`
-- Media3 `1.6.1`
-- Coil `2.7.0`
+- Kotlin `2.2.21`
+- Compose BOM `2026.06.00` (Material 3 is BOM-managed)
+- Room `2.8.4`
+- DataStore `1.2.1`
+- WorkManager `2.11.2`
+- Media3 `1.11.0`
+- Coil `3.3.0`
+- Hilt `2.56.1`
 
 Project layout:
 

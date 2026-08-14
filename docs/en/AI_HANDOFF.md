@@ -6,10 +6,10 @@ This document is a quick handoff for the next maintainer or AI assistant. It onl
 
 - App name: Keepix / 看了么
 - Package name: `com.futureape.kanleme`
-- Current version: `2.3.1`
-- `versionCode`: `57`
+- Current version: `2.3.4`
+- `versionCode`: `60`
 - Minimum OS: Android 11, `minSdk = 30`
-- Target OS: `targetSdk = 35`
+- Target OS: `targetSdk = 36`
 
 ## Current Functional State
 
@@ -63,8 +63,7 @@ Common verification commands:
 Current local release artifact paths:
 
 ```text
-app/build/outputs/apk/release/app-release-signed.apk
-app/build/outputs/release-package/kanleme-v2.3.1-release.zip
+app/build/outputs/apk/release/app-release-unsigned.apk
 ```
 
-These artifacts should be uploaded as GitHub Release attachments, not committed to Git.
+The repository's default build is an unsigned Release candidate; a signed attachment is produced only when a local or CI release keystore is configured. Build artifacts must not be committed.

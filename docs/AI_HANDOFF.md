@@ -6,10 +6,10 @@
 
 - App 名称：看了么 / Keepix
 - 包名：`com.futureape.kanleme`
-- 当前版本：`2.3.1`
-- `versionCode`：`57`
+- 当前版本：`2.3.4`
+- `versionCode`：`60`
 - 最低系统：Android 11，`minSdk = 30`
-- 目标系统：`targetSdk = 35`
+- 目标系统：`targetSdk = 36`
 
 ## 当前功能状态
 
@@ -60,8 +60,7 @@
 当前本地发布产物路径：
 
 ```text
-app/build/outputs/apk/release/app-release-signed.apk
-app/build/outputs/release-package/kanleme-v2.3.1-release.zip
+app/build/outputs/apk/release/app-release-unsigned.apk
 ```
 
-这些产物应作为 GitHub Release 附件上传，不应提交进 Git。
+仓库默认构建的是未签名 Release 候选；只有配置本机或 CI release keystore 后才会生成签名附件。构建产物不应提交进 Git。

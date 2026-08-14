@@ -2,8 +2,8 @@
 
 ## 技术栈
 
-- Kotlin 2.0.21
-- Android Gradle Plugin 8.8.2
+- Kotlin 2.2.21
+- Android Gradle Plugin 8.13.2
 - Jetpack Compose + Material 3
 - Hilt
 - Room + Flow
@@ -11,8 +11,8 @@
 - DataStore
 - WorkManager
 - Media3 / ExoPlayer
-- Coil GIF Decoder
-- ExifInterface
+- Coil 3 GIF Decoder
+- MediaStore-provided EXIF fields
 
 ## 分层
 

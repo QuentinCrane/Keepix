@@ -47,14 +47,15 @@ Prefer Android platform capabilities over custom replacements:
 
 ## Current Release State
 
-Version `2.3.1` continues the cleanup-workspace direction:
+Version `2.3.4` (`versionCode 60`) continues the cleanup-workspace direction:
 
 - The home screen uses a modern white and light-blue visual style, supports horizontal switching between photo and video cleanup, and restores the recent media entry points.
 - Photo cleanup uses edge-triggered action feedback, a compact progress pill, fullscreen year and month filters, and a fullscreen viewer.
 - Video cleanup uses staged keep behavior, a draggable tool strip, and fullscreen time filters with enter and exit animation.
 - Trash is split into separate photo and video views.
+- The trash uses a 30-day local review reminder; reaching the date does not trigger automatic permanent deletion by Keepix.
 - Settings are grouped by common settings, media scope, and support or maintenance.
-- Release builds keep R8 shrinking and resource shrinking enabled, with a signed APK size of about 6.2 MiB.
+- Release builds keep R8 shrinking and resource shrinking enabled. The repository produces an unsigned candidate by default; publishing requires a local or CI signing key.
 
 ## Home Screen
 

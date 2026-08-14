@@ -8,7 +8,7 @@
 
 <p align="center">
   <img alt="Android" src="https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white">
-  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white">
+  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-2.2.21-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Jetpack Compose" src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4">
   <img alt="Local First" src="https://img.shields.io/badge/privacy-local--first-111827">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue">
@@ -95,7 +95,7 @@
 </p>
 
 <p align="center">
-  <em>收藏与回收站 — 30 天安全期内可恢复</em>
+  <em>收藏与回收站 — 30 天复核提醒，不会自动永久删除</em>
 </p>
 
 <br>
@@ -168,19 +168,20 @@ app/build/outputs/apk/debug/app-debug.apk
 版本要求：
 
 - `minSdk = 30`
-- `targetSdk = 35`
-- `compileSdk = 35`
+- `targetSdk = 36`
+- `compileSdk = 36`
 - JDK 17
 
 技术栈：
 
-- Kotlin `2.0.21`
-- Jetpack Compose `1.8.2`
-- Material 3 `1.3.2`
-- Room `2.7.1`
-- DataStore `1.1.7`
-- Media3 `1.6.1`
-- Coil `2.7.0`
+- Kotlin `2.2.21`
+- Compose BOM `2026.06.00`（Material 3 由 BOM 管理）
+- Room `2.8.4`
+- DataStore `1.2.1`
+- WorkManager `2.11.2`
+- Media3 `1.11.0`
+- Coil `3.3.0`
+- Hilt `2.56.1`
 
 </details>
 

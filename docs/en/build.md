@@ -2,6 +2,8 @@
 
 Use Android Studio or the Gradle Wrapper from the project root.
 
+The current app version is `2.3.4`, `versionCode` is `60`, `minSdk = 30`, and both `compileSdk` and `targetSdk` are `36`.
+
 ## Debug Build
 
 ```powershell
@@ -37,7 +39,7 @@ isMinifyEnabled = true
 isShrinkResources = true
 ```
 
-The signed Release APK is currently about 6.2 MiB. Use your own release keystore from local machine storage or CI secrets, and do not commit signing keys, passwords, `local.properties`, or build artifacts.
+The default Release output is an unsigned APK. Use your own release keystore from local machine storage or CI secrets for publishing; the signed size depends on the build and signing configuration. Do not commit signing keys, passwords, `local.properties`, or build artifacts.
 
 ### Local signing check
 
@@ -50,5 +52,4 @@ apksigner sign --ks <your-release-keystore> --ks-key-alias <alias> --out app\bui
 apksigner verify --verbose --print-certs app\build\outputs\apk\release\app-release-signed.apk
 ```
 
-Only upload the final signed APK or a release zip. Do not upload unsigned or aligned intermediate files.
-
+Upload only the final signed APK or a reviewed release package. Do not upload `app-release-unsigned.apk`, aligned intermediate files, or `app/build/`.

@@ -2,6 +2,8 @@
 
 建议直接使用 Android Studio，或在项目根目录通过 Gradle Wrapper 构建。Windows 使用 `gradlew.bat`，macOS / Linux 使用 `./gradlew`。
 
+当前应用版本为 `2.3.4`，`versionCode` 为 `60`，`minSdk = 30`，`compileSdk = 36`，`targetSdk = 36`。
+
 ```powershell
 .\gradlew.bat :app:assembleDebug
 .\gradlew.bat :app:assembleRelease
@@ -36,7 +38,7 @@ isMinifyEnabled = true
 isShrinkResources = true
 ```
 
-当前签名 Release APK 体积约 6.2 MiB。发布 APK 请使用本机或 CI Secret 中的 release keystore 签名，不要把签名密钥、密码、`local.properties` 或构建产物提交进仓库。
+默认 Release 构建产物是未签名 APK。发布 APK 请使用本机或 CI Secret 中的 release keystore 签名；签名后的大小取决于构建与签名配置，不在这里固定声明。不要把签名密钥、密码、`local.properties` 或构建产物提交进仓库。
 
 ### 本机签名检查
 
@@ -49,9 +51,8 @@ apksigner sign --ks <your-release-keystore> --ks-key-alias <alias> --out app\bui
 apksigner verify --verbose --print-certs app\build\outputs\apk\release\app-release-signed.apk
 ```
 
-发布附件建议只上传最终签名 APK，或上传发布用压缩包；不要上传 unsigned / aligned 中间产物。
+发布附件只上传最终签名 APK 或经过审阅的发布压缩包；不要上传 `app-release-unsigned.apk`、aligned 中间产物或 `app/build/`。
 
 ```text
 app/build/outputs/apk/release/app-release-signed.apk
-app/build/outputs/release-package/kanleme-v2.3.1-release.zip
 ```
