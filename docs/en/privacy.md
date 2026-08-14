@@ -28,6 +28,7 @@ These records are stored mainly in the device's Room database and DataStore, not
 - No forced login.
 - No photo or video uploads.
 - No cloud sync.
+- App-local databases, settings, and caches are excluded from Android cloud backup and device transfer through explicit manifest data-extraction rules.
 - No ad tracking.
 - No membership, VIP, payment, subscription, or remote authorization checks.
 - No bypass of Android's confirmation flow for permanent deletion.
