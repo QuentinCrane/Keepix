@@ -37,7 +37,7 @@ Windows uses `gradlew.bat`; macOS/Linux uses `./gradlew`.
 adb devices
 ```
 
-## Partial API 35 device execution
+## API 30, API 35, and API 36 device execution
 
 On 2026-08-14, a temporary `KeepixApi35` AVD was created from the existing API 35 Google Play x86_64 system image. The device was `sdk_gphone64_x86_64`, Android 15/API 35, 1080x2400 at 420 dpi. The run used:
 
@@ -46,6 +46,15 @@ On 2026-08-14, a temporary `KeepixApi35` AVD was created from the existing API 3
 ```
 
 Result: explicit `Exit code: 0`, 25 tests, 0 failures, 0 errors, and 0 skipped. This proves that the current AndroidTest, Hilt runner, WorkManager availability, Compose tests, and Room tests can execute on an API 35 emulator; it is not the API 30/API 36 matrix, a physical-device/OEM check, or system-UI acceptance. The four user-owned unstaged UI files were still present and untouched during this run, so the result is not equivalent to clean Release-candidate acceptance.
+
+The same gate was then executed on the two target API AVDs:
+
+| Device | Result | Report |
+| --- | --- | --- |
+| `KeepixApi30` / Android 11 API 30 / `sdk_gphone_x86_64` / 1080x2400 / 420 dpi | `Exit code: 0`, `BUILD SUCCESSFUL in 44s`, 25 tests, 0 failures, 0 errors, 0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-KeepixApi30(AVD) - 11-_app-.xml` |
+| `medium_phone` / Android 16 API 36 / `sdk_gphone64_x86_64` / 1080x2400 / 420 dpi | `Exit code: 0`, `BUILD SUCCESSFUL in 44s`, 25 tests, 0 failures, 0 errors, 0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-medium_phone(AVD) - 16-_app-.xml` |
+
+Manual permission observations: API 30 reached the home screen with `READ_EXTERNAL_STORAGE` granted and returned to the authorization screen after denial. API 36 covered full access, partial access with `READ_MEDIA_VISUAL_USER_SELECTED` only (the app displayed `Selected media access` and `Re-select access`), and denied access. These are debug-AVD startup and permission observations, not physical-device/OEM, TalkBack/D-pad, delete-authorization, or full release-candidate acceptance. See the [release-candidate validation record](发布候选验证记录_2026-08-14.md) for the detailed matrix.
 
 ## Baseline Profile and performance
 
@@ -67,4 +76,4 @@ Deletion/restore/move, partial media permissions, system authorization cancellat
 
 ## Current evidence status
 
-As of this snapshot, `lintDebug`, JVM unit tests, AndroidTest compilation, 25/25 AndroidTest execution on the API 35 AVD, the app Release gate, and benchmark APK builds have explicit successful exit codes. There is still no API 30/API 36 AVD, so final device-matrix acceptance remains pending.
+As of this snapshot, `lintDebug`, JVM unit tests, AndroidTest compilation, 25/25 AndroidTest execution on each API 30/API 35/API 36 AVD, the app Release gate, and benchmark APK builds have explicit successful exit codes. API 30/API 36 startup and permission-state observations are also recorded. Final device-matrix acceptance remains pending because OEM/system-authorization failure paths, accessibility/window matrices, Media3/WorkManager process paths, screenshot goldens, and real performance data are not closed.

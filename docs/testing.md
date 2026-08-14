@@ -37,7 +37,7 @@ Windows 使用 `gradlew.bat`，macOS/Linux 使用 `./gradlew`。
 adb devices
 ```
 
-## API 35 部分设备执行
+## API 30、API 35、API 36 设备执行
 
 2026-08-14 在本机已有的 API 35 Google Play x86_64 system image 上建立临时 `KeepixApi35` AVD，设备为 `sdk_gphone64_x86_64`、Android 15/API 35、1080x2400、420 dpi。执行：
 
@@ -46,6 +46,15 @@ adb devices
 ```
 
 结果：明确返回 `Exit code: 0`，25 tests、0 failures、0 errors、0 skipped。该次运行证明当前 AndroidTest、Hilt runner、WorkManager 可用性、Compose 测试和 Room 测试能在 API35 模拟器执行；它不是 API30/API36 矩阵、真机/OEM 或系统 UI 验收。运行时工作树仍保留四个用户未提交的 UI 文件，它们未被本轮触碰或暂存，因此该结果也不等同于干净 Release 候选验收。
+
+同日继续在两个目标 API AVD 上执行同一门禁：
+
+| 设备 | 结果 | 报告 |
+| --- | --- | --- |
+| `KeepixApi30` / Android 11 API 30 / `sdk_gphone_x86_64` / 1080×2400 / 420 dpi | `Exit code: 0`，`BUILD SUCCESSFUL in 44s`，25 tests、0 failures、0 errors、0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-KeepixApi30(AVD) - 11-_app-.xml` |
+| `medium_phone` / Android 16 API 36 / `sdk_gphone64_x86_64` / 1080×2400 / 420 dpi | `Exit code: 0`，`BUILD SUCCESSFUL in 44s`，25 tests、0 failures、0 errors、0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-medium_phone(AVD) - 16-_app-.xml` |
+
+API 30 手动授权观察到 `READ_EXTERNAL_STORAGE` 的允许/拒绝状态；API 36 手动观察到 full、partial（`READ_MEDIA_VISUAL_USER_SELECTED` only）和 denied 三态，应用在 partial 状态显示 `Selected media access` 与 `Re-select access`。这些是 debug AVD 上的启动/授权观察，不等于物理设备、OEM、TalkBack/D-pad、删除系统授权或完整发布候选验收。详细记录见[发布候选验证记录](发布候选验证记录_2026-08-14.md)。
 
 ## Baseline Profile 与性能
 
@@ -67,4 +76,4 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## 当前证据状态
 
-截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API35 AVD 上的 25/25 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；本机仍没有 API30/API36 AVD。因此最终设备矩阵验收仍保持待运行。
+截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上各自的 25/25 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30/API36 的基础启动与权限状态也已观察。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、无障碍/窗口矩阵、Media3/WorkManager 进程路径、截图 golden 和真实性能数据尚未闭环。
