@@ -18,7 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import com.futureape.kanleme.ui.i18n.Text
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -36,6 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.futureape.kanleme.R
 import kotlin.math.max
 
 @Immutable
@@ -129,7 +131,7 @@ fun PositionGuideOverlay(
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "步骤 " + (stepIndex + 1) + "/" + steps.size,
+                    text = stringResource(R.string.photo_guide_step, stepIndex + 1, steps.size),
                     style = MaterialTheme.typography.labelLarge,
                     color = resolvedHighlightColor,
                 )
@@ -141,13 +143,19 @@ fun PositionGuideOverlay(
                             onClick = { stepIndex -= 1 },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(999.dp),
-                        ) { Text("上一步") }
+                        ) { Text(stringResource(R.string.onboarding_previous)) }
                     }
                     Button(
                         onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(999.dp),
-                    ) { Text(if (stepIndex < steps.lastIndex) "下一步" else "知道了") }
+                    ) {
+                        Text(
+                            stringResource(
+                                if (stepIndex < steps.lastIndex) R.string.onboarding_next else R.string.photo_guide_done,
+                            ),
+                        )
+                    }
                 }
             }
         }

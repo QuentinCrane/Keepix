@@ -512,6 +512,11 @@
     <string name="favorites_share">Share</string>
     <string name="favorites_today">On This Day</string>
     <string name="favorites_pending_delete">Pending delete</string>
+    <string name="photo_compare_title">Compare photos</string>
+    <string name="photo_compare_subtitle">Open from the system share menu to compare 2–4 images quickly</string>
+    <string name="photo_compare_checking">Checking images</string>
+    <string name="photo_compare_empty_title">No images received</string>
+    <string name="photo_compare_received">Received %1$d images</string>
     <string name="permission_title">Photo library access required</string>
     <string name="permission_intro">Keepix organizes your full photo library, so it needs access to photos and videos. Scanning stays on this device and media files are never uploaded.</string>
     <string name="permission_platform_notice">On Android 14 and later, choosing “Select photos and videos” only allows Keepix to clean the selected items. Choose all photos and videos in the system dialog for full-library cleaning.</string>

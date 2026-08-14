@@ -512,6 +512,11 @@
     <string name="favorites_share">分享</string>
     <string name="favorites_today">那年今日</string>
     <string name="favorites_pending_delete">待刪</string>
+    <string name="photo_compare_title">照片比較</string>
+    <string name="photo_compare_subtitle">從系統分享選單進入，適合快速比較 2–4 張圖片</string>
+    <string name="photo_compare_checking">正在檢查圖片</string>
+    <string name="photo_compare_empty_title">沒有收到圖片</string>
+    <string name="photo_compare_received">已接收 %1$d 張</string>
     <string name="permission_title">需要存取相簿</string>
     <string name="permission_intro">看了麼的核心功能是全相簿整理，所以需要讀取照片和影片。所有掃描都在本機完成，不上傳媒體檔案。</string>
     <string name="permission_platform_notice">Android 14 及以上如果選擇「選擇照片和影片」，只能整理你選取的部分內容；若要整理完整相簿，請在系統對話框中選擇允許存取所有照片和影片。</string>

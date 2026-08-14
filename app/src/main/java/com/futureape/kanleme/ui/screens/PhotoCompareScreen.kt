@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.EmptyState
-import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun PhotoCompareScreen(
@@ -39,7 +39,11 @@ fun PhotoCompareScreen(
             .navigationBarsPadding()
             .padding(top = 12.dp, start = 18.dp, end = 18.dp),
     ) {
-        ScreenHeader("照片对比", "从系统分享菜单进入，适合 2-4 张图快速比较", onBack)
+        ScreenHeader(
+            stringResource(R.string.photo_compare_title),
+            stringResource(R.string.photo_compare_subtitle),
+            onBack,
+        )
         if (isValidating) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(
@@ -47,13 +51,18 @@ fun PhotoCompareScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     CircularProgressIndicator()
-                    Text("正在检查图片", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.photo_compare_checking), style = MaterialTheme.typography.bodyLarge)
                 }
             }
         } else if (uris.isEmpty()) {
-            EmptyState("没有收到图片", stringResource(R.string.photo_compare_empty_message), "返回", onBack)
+            EmptyState(
+                stringResource(R.string.photo_compare_empty_title),
+                stringResource(R.string.photo_compare_empty_message),
+                stringResource(R.string.onboarding_previous),
+                onBack,
+            )
         } else {
-            Text("已接收 ${uris.size} 张", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.photo_compare_received, uris.size), style = MaterialTheme.typography.titleMedium)
             LazyVerticalGrid(
                 columns = GridCells.Fixed(if (uris.size <= 2) 1 else 2),
                 modifier = Modifier.fillMaxSize().padding(top = 12.dp),
