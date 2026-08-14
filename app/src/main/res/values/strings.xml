@@ -648,4 +648,21 @@
     <string name="settings_export_crash_logs">导出闪退日志</string>
     <string name="settings_export_crash_logs_desc">自动记录最近 8 次闪退，方便后续 debug</string>
     <string name="settings_no_crash_logs">暂无闪退日志</string>
+    <string name="settings_accent_ice_blue">冰蓝</string>
+    <string name="settings_accent_light_blue">浅蓝</string>
+    <string name="settings_accent_mist_white">雾白</string>
+    <string name="settings_accent_clear">清透</string>
+    <string name="settings_accent_cool_gray">冷灰</string>
+    <string name="settings_move_permission_title">移动到文件夹时</string>
+    <string name="settings_file_move_title">文件移动功能</string>
+    <string name="settings_file_move_enabled">已开启，指定归档会先确认再移动当前媒体</string>
+    <string name="settings_file_move_disabled">点击开启后，可使用指定归档和移动到文件夹功能</string>
+    <string name="settings_file_move_hint_enabled">开启后，整理页点“指定归档”选择文件夹并确认，就会移动当前照片或视频并进入下一项</string>
+    <string name="settings_file_move_hint_disabled">请先开启文件移动功能，才能使用移动到文件夹</string>
+    <string name="settings_select_photo_clean_mode">选择照片清理模式</string>
+    <string name="settings_photo_clean_mode_hint">如果清理时出现卡顿或卡住，可以切换模式帮助判断问题</string>
+    <string name="settings_haptic_settings">震动反馈设置</string>
+    <string name="settings_haptic_enabled">已开启，滑动时提供触觉反馈</string>
+    <string name="settings_haptic_disabled">已关闭，滑动时不提供触觉反馈</string>
+    <string name="settings_haptic_preview_hint">为不同操作预览震动反馈强度，点击可立即切换当前全局强度</string>
 </resources>

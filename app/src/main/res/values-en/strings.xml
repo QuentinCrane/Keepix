@@ -648,4 +648,21 @@
     <string name="settings_export_crash_logs">Export crash logs</string>
     <string name="settings_export_crash_logs_desc">Automatically keep the latest 8 crashes for debugging</string>
     <string name="settings_no_crash_logs">No crash logs available</string>
+    <string name="settings_accent_ice_blue">Ice blue</string>
+    <string name="settings_accent_light_blue">Light blue</string>
+    <string name="settings_accent_mist_white">Mist white</string>
+    <string name="settings_accent_clear">Clear</string>
+    <string name="settings_accent_cool_gray">Cool gray</string>
+    <string name="settings_move_permission_title">When moving to a folder</string>
+    <string name="settings_file_move_title">File moving</string>
+    <string name="settings_file_move_enabled">Enabled; archive moves are confirmed before moving the current media</string>
+    <string name="settings_file_move_disabled">Turn it on to use archive and move-to-folder actions</string>
+    <string name="settings_file_move_hint_enabled">After enabling, choose and confirm a folder from the cleaning page to move the current photo or video and continue</string>
+    <string name="settings_file_move_hint_disabled">Enable file moving first to use move-to-folder</string>
+    <string name="settings_select_photo_clean_mode">Choose photo cleaning mode</string>
+    <string name="settings_photo_clean_mode_hint">If cleaning stutters or gets stuck, switch modes to help identify the issue</string>
+    <string name="settings_haptic_settings">Haptic feedback settings</string>
+    <string name="settings_haptic_enabled">Enabled; swipes provide haptic feedback</string>
+    <string name="settings_haptic_disabled">Disabled; swipes provide no haptic feedback</string>
+    <string name="settings_haptic_preview_hint">Preview haptic strength for each action; tap to change the current global strength</string>
 </resources>

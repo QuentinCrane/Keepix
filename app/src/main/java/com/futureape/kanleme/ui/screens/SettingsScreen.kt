@@ -603,12 +603,13 @@ private fun swipeSoundStyleOptions(): List<Pair<String, String>> = SwipeSoundSty
 @Composable
 private fun photoCleanModeOptions(): List<Pair<String, String>> = PhotoCleanMode.entries.map { it.name to stringResource(it.labelRes) }
 
+@Composable
 private fun accentColorOptions(): List<Pair<Long, String>> = listOf(
-    0xFFC7ECFE to "冰蓝",
-    0xFFDDF5FF to "浅蓝",
-    0xFFF4FBFF to "雾白",
-    0xFFEAF8FF to "清透",
-    0xFFE8F0F7 to "冷灰",
+    0xFFC7ECFE to stringResource(R.string.settings_accent_ice_blue),
+    0xFFDDF5FF to stringResource(R.string.settings_accent_light_blue),
+    0xFFF4FBFF to stringResource(R.string.settings_accent_mist_white),
+    0xFFEAF8FF to stringResource(R.string.settings_accent_clear),
+    0xFFE8F0F7 to stringResource(R.string.settings_accent_cool_gray),
 )
 
 private val KeepixIosSettingsBackground = Color(0xFF000000)
@@ -794,14 +795,14 @@ private fun MovePermissionSheet(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
-            "移动到文件夹时",
+            stringResource(R.string.settings_move_permission_title),
             modifier = Modifier.align(Alignment.CenterHorizontally),
             style = MaterialTheme.typography.titleLarge,
         )
         SheetToggleCard(
             icon = Icons.Rounded.Folder,
-            title = "文件移动功能",
-            subtitle = if (settings.autoMoveOnKeepFavorite) "已开启，指定归档会先确认再移动当前媒体" else "点击开启后，可使用指定归档和移动到文件夹功能",
+            title = stringResource(R.string.settings_file_move_title),
+            subtitle = if (settings.autoMoveOnKeepFavorite) stringResource(R.string.settings_file_move_enabled) else stringResource(R.string.settings_file_move_disabled),
             checked = settings.autoMoveOnKeepFavorite,
             onCheckedChange = {
                 onTick()
@@ -816,7 +817,7 @@ private fun MovePermissionSheet(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             Text(
-                if (settings.autoMoveOnKeepFavorite) "开启后，整理页点“指定归档”选择文件夹并确认，就会移动当前照片或视频并进入下一项" else "请先开启文件移动功能，才能使用移动到文件夹",
+                if (settings.autoMoveOnKeepFavorite) stringResource(R.string.settings_file_move_hint_enabled) else stringResource(R.string.settings_file_move_hint_disabled),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (settings.autoMoveOnKeepFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
             )
@@ -832,9 +833,9 @@ private fun PhotoCleanModeSheet(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            Text("选择照片清理模式", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.settings_select_photo_clean_mode), style = MaterialTheme.typography.titleLarge)
             Text(
-                "如果清理时出现卡顿或卡住，可以切换模式帮助判断问题",
+                stringResource(R.string.settings_photo_clean_mode_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -873,14 +874,14 @@ private fun HapticSettingsSheet(
     ).any { it != HapticLevel.OFF }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(
-            "震动反馈设置",
+            stringResource(R.string.settings_haptic_settings),
             modifier = Modifier.align(Alignment.CenterHorizontally),
             style = MaterialTheme.typography.titleLarge,
         )
         SheetToggleCard(
             icon = Icons.Rounded.Vibration,
-            title = "震动反馈",
-            subtitle = if (hapticEnabled) "已开启，滑动时提供触觉反馈" else "已关闭，滑动时不提供触觉反馈",
+            title = stringResource(R.string.settings_haptic_feedback),
+            subtitle = if (hapticEnabled) stringResource(R.string.settings_haptic_enabled) else stringResource(R.string.settings_haptic_disabled),
             checked = hapticEnabled,
             onCheckedChange = {
                 onSuccess()
@@ -899,13 +900,13 @@ private fun HapticSettingsSheet(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.44f))
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
-            Text("为不同操作预览震动反馈强度，点击可立即切换当前全局强度", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.settings_haptic_preview_hint), style = MaterialTheme.typography.bodyMedium)
         }
         SettingsGroup(listOf<@Composable () -> Unit>(
-            { HapticActionRow("保留", Color(0xFF4C8FF7), settings.keepHapticLevel, onSuccess) { viewModel.setKeepHapticLevel(it) } },
-            { HapticActionRow("删除", Color(0xFFE74C4C), settings.deleteHapticLevel, onSuccess) { viewModel.setDeleteHapticLevel(it) } },
-            { HapticActionRow("收藏", Color(0xFF54B766), settings.favoriteHapticLevel, onSuccess) { viewModel.setFavoriteHapticLevel(it) } },
-            { HapticActionRow("撤销", Color(0xFFF0A63A), settings.undoHapticLevel, onSuccess) { viewModel.setUndoHapticLevel(it) } },
+            { HapticActionRow(stringResource(R.string.a11y_keep), Color(0xFF4C8FF7), settings.keepHapticLevel, onSuccess) { viewModel.setKeepHapticLevel(it) } },
+            { HapticActionRow(stringResource(R.string.a11y_delete), Color(0xFFE74C4C), settings.deleteHapticLevel, onSuccess) { viewModel.setDeleteHapticLevel(it) } },
+            { HapticActionRow(stringResource(R.string.a11y_favorite), Color(0xFF54B766), settings.favoriteHapticLevel, onSuccess) { viewModel.setFavoriteHapticLevel(it) } },
+            { HapticActionRow(stringResource(R.string.action_undo), Color(0xFFF0A63A), settings.undoHapticLevel, onSuccess) { viewModel.setUndoHapticLevel(it) } },
         ))
     }
 }
@@ -983,10 +984,10 @@ private fun HapticActionRow(
     ) {
         IconTile(Icons.Rounded.CheckCircle, color)
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-        HapticLevelChip("关", HapticLevel.OFF, selectedLevel == HapticLevel.OFF, Color(0xFF8A8F98), onPreview, onLevelSelected)
-        HapticLevelChip("默认", HapticLevel.MEDIUM, selectedLevel == HapticLevel.MEDIUM, color, onPreview, onLevelSelected)
-        HapticLevelChip("轻", HapticLevel.LIGHT, selectedLevel == HapticLevel.LIGHT, color, onPreview, onLevelSelected)
-        HapticLevelChip("强", HapticLevel.STRONG, selectedLevel == HapticLevel.STRONG, color, onPreview, onLevelSelected)
+        HapticLevelChip(stringResource(R.string.haptic_level_off), HapticLevel.OFF, selectedLevel == HapticLevel.OFF, Color(0xFF8A8F98), onPreview, onLevelSelected)
+        HapticLevelChip(stringResource(R.string.haptic_level_medium), HapticLevel.MEDIUM, selectedLevel == HapticLevel.MEDIUM, color, onPreview, onLevelSelected)
+        HapticLevelChip(stringResource(R.string.haptic_level_light), HapticLevel.LIGHT, selectedLevel == HapticLevel.LIGHT, color, onPreview, onLevelSelected)
+        HapticLevelChip(stringResource(R.string.haptic_level_strong), HapticLevel.STRONG, selectedLevel == HapticLevel.STRONG, color, onPreview, onLevelSelected)
     }
 }
 
