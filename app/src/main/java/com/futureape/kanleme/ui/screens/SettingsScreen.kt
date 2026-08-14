@@ -386,12 +386,12 @@ private fun SettingsPageContent(
             }
 
             SettingsPage.EXCLUDED_FOLDERS -> {
-                SectionTitle("排除文件夹")
+                SectionTitle(stringResource(R.string.settings_page_excluded_folders))
                 val rows = mutableListOf<@Composable () -> Unit>()
                 rows.add {
                     NativeFolderExcludeButton(
-                        title = "用系统选择器添加排除",
-                        subtitle = "优先调用安卓原生文件夹选择器；下方输入框仅作备用",
+                        title = stringResource(R.string.settings_excluded_add_system),
+                        subtitle = stringResource(R.string.settings_excluded_system_subtitle),
                         onFolderSelected = { path -> onSuccess(); viewModel.addExcludedFolder(path) },
                     )
                 }
@@ -412,8 +412,8 @@ private fun SettingsPageContent(
                 rows.add {
                     SettingsRow(
                         Icons.Rounded.Block,
-                        "排除状态",
-                        if (settings.excludedFolderPaths.isEmpty()) "未排除，照片和视频都会进入整理队列" else "已排除 " + settings.excludedFolderPaths.size + " 个文件夹；点已选项可取消",
+                        stringResource(R.string.settings_excluded_status),
+                        if (settings.excludedFolderPaths.isEmpty()) stringResource(R.string.settings_excluded_none) else stringResource(R.string.settings_excluded_count_selected, settings.excludedFolderPaths.size),
                         onClick = { onTick(); if (settings.excludedFolderPaths.isNotEmpty()) viewModel.clearExcludedFolders() },
                         color = Color(0xFFB64040),
                     )
@@ -424,7 +424,7 @@ private fun SettingsPageContent(
                         SettingsSwitchRow(
                             Icons.Rounded.Block,
                             label,
-                            "系统路径：" + folderPath,
+                            stringResource(R.string.settings_system_path, folderPath),
                             checked = true,
                             onCheckedChange = { onTick(); viewModel.toggleExcludedFolder(folderPath) },
                             color = Color(0xFFB64040),
@@ -437,8 +437,8 @@ private fun SettingsPageContent(
                     rows.add {
                         SettingsRow(
                             Icons.Rounded.Folder,
-                            if (showAllFolderRules) "收起可选文件夹" else "展开可选文件夹",
-                            "当前显示 " + visibleFolders.size + " / " + availableFolders.size + " 个，可点右侧开关排除",
+                            stringResource(if (showAllFolderRules) R.string.settings_show_less else R.string.settings_show_more),
+                            stringResource(R.string.settings_available_folder_count, visibleFolders.size, availableFolders.size),
                             onClick = { onTick(); onToggleShowAllFolderRules() },
                             color = Color(0xFF5E8DB4),
                         )
@@ -449,7 +449,7 @@ private fun SettingsPageContent(
                             SettingsSwitchRow(
                                 Icons.Rounded.Folder,
                                 label,
-                                "系统路径：" + folderPath,
+                                stringResource(R.string.settings_system_path, folderPath),
                                 checked = false,
                                 onCheckedChange = { onTick(); viewModel.toggleExcludedFolder(folderPath) },
                                 color = Color(0xFF5E8DB4),
@@ -458,56 +458,56 @@ private fun SettingsPageContent(
                     }
                 }
                 if (allFolders.isEmpty()) {
-                    rows.add { SettingsRow(Icons.Rounded.Info, "暂无文件夹", "先同步媒体库后，这里会列出照片和视频文件夹；也可以先手动输入相机文件夹名称", onClick = { onSuccess(); viewModel.refreshLibrary() }) }
+                    rows.add { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_no_folders), stringResource(R.string.settings_no_folders_desc), onClick = { onSuccess(); viewModel.refreshLibrary() }) }
                 }
                 SettingsGroup(rows)
             }
 
             SettingsPage.EXPERIENCE -> {
-                SectionTitle("操作体验")
+                SectionTitle(stringResource(R.string.settings_page_experience))
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsSegmentedRow(Icons.Rounded.Tune, "滑动灵敏度", stringResource(settings.swipeSensitivity.labelRes), swipeSensitivityOptions(), settings.swipeSensitivity.name, color = Color(0xFFD44C84), onSelected = { onTick(); viewModel.setSwipeSensitivity(SwipeSensitivity.valueOf(it)) }) },
-                    { SettingsSegmentedRow(Icons.Rounded.TouchApp, "手势方向", stringResource(settings.gestureDirection.labelRes), gestureDirectionOptions(), settings.gestureDirection.name, color = Color(0xFFD44C84), onSelected = { onTick(); viewModel.setGestureDirection(GestureDirection.valueOf(it)) }) },
-                    { SettingsSwitchRow(Icons.Rounded.MusicNote, "照片划走音效", if (settings.swipeSound) "已开启 · " + stringResource(settings.swipeSoundStyle.labelRes) else "已关闭 · 可在下方选择音效", checked = settings.swipeSound, onCheckedChange = { onTick(); viewModel.setSwipeSound(it) }, color = Color(0xFFE8A93B)) },
-                    { SettingsSegmentedRow(Icons.Rounded.MusicNote, "音效风格", stringResource(settings.swipeSoundStyle.descriptionRes), swipeSoundStyleOptions(), settings.swipeSoundStyle.name, color = Color(0xFFE8A93B), onSelected = { onTick(); viewModel.setSwipeSoundStyle(SwipeSoundStyle.valueOf(it)) }) },
-                    { SettingsSwitchRow(Icons.Rounded.MusicNote, "打开视频默认静音", "进入视频整理时默认静音，点侧边栏音量按钮可恢复声音", checked = settings.videoDefaultMuted, onCheckedChange = { onTick(); viewModel.setVideoDefaultMuted(it) }, color = Color(0xFFE8A93B)) },
-                    { SettingsSegmentedRow(Icons.Rounded.AspectRatio, "视频显示比例", stringResource(settings.videoDisplayMode.labelRes), videoDisplayModeOptions(), settings.videoDisplayMode.name, color = Color(0xFF5E8DB4), onSelected = { onTick(); viewModel.setVideoDisplayMode(VideoDisplayMode.valueOf(it)) }) },
-                    { SettingsSwitchRow(Icons.Rounded.TouchApp, "整理快捷按钮", if (settings.quickActionButtons) "照片页显示保留、收藏、待删" else "关闭后继续使用滑动手势", checked = settings.quickActionButtons, onCheckedChange = { onTick(); viewModel.setQuickActionButtons(it) }, color = Color(0xFF5E8DB4)) },
-                    { SettingsSwitchRow(Icons.Rounded.Tune, "分享/撤销位置互换", if (settings.swapShareAndUndo) "底部撤销在左、分享在右" else "底部分享在左、撤销在右", checked = settings.swapShareAndUndo, onCheckedChange = { onTick(); viewModel.setSwapShareAndUndo(it) }, color = Color(0xFF5E8DB4)) },
-                    { SettingsSegmentedRow(Icons.Rounded.Vibration, "默认震动强度", stringResource(settings.hapticLevel.labelRes), hapticLevelOptions(), settings.hapticLevel.name, color = Color(0xFF55A6C8), onSelected = { onSuccess(); viewModel.setHapticLevel(HapticLevel.valueOf(it)) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Tune, stringResource(R.string.settings_swipe_sensitivity), stringResource(settings.swipeSensitivity.labelRes), swipeSensitivityOptions(), settings.swipeSensitivity.name, color = Color(0xFFD44C84), onSelected = { onTick(); viewModel.setSwipeSensitivity(SwipeSensitivity.valueOf(it)) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.TouchApp, stringResource(R.string.settings_gesture_direction), stringResource(settings.gestureDirection.labelRes), gestureDirectionOptions(), settings.gestureDirection.name, color = Color(0xFFD44C84), onSelected = { onTick(); viewModel.setGestureDirection(GestureDirection.valueOf(it)) }) },
+                    { SettingsSwitchRow(Icons.Rounded.MusicNote, stringResource(R.string.settings_swipe_sound), if (settings.swipeSound) stringResource(R.string.settings_swipe_sound_enabled, stringResource(settings.swipeSoundStyle.labelRes)) else stringResource(R.string.settings_swipe_sound_disabled), checked = settings.swipeSound, onCheckedChange = { onTick(); viewModel.setSwipeSound(it) }, color = Color(0xFFE8A93B)) },
+                    { SettingsSegmentedRow(Icons.Rounded.MusicNote, stringResource(R.string.settings_sound_style), stringResource(settings.swipeSoundStyle.descriptionRes), swipeSoundStyleOptions(), settings.swipeSoundStyle.name, color = Color(0xFFE8A93B), onSelected = { onTick(); viewModel.setSwipeSoundStyle(SwipeSoundStyle.valueOf(it)) }) },
+                    { SettingsSwitchRow(Icons.Rounded.MusicNote, stringResource(R.string.settings_video_default_muted), stringResource(R.string.settings_video_default_muted_desc), checked = settings.videoDefaultMuted, onCheckedChange = { onTick(); viewModel.setVideoDefaultMuted(it) }, color = Color(0xFFE8A93B)) },
+                    { SettingsSegmentedRow(Icons.Rounded.AspectRatio, stringResource(R.string.settings_video_display_ratio), stringResource(settings.videoDisplayMode.labelRes), videoDisplayModeOptions(), settings.videoDisplayMode.name, color = Color(0xFF5E8DB4), onSelected = { onTick(); viewModel.setVideoDisplayMode(VideoDisplayMode.valueOf(it)) }) },
+                    { SettingsSwitchRow(Icons.Rounded.TouchApp, stringResource(R.string.settings_quick_actions), if (settings.quickActionButtons) stringResource(R.string.settings_quick_actions_enabled) else stringResource(R.string.settings_quick_actions_disabled), checked = settings.quickActionButtons, onCheckedChange = { onTick(); viewModel.setQuickActionButtons(it) }, color = Color(0xFF5E8DB4)) },
+                    { SettingsSwitchRow(Icons.Rounded.Tune, stringResource(R.string.settings_swap_share_undo), if (settings.swapShareAndUndo) stringResource(R.string.settings_swap_share_undo_enabled) else stringResource(R.string.settings_swap_share_undo_disabled), checked = settings.swapShareAndUndo, onCheckedChange = { onTick(); viewModel.setSwapShareAndUndo(it) }, color = Color(0xFF5E8DB4)) },
+                    { SettingsSegmentedRow(Icons.Rounded.Vibration, stringResource(R.string.settings_default_haptic), stringResource(settings.hapticLevel.labelRes), hapticLevelOptions(), settings.hapticLevel.name, color = Color(0xFF55A6C8), onSelected = { onSuccess(); viewModel.setHapticLevel(HapticLevel.valueOf(it)) }) },
                 ))
             }
 
             SettingsPage.APPEARANCE -> {
-                SectionTitle("外观显示")
+                SectionTitle(stringResource(R.string.settings_page_appearance))
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsSegmentedRow(Icons.Rounded.Palette, "主题模式", stringResource(settings.themeMode.labelRes), themeModeOptions(), settings.themeMode.name, onSelected = { onTick(); viewModel.setThemeMode(ThemeMode.valueOf(it)) }) },
-                    { SettingsColorRow(Icons.Rounded.ColorLens, "主题色", "选择应用高亮色", accentColorOptions(), settings.accentColor, onSelected = { onTick(); viewModel.setAccentColor(it) }) },
-                    { SettingsSegmentedRow(Icons.Rounded.Folder, "文件夹显示", stringResource(settings.folderDisplay.labelRes), folderDisplayOptions(), settings.folderDisplay.name, onSelected = { onTick(); viewModel.setFolderDisplay(FolderDisplayMode.valueOf(it)) }) },
-                    { SettingsSwitchRow(Icons.Rounded.Palette, "沉浸背景", "整理时以当前照片的模糊效果作为背景；流畅优先会自动关闭", checked = settings.immersiveBackground, onCheckedChange = { onTick(); viewModel.setImmersiveBackground(it) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Palette, stringResource(R.string.settings_theme_mode), stringResource(settings.themeMode.labelRes), themeModeOptions(), settings.themeMode.name, onSelected = { onTick(); viewModel.setThemeMode(ThemeMode.valueOf(it)) }) },
+                    { SettingsColorRow(Icons.Rounded.ColorLens, stringResource(R.string.settings_accent_color), stringResource(R.string.settings_accent_color_desc), accentColorOptions(), settings.accentColor, onSelected = { onTick(); viewModel.setAccentColor(it) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Folder, stringResource(R.string.settings_folder_display), stringResource(settings.folderDisplay.labelRes), folderDisplayOptions(), settings.folderDisplay.name, onSelected = { onTick(); viewModel.setFolderDisplay(FolderDisplayMode.valueOf(it)) }) },
+                    { SettingsSwitchRow(Icons.Rounded.Palette, stringResource(R.string.settings_immersive_background), stringResource(R.string.settings_immersive_background_desc), checked = settings.immersiveBackground, onCheckedChange = { onTick(); viewModel.setImmersiveBackground(it) }) },
                 ))
             }
 
             SettingsPage.DATA -> {
-                SectionTitle("数据与更新")
+                SectionTitle(stringResource(R.string.settings_page_data))
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.Info, "更新日志", "当前版本 " + BuildConfig.VERSION_NAME + " · 查看完整开发记录", color = Color(0xFFE3B13B), onClick = { goTo(SettingsPage.CHANGELOG) }) },
-                    { SettingsRow(Icons.Rounded.Info, "隐私政策", "本地相册权限、删除移动规则和数据存储说明", color = Color(0xFF55A6C8), onClick = { goTo(SettingsPage.PRIVACY) }) },
-                    { SettingsRow(Icons.Rounded.TouchApp, "使用帮助", "照片整理、视频整理、筛选、相册和排除文件夹", color = Color(0xFF6D9E65), onClick = { goTo(SettingsPage.HELP) }) },
-                    { SettingsRow(Icons.Rounded.TouchApp, "重新播放定位式教程", "再次进入照片/视频整理页时，按页面位置逐项指示", color = Color(0xFF7A6AA6), onClick = { onSuccess(); viewModel.replayPositionGuides() }) },
-                    { SettingsRow(Icons.Rounded.CleaningServices, "媒体库维护", "重新扫描照片和视频索引", onClick = { onSuccess(); viewModel.refreshLibrary() }) },
-                    { SettingsRow(Icons.Rounded.Info, "版本信息", "版本 " + BuildConfig.VERSION_NAME + " · versionCode " + BuildConfig.VERSION_CODE, onClick = { goTo(SettingsPage.CHANGELOG) }) },
+                    { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_changelog), stringResource(R.string.settings_changelog_desc, BuildConfig.VERSION_NAME), color = Color(0xFFE3B13B), onClick = { goTo(SettingsPage.CHANGELOG) }) },
+                    { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_privacy_policy), stringResource(R.string.settings_privacy_policy_desc), color = Color(0xFF55A6C8), onClick = { goTo(SettingsPage.PRIVACY) }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, stringResource(R.string.settings_help), stringResource(R.string.settings_help_desc), color = Color(0xFF6D9E65), onClick = { goTo(SettingsPage.HELP) }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, stringResource(R.string.settings_replay_guides), stringResource(R.string.settings_replay_guides_desc), color = Color(0xFF7A6AA6), onClick = { onSuccess(); viewModel.replayPositionGuides() }) },
+                    { SettingsRow(Icons.Rounded.CleaningServices, stringResource(R.string.settings_media_maintenance), stringResource(R.string.settings_media_maintenance_desc), onClick = { onSuccess(); viewModel.refreshLibrary() }) },
+                    { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_version_info), stringResource(R.string.settings_version_info_desc, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE), onClick = { goTo(SettingsPage.CHANGELOG) }) },
                 ))
             }
 
-            SettingsPage.CHANGELOG -> { SectionTitle("更新日志"); ChangelogContent() }
-            SettingsPage.PRIVACY -> { SectionTitle("隐私政策"); PrivacyPolicyContent() }
-            SettingsPage.HELP -> { SectionTitle("使用帮助"); HelpContent() }
+            SettingsPage.CHANGELOG -> { SectionTitle(stringResource(R.string.settings_page_changelog)); ChangelogContent() }
+            SettingsPage.PRIVACY -> { SectionTitle(stringResource(R.string.settings_page_privacy)); PrivacyPolicyContent() }
+            SettingsPage.HELP -> { SectionTitle(stringResource(R.string.settings_page_help)); HelpContent() }
             SettingsPage.DIAGNOSIS -> {
-                SectionTitle("高级设置")
+                SectionTitle(stringResource(R.string.settings_page_diagnosis))
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsSegmentedRow(Icons.Rounded.CleaningServices, "照片清理模式", stringResource(settings.photoCleanMode.labelRes), photoCleanModeOptions(), settings.photoCleanMode.name, onSelected = { onSuccess(); viewModel.setPhotoCleanMode(PhotoCleanMode.valueOf(it)) }) },
-                    { SettingsRow(Icons.Rounded.Info, "导出闪退日志", "自动记录最近 8 次闪退，方便后续 debug", onClick = { onTick(); if (!shareCrashLogs(context)) viewModel.showMessage("暂无闪退日志") }) },
+                    { SettingsSegmentedRow(Icons.Rounded.CleaningServices, stringResource(R.string.settings_photo_clean_mode), stringResource(settings.photoCleanMode.labelRes), photoCleanModeOptions(), settings.photoCleanMode.name, onSelected = { onSuccess(); viewModel.setPhotoCleanMode(PhotoCleanMode.valueOf(it)) }) },
+                    { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_export_crash_logs), stringResource(R.string.settings_export_crash_logs_desc), onClick = { onTick(); if (!shareCrashLogs(context)) viewModel.showMessage(context.getString(R.string.settings_no_crash_logs)) }) },
                 ))
                 Text(stringResource(settings.photoCleanMode.descriptionRes), modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
