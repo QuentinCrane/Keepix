@@ -91,6 +91,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -1015,6 +1016,7 @@ private fun HapticLevelChip(
     }
 }
 
+/*
 @Composable
 private fun ChangelogContent() {
     ContentCard(
@@ -1275,6 +1277,39 @@ private fun HelpContent() {
             ),
         ),
     )
+}
+*/
+
+@Composable
+private fun ChangelogContent() {
+    ContentCard(
+        title = stringResource(R.string.settings_changelog_content_title),
+        subtitle = stringResource(R.string.settings_changelog_content_subtitle, BuildConfig.VERSION_NAME),
+        sections = parseSettingsSections(stringArrayResource(R.array.settings_changelog_sections)),
+    )
+}
+
+@Composable
+private fun PrivacyPolicyContent() {
+    ContentCard(
+        title = stringResource(R.string.settings_privacy_content_title),
+        subtitle = stringResource(R.string.settings_privacy_content_subtitle),
+        sections = parseSettingsSections(stringArrayResource(R.array.settings_privacy_sections)),
+    )
+}
+
+@Composable
+private fun HelpContent() {
+    ContentCard(
+        title = stringResource(R.string.settings_help_content_title),
+        subtitle = stringResource(R.string.settings_help_content_subtitle),
+        sections = parseSettingsSections(stringArrayResource(R.array.settings_help_sections)),
+    )
+}
+
+private fun parseSettingsSections(entries: Array<String>): List<Pair<String, List<String>>> = entries.map { entry ->
+    val parts = entry.split("||", limit = 2)
+    parts.first() to parts.getOrElse(1) { "" }.split('|').filter(String::isNotBlank)
 }
 
 @Composable

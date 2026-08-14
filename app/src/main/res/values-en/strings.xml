@@ -665,4 +665,55 @@
     <string name="settings_haptic_enabled">Enabled; swipes provide haptic feedback</string>
     <string name="settings_haptic_disabled">Disabled; swipes provide no haptic feedback</string>
     <string name="settings_haptic_preview_hint">Preview haptic strength for each action; tap to change the current global strength</string>
+    <string name="settings_changelog_content_title">Keepix development history</string>
+    <string name="settings_changelog_content_subtitle">Current version: %1$s</string>
+    <string name="settings_privacy_content_title">Privacy policy</string>
+    <string name="settings_privacy_content_subtitle">Keepix is a local photo organizer with no accounts, memberships, payments, ad tracking or cloud sync.</string>
+    <string name="settings_help_content_title">Help</string>
+    <string name="settings_help_content_subtitle">Follow the cleaning flow; every action centers on photos, videos, filters and the trash.</string>
+    <string-array name="settings_changelog_sections">
+        <item>v2.3.3 · Daily summary stickers and export||The home page restores Today in History and Daily Summary as separate entries. Daily Summary opens as a sticker dialog. |Daily Summary stickers can be exported and shared without storage permission.</item>
+        <item>v2.3.2 · Photo deck animation and queue stability||Improved drag, fly-out and refill animations to reduce flashes and jumps. |Fixed aspect handling for long, screenshot and wide photos and stabilized queue refill after actions.</item>
+        <item>v2.2.9 · Motion photos, GIFs, achievements and release polish||Scanning recognizes GIF, HEIC/HEIF/WEBP motion clues and common motion-photo names. |Cleaning, favorites, trash, timeline and previews share GIF and motion playback support. |Similarity detection, the achievement cabinet, reclaimable-space hints and release shrinking were upgraded.</item>
+        <item>v2.2.8 · Video controls and settings transition fixes||Removed obstructive large video controls and changed settings subpages to stable single-page replacement.</item>
+        <item>v2.2.7 · Real similarity progress and anti-stall work||Progress now follows processed items, thumbnail fingerprints are reused and unsuitable files are skipped. |Hash-bucket candidates reduce long pauses in large libraries.</item>
+        <item>v2.2.6 · Lighter video controls||Video actions and playback hints use lighter translucent controls while keeping haptic feedback.</item>
+        <item>v2.2.5 · Memories, system deletion, video pause and background detection||Today in History supports mixed photo and video memories, and video pages support pause. |Permanent trash deletion uses Android authorization and similarity detection can resume in the background.</item>
+        <item>v2.2.3 · Release stability, shuffle and guided tips||Improved tablet navigation, similarity detection and random queues. |The onboarding guide now points at real page regions and reduces decoding and prefetch pressure.</item>
+        <item>v2.2.2 · Favorite preview and complete history||Favorite photos support full-screen preview, zoom and album, share and trash actions. |Early development history was filled in.</item>
+        <item>v2.2.1 · Trash preview and safer gestures||Trash photos support preview and zoom, while gestures use direction locking and main-axis checks. |Higher delete thresholds make release actions clearer.</item>
+        <item>v2.2.0 · Gallery viewing, zoom and haptics||Photo preview supports zoom, double tap and panning, with URI permission fallbacks for gallery viewing. |Dock navigation provides light haptic feedback.</item>
+        <item>v2.1.9 · Stability and navigation links||Fixed gallery positioning, player lifecycle and live organizer previews. |Settings use predictive back and Me links consistently to help, privacy and diagnostics.</item>
+        <item>v2.1.8 · Queue and documentation fixes||Expanded continuous photo and video buffers and improved centered layouts. |Completed settings help and release-script notes.</item>
+        <item>v2.1.7 · Compact cleaning pages||Cleaning pages focus on the media, information and remaining count, with keep, shuffle and filters grouped at the top. |Video shuffle moved into the top controls.</item>
+        <item>v2.1.6 · Shuffle and structure fixes||Fixed reshuffle, top controls and video preparation states and simplified Compose nesting.</item>
+        <item>v2.1.5 · Viewing and queue experience||Today in History and cleaning pages support direct viewing and show less empty-queue flashing. |More album metadata prepares viewing and archiving.</item>
+        <item>v2.1.4 · Visual customization||Settings gained primary and secondary menus plus live component previews. |Photo and video pages support manual reshuffle.</item>
+        <item>v2.1.3 · Dark mode and excluded folders||Unified dark-mode contrast for cards, text and backgrounds. |Excluded folders prefer the system picker with manual input as fallback.</item>
+        <item>v2.1.2 · Photo and video switch||The home cleaning entry switches between photos and videos with a consistent flow and fade transition.</item>
+        <item>v2.1.1 · Tablet and home details||Improved wide-screen entry cards, tablet spacing and the start-cleaning button.</item>
+        <item>v2.1.0 · Home, Me and core feature integration||The home page groups photos, videos, trash, favorites and common entries. |Bottom Dock and large-screen rail navigation form the base shell.</item>
+        <item>v2.0.0 · Local photo and video organizer||MediaStore indexing supports keep, favorite, trash and undo for photos and videos. |Similarity, timeline, Today in History, trash and favorites are included.</item>
+        <item>Early versions · Keepix foundation||A lightweight local album-cleaning experience with no accounts, memberships, payments or cloud sync. |The product direction centers on photo/video cleaning, gestures and native gallery links.</item>
+    </string-array>
+    <string-array name="settings_privacy_sections">
+        <item>1. Permissions we use||Photo and video access reads MediaStore and builds a local index. |Move, trash and permanent deletion request system authorization only after you act. |The app does not read contacts, location, microphone or camera in the background.</item>
+        <item>2. Data handling||Media stays in the device gallery; Keepix does not upload, copy or sync photos and videos. |Indexes, cleanup state, fingerprints, exclusions and preferences stay local.</item>
+        <item>3. Deletion, restore and space||Pending items go through the app or system trash flow. |Permanent deletion requests Android authorization and may be irreversible. |Reclaimable space is a local file-size estimate.</item>
+        <item>4. Backup and export||Backups may include media paths, cleanup state, exclusions and preferences. |You control where backups are saved, shared or deleted; uninstall does not delete gallery originals.</item>
+        <item>5. Third parties and network||The current version has no accounts, payments, ad SDK or behavior tracking. |Core cleaning does not require a network.</item>
+        <item>6. Your control||You can revoke media access in system settings and refresh the library, manage trash or clear cache in the app. |Add excluded folders to keep directories out of the queue.</item>
+    </string-array>
+    <string-array name="settings_help_sections">
+        <item>v2.2.5 · Memories, system deletion, video pause and background detection||Today in History supports mixed memories, video pause, system-confirmed permanent deletion and resumable similarity detection.</item>
+        <item>1. First use||Grant photo and video access to build a local MediaStore index. |If counts look wrong, open Data and updates and run media library maintenance.</item>
+        <item>2. Guided tips||The first cleaning session points at the real top, center, bottom and action regions. |Replay it from Data and updates.</item>
+        <item>3. Photo cleaning||The top keep button keeps the current photo and reshuffle creates a new queue. |Photo and time filters cover all, normal, screenshots, selfies, motion, long images and recent ranges. |Tap the photo or info bar to zoom.</item>
+        <item>4. Gestures||Swipe horizontally to keep and vertically to favorite or trash; direction is configurable. |Lower sensitivity or use the top buttons if you are concerned about mistakes.</item>
+        <item>5. Albums and excluded folders||Choose an archive album from the album button; auto-archive can move kept or favorited media. |Excluded folders keep screenshots and downloads out of the queue.</item>
+        <item>6. Video cleaning||Video cleaning uses an up/down feed. |Reshuffle is at the top; ratio, default mute and progress are configurable.</item>
+        <item>7. Favorites and preview||Favorites collect photos and videos. |Photo preview supports double tap, pinch and pan, with gallery, share and trash actions below.</item>
+        <item>8. Trash and undo||Use undo first after a mistake. |Trash items can be restored or permanently deleted; confirm permanent deletion carefully.</item>
+        <item>9. Common questions||The queue is buffered and is not the total gallery count. |Refresh the library and check exclusions when media is missing. |Re-enter the page after changing dark-mode contrast.</item>
+    </string-array>
 </resources>
