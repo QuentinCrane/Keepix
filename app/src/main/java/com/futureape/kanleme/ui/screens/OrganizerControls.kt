@@ -40,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -62,7 +63,6 @@ import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.util.formatSize
 import java.util.Calendar
 import java.util.Locale
-import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun OrganizerProgressPill(
@@ -241,18 +241,22 @@ fun OrganizerDatePickerOverlay(
             ) {
                 Column {
                     Text(
-                        selectedYear.toString() + " 年",
+                        stringResource(R.string.organizer_date_year, selectedYear),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Black,
                     )
                     Text(
-                        if (selectedMonths.isEmpty()) "点选月份，长按月份可多选" else "已选 " + selectedMonths.size + " 个月",
+                        if (selectedMonths.isEmpty()) {
+                            stringResource(R.string.organizer_month_selection_hint)
+                        } else {
+                            stringResource(R.string.organizer_selected_months, selectedMonths.size)
+                        },
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 TextButton(onClick = { onApply("y:" + selectedYear); onDismiss() }) {
-                    Text("整年")
+                    Text(stringResource(R.string.organizer_full_year))
                 }
             }
 
@@ -293,7 +297,11 @@ fun OrganizerDatePickerOverlay(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
-                            Text(month.toString() + "月", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                stringResource(R.string.organizer_month_label, month),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
                             if (selected) {
                                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
                                     Icon(
@@ -320,7 +328,7 @@ fun OrganizerDatePickerOverlay(
                     .padding(top = 12.dp, bottom = 12.dp),
                 enabled = selectedMonths.isNotEmpty(),
             ) {
-                Text("确定多选")
+                Text(stringResource(R.string.organizer_confirm_months))
             }
         }
     }
@@ -372,7 +380,11 @@ fun OrganizerFolderPickerOverlay(
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
-                        Text("选择后确认，当前媒体会直接归档并进入下一项", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            stringResource(R.string.organizer_folder_description),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     Spacer(Modifier.width(48.dp))
                 }
@@ -384,7 +396,7 @@ fun OrganizerFolderPickerOverlay(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(folderItems) { path ->
-                        val label = folderLabel(path)
+                        val label = folderLabel(path, stringResource(R.string.organizer_album_fallback))
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -423,28 +435,35 @@ fun OrganizerFolderPickerOverlay(
         AlertDialog(
             onDismissRequest = { pendingFolder = null },
             icon = { Icon(Icons.Rounded.Schedule, contentDescription = null) },
-            title = { Text("确定归档？") },
-            text = { Text("移动到 " + folderLabel(target) + " 后，会直接进入下一项") },
+            title = { Text(stringResource(R.string.organizer_archive_confirm_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.organizer_archive_confirm_text,
+                        folderLabel(target, stringResource(R.string.organizer_album_fallback)),
+                    ),
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     pendingFolder = null
                     onArchive(target)
                     onDismiss()
                 }) {
-                    Text("确定")
+                    Text(stringResource(R.string.organizer_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingFolder = null }) {
-                    Text("取消")
+                    Text(stringResource(R.string.organizer_cancel))
                 }
             },
         )
     }
 }
 
-fun folderLabel(path: String): String =
-    path.trim('/').substringAfterLast('/').ifBlank { "相册" }
+fun folderLabel(path: String, fallback: String): String =
+    path.trim('/').substringAfterLast('/').ifBlank { fallback }
 
 @Composable
 fun organizerDateModeLabel(mode: String): String = when {

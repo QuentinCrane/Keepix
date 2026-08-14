@@ -517,6 +517,17 @@
     <string name="photo_compare_checking">Checking images</string>
     <string name="photo_compare_empty_title">No images received</string>
     <string name="photo_compare_received">Received %1$d images</string>
+    <string name="organizer_month_selection_hint">Select months; long-press to select multiple</string>
+    <string name="organizer_selected_months">%1$d months selected</string>
+    <string name="organizer_full_year">Full year</string>
+    <string name="organizer_month_label">%1$d month</string>
+    <string name="organizer_confirm_months">Confirm selection</string>
+    <string name="organizer_folder_description">Confirm after choosing; the current media will be archived and move to the next item</string>
+    <string name="organizer_album_fallback">Album</string>
+    <string name="organizer_archive_confirm_title">Archive this item?</string>
+    <string name="organizer_archive_confirm_text">Moving to %1$s will move to the next item</string>
+    <string name="organizer_confirm">Confirm</string>
+    <string name="organizer_cancel">Cancel</string>
     <string name="permission_title">Photo library access required</string>
     <string name="permission_intro">Keepix organizes your full photo library, so it needs access to photos and videos. Scanning stays on this device and media files are never uploaded.</string>
     <string name="permission_platform_notice">On Android 14 and later, choosing “Select photos and videos” only allows Keepix to clean the selected items. Choose all photos and videos in the system dialog for full-library cleaning.</string>

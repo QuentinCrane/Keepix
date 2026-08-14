@@ -517,6 +517,17 @@
     <string name="photo_compare_checking">正在检查图片</string>
     <string name="photo_compare_empty_title">没有收到图片</string>
     <string name="photo_compare_received">已接收 %1$d 张</string>
+    <string name="organizer_month_selection_hint">点选月份，长按月份可多选</string>
+    <string name="organizer_selected_months">已选 %1$d 个月</string>
+    <string name="organizer_full_year">整年</string>
+    <string name="organizer_month_label">%1$d 月</string>
+    <string name="organizer_confirm_months">确定多选</string>
+    <string name="organizer_folder_description">选择后确认，当前媒体会直接归档并进入下一项</string>
+    <string name="organizer_album_fallback">相册</string>
+    <string name="organizer_archive_confirm_title">确定归档？</string>
+    <string name="organizer_archive_confirm_text">移动到 %1$s 后，会直接进入下一项</string>
+    <string name="organizer_confirm">确定</string>
+    <string name="organizer_cancel">取消</string>
     <string name="permission_title">需要访问相册</string>
     <string name="permission_intro">看了么的核心功能是全相册整理，所以需要读取照片和视频。所有扫描都在本机完成，不上传媒体文件。</string>
     <string name="permission_platform_notice">Android 14 及以上如果选择“选择照片和视频”，只能整理你选中的部分内容；要做全相册整理，请在系统弹窗里选择允许访问所有照片和视频。</string>

@@ -517,6 +517,17 @@
     <string name="photo_compare_checking">正在檢查圖片</string>
     <string name="photo_compare_empty_title">沒有收到圖片</string>
     <string name="photo_compare_received">已接收 %1$d 張</string>
+    <string name="organizer_month_selection_hint">點選月份，長按月份可多選</string>
+    <string name="organizer_selected_months">已選 %1$d 個月</string>
+    <string name="organizer_full_year">整年</string>
+    <string name="organizer_month_label">%1$d 月</string>
+    <string name="organizer_confirm_months">確定多選</string>
+    <string name="organizer_folder_description">選擇後確認，目前媒體會直接歸檔並進入下一項</string>
+    <string name="organizer_album_fallback">相簿</string>
+    <string name="organizer_archive_confirm_title">確定歸檔？</string>
+    <string name="organizer_archive_confirm_text">移動到 %1$s 後，會直接進入下一項</string>
+    <string name="organizer_confirm">確定</string>
+    <string name="organizer_cancel">取消</string>
     <string name="permission_title">需要存取相簿</string>
     <string name="permission_intro">看了麼的核心功能是全相簿整理，所以需要讀取照片和影片。所有掃描都在本機完成，不上傳媒體檔案。</string>
     <string name="permission_platform_notice">Android 14 及以上如果選擇「選擇照片和影片」，只能整理你選取的部分內容；若要整理完整相簿，請在系統對話框中選擇允許存取所有照片和影片。</string>
