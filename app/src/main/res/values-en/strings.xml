@@ -590,6 +590,7 @@
     <string name="a11y_delete">Pending delete</string>
     <string name="a11y_shuffle">Shuffle again</string>
     <string name="a11y_more_actions">More actions</string>
+    <string name="a11y_settings">Settings</string>
     <string name="a11y_apply_day_memory">Apply this day</string>
     <string name="a11y_memory_jump">Return to the last deleted position</string>
     <string name="action_undo">Undo last action</string>

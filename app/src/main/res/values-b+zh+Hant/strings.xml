@@ -590,6 +590,7 @@
     <string name="a11y_delete">待刪</string>
     <string name="a11y_shuffle">重新隨機</string>
     <string name="a11y_more_actions">更多操作</string>
+    <string name="a11y_settings">設定</string>
     <string name="a11y_apply_day_memory">套用這一天</string>
     <string name="a11y_memory_jump">回到剛才刪除的位置</string>
     <string name="action_undo">撤銷上一步</string>

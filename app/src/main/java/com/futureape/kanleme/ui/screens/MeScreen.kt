@@ -105,7 +105,11 @@ fun MeScreen(
                             color = Color.White,
                             fontWeight = FontWeight.Black,
                         )
-                        RoundIconSurface(icon = Icons.Rounded.Settings, onClick = onSettings)
+                        RoundIconSurface(
+                            icon = Icons.Rounded.Settings,
+                            contentDescription = stringResource(R.string.a11y_settings),
+                            onClick = onSettings,
+                        )
                     }
                 }
 
@@ -205,7 +209,11 @@ private fun UsageHeroCard(
                     )
                     Text(stringResource(if (historicalFreed > 0L) R.string.me_historical_freed else R.string.me_estimated_freed), style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.58f), fontWeight = FontWeight.Bold)
                 }
-                RoundIconSurface(icon = Icons.Rounded.Refresh, onClick = onRefresh)
+                RoundIconSurface(
+                    icon = Icons.Rounded.Refresh,
+                    contentDescription = stringResource(R.string.a11y_refresh),
+                    onClick = onRefresh,
+                )
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 HeroMetric(stringResource(R.string.me_browsed), dashboard.processedCount.toString(), Modifier.weight(1f))
@@ -345,7 +353,7 @@ private fun ProfileRow(
 }
 
 @Composable
-private fun RoundIconSurface(icon: ImageVector, onClick: () -> Unit) {
+private fun RoundIconSurface(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier.size(52.dp),
@@ -355,7 +363,7 @@ private fun RoundIconSurface(icon: ImageVector, onClick: () -> Unit) {
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+            Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(24.dp))
         }
     }
 }
