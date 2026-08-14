@@ -114,7 +114,8 @@ class StatsEventDaoTest {
         val aggregate = dao.aggregateEvents(start, end)
         val months = dao.monthlyEventCounts(start, end)
         val folder = dao.topFolderForPeriod(start, end)
-        val empty = dao.aggregateEvents(end, end + 365L * 24L * 60L * 60L * 1_000L)
+        val emptyStart = end + 1L
+        val empty = dao.aggregateEvents(emptyStart, emptyStart + 365L * 24L * 60L * 60L * 1_000L)
 
         assertEquals(1L, aggregate.photoDelta)
         assertEquals("02", months.single().month)
