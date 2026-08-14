@@ -38,7 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -95,11 +96,12 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
     val todayInHistoryVideos by viewModel.todayInHistoryVideos.collectAsStateWithLifecycle()
     val backStack by navController.currentBackStackEntryAsState()
     val current = backStack?.destination?.route ?: Destinations.HOME
-    val configuration = LocalConfiguration.current
-    val screenWidthDp = configuration.screenWidthDp
-    val screenHeightDp = configuration.screenHeightDp
+    val windowSize = LocalWindowInfo.current.containerSize
+    val density = LocalDensity.current
+    val screenWidthDp = with(density) { windowSize.width.toDp() }
+    val screenHeightDp = with(density) { windowSize.height.toDp() }
     // 平板竖屏仍使用底部 Dock；只有横屏或超宽屏才切换到左侧 Rail。
-    val useSideRail = screenWidthDp >= 840 && screenWidthDp > screenHeightDp && current in setOf(Destinations.HOME, Destinations.ME)
+    val useSideRail = screenWidthDp >= 840.dp && screenWidthDp > screenHeightDp && current in setOf(Destinations.HOME, Destinations.ME)
     val homeBottomPadding = if (useSideRail) 30.dp else 108.dp
     val haptic = rememberHapticKit(settings)
     val openTodayInHistory = {

@@ -923,13 +923,13 @@ private fun PhotoOrganizerTopControls(
     selectedMediaIndex: Int,
     dateMode: String,
     randomEnabled: Boolean,
+    modifier: Modifier = Modifier,
     showShuffle: Boolean = true,
     showFilters: Boolean = true,
     showRemaining: Boolean = true,
     onShuffle: () -> Unit,
     onMediaSelected: (Int) -> Unit,
     onDateClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     var openPanel by remember { mutableStateOf<PhotoQuickPanel?>(null) }
     val dateLabel = organizerDateModeLabel(dateMode)
