@@ -94,6 +94,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.futureape.kanleme.BuildConfig
 import com.futureape.kanleme.data.settings.AppSettings
@@ -121,18 +122,18 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.futureape.kanleme.ui.i18n.Text
 
-private enum class SettingsPage(val title: String) {
-    HOME("设置"),
-    CLEANING_DISPLAY("整理页面显示"),
-    ORGANIZE("整理方式"),
-    EXCLUDED_FOLDERS("排除文件夹"),
-    EXPERIENCE("操作体验"),
-    APPEARANCE("外观显示"),
-    DATA("数据与更新"),
-    CHANGELOG("更新日志"),
-    PRIVACY("隐私政策"),
-    HELP("使用帮助"),
-    DIAGNOSIS("高级设置"),
+private enum class SettingsPage(@StringRes val titleRes: Int) {
+    HOME(R.string.settings_page_home),
+    CLEANING_DISPLAY(R.string.settings_page_cleaning_display),
+    ORGANIZE(R.string.settings_page_organize),
+    EXCLUDED_FOLDERS(R.string.settings_page_excluded_folders),
+    EXPERIENCE(R.string.settings_page_experience),
+    APPEARANCE(R.string.settings_page_appearance),
+    DATA(R.string.settings_page_data),
+    CHANGELOG(R.string.settings_page_changelog),
+    PRIVACY(R.string.settings_page_privacy),
+    HELP(R.string.settings_page_help),
+    DIAGNOSIS(R.string.settings_page_diagnosis),
 }
 
 private enum class SettingsSheet {
@@ -252,8 +253,10 @@ fun SettingsScreen(
                     ) {
                         item {
                             SettingsHeader(
-                                title = animatedPage.title,
-                                subtitle = if (animatedPage == SettingsPage.HOME) "一级菜单" else "二级设置 · 修改后立即生效",
+                                title = stringResource(animatedPage.titleRes),
+                                subtitle = stringResource(
+                                    if (animatedPage == SettingsPage.HOME) R.string.settings_primary_menu else R.string.settings_secondary_menu,
+                                ),
                                 onBack = {
                                     haptics.tick()
                                     if (animatedPage == SettingsPage.HOME) onBack() else pageName = SettingsPage.HOME.name
@@ -319,21 +322,21 @@ private fun SettingsPageContent(
         when (page) {
             SettingsPage.HOME -> {
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.Rounded.Layers, "整理方式", "范围、排序、批次数量、删除模式", color = Color(0xFF86A7FF), showIcon = false, onClick = { goTo(SettingsPage.ORGANIZE) }) },
-                    { SettingsRow(Icons.Rounded.Visibility, "整理页面显示", cleaningDisplaySummary(settings), color = Color(0xFF86A7FF), showIcon = false, onClick = { goTo(SettingsPage.CLEANING_DISPLAY) }) },
-                    { SettingsRow(Icons.Rounded.TouchApp, "操作体验", stringResource(settings.swipeSensitivity.labelRes) + " · " + stringResource(settings.gestureDirection.labelRes) + " · 音效" + if (settings.swipeSound) "已开" else "已关", color = Color(0xFFD44C84), showIcon = false, onClick = { goTo(SettingsPage.EXPERIENCE) }) },
-                    { SettingsSwitchRow(Icons.Rounded.Vibration, "震动反馈", stringResource(settings.hapticLevel.labelRes), checked = settings.hapticLevel != HapticLevel.OFF, onCheckedChange = { onTick(); viewModel.setHapticLevel(if (it) HapticLevel.MEDIUM else HapticLevel.OFF) }, color = Color(0xFF86A7FF), showIcon = false) },
-                    { SettingsSwitchRow(Icons.Rounded.Visibility, "照片光效", if (settings.photoShowGestureHint) "删除和收藏时显示光效" else "已关闭", checked = settings.photoShowGestureHint, onCheckedChange = { onTick(); viewModel.setPhotoShowGestureHint(it) }, color = Color(0xFF86A7FF), showIcon = false) },
-                    { SettingsSwitchRow(Icons.Rounded.Movie, "视频进度条", if (settings.videoShowProgressBar) "细条" else "隐藏", checked = settings.videoShowProgressBar, onCheckedChange = { onTick(); viewModel.setVideoShowProgressBar(it) }, color = Color(0xFFB884FF), showIcon = false) },
-                    { SettingsRow(Icons.Rounded.Block, "排除文件夹", if (settings.excludedFolderPaths.isEmpty()) "单独管理" else "已排除 " + settings.excludedFolderPaths.size + " 个文件夹", color = Color(0xFFE46A62), showIcon = false, onClick = { goTo(SettingsPage.EXCLUDED_FOLDERS) }) },
-                    { SettingsRow(Icons.Rounded.CleaningServices, "数据与更新", "媒体库维护、更新日志、帮助、隐私", color = Color(0xFF6D9E65), showIcon = false, onClick = { goTo(SettingsPage.DATA) }) },
+                    { SettingsRow(Icons.Rounded.Layers, stringResource(R.string.settings_organize), stringResource(R.string.settings_organize_summary), color = Color(0xFF86A7FF), showIcon = false, onClick = { goTo(SettingsPage.ORGANIZE) }) },
+                    { SettingsRow(Icons.Rounded.Visibility, stringResource(R.string.settings_cleaning_display), cleaningDisplaySummary(settings), color = Color(0xFF86A7FF), showIcon = false, onClick = { goTo(SettingsPage.CLEANING_DISPLAY) }) },
+                    { SettingsRow(Icons.Rounded.TouchApp, stringResource(R.string.settings_experience), stringResource(R.string.settings_sound_summary, stringResource(settings.swipeSensitivity.labelRes), stringResource(settings.gestureDirection.labelRes), stringResource(if (settings.swipeSound) R.string.settings_sound_on else R.string.settings_sound_off)), color = Color(0xFFD44C84), showIcon = false, onClick = { goTo(SettingsPage.EXPERIENCE) }) },
+                    { SettingsSwitchRow(Icons.Rounded.Vibration, stringResource(R.string.settings_haptic_feedback), stringResource(settings.hapticLevel.labelRes), checked = settings.hapticLevel != HapticLevel.OFF, onCheckedChange = { onTick(); viewModel.setHapticLevel(if (it) HapticLevel.MEDIUM else HapticLevel.OFF) }, color = Color(0xFF86A7FF), showIcon = false) },
+                    { SettingsSwitchRow(Icons.Rounded.Visibility, stringResource(R.string.settings_photo_lighting), if (settings.photoShowGestureHint) stringResource(R.string.settings_photo_lighting_on) else stringResource(R.string.settings_closed), checked = settings.photoShowGestureHint, onCheckedChange = { onTick(); viewModel.setPhotoShowGestureHint(it) }, color = Color(0xFF86A7FF), showIcon = false) },
+                    { SettingsSwitchRow(Icons.Rounded.Movie, stringResource(R.string.settings_video_progress), if (settings.videoShowProgressBar) stringResource(R.string.settings_progress_thin) else stringResource(R.string.settings_hidden), checked = settings.videoShowProgressBar, onCheckedChange = { onTick(); viewModel.setVideoShowProgressBar(it) }, color = Color(0xFFB884FF), showIcon = false) },
+                    { SettingsRow(Icons.Rounded.Block, stringResource(R.string.settings_excluded_folders), if (settings.excludedFolderPaths.isEmpty()) stringResource(R.string.settings_excluded_manage) else stringResource(R.string.settings_excluded_count, settings.excludedFolderPaths.size), color = Color(0xFFE46A62), showIcon = false, onClick = { goTo(SettingsPage.EXCLUDED_FOLDERS) }) },
+                    { SettingsRow(Icons.Rounded.CleaningServices, stringResource(R.string.settings_data_updates), stringResource(R.string.settings_data_updates_summary), color = Color(0xFF6D9E65), showIcon = false, onClick = { goTo(SettingsPage.DATA) }) },
                 ))
-                SectionTitle("服务与支持")
+                SectionTitle(stringResource(R.string.settings_service_support))
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsRow(Icons.AutoMirrored.Rounded.Help, "常见问题", "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.HELP) }) },
-                    { SettingsRow(Icons.Rounded.Info, "隐私说明", "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.PRIVACY) }) },
-                    { SettingsRow(Icons.Rounded.Info, "更新日志", BuildConfig.VERSION_NAME, color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.CHANGELOG) }) },
-                    { SettingsRow(Icons.Rounded.Tune, "高级设置", "诊断和清理模式", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.DIAGNOSIS) }) },
+                    { SettingsRow(Icons.AutoMirrored.Rounded.Help, stringResource(R.string.settings_faq), "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.HELP) }) },
+                    { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_privacy), "", color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.PRIVACY) }) },
+                    { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_changelog), BuildConfig.VERSION_NAME, color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.CHANGELOG) }) },
+                    { SettingsRow(Icons.Rounded.Tune, stringResource(R.string.settings_advanced), stringResource(R.string.settings_advanced_summary), color = Color(0xFF8FA0FF), showIcon = false, onClick = { goTo(SettingsPage.DIAGNOSIS) }) },
                 ))
             }
 
@@ -359,26 +362,26 @@ private fun SettingsPageContent(
             }
 
             SettingsPage.ORGANIZE -> {
-                SectionTitle("照片默认")
+                SectionTitle(stringResource(R.string.settings_photo_defaults))
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsSegmentedRow(Icons.Rounded.CalendarToday, "整理范围", organizerDateModeLabel(settings.photoDateMode), settingsDateModeOptions(), settings.photoDateMode, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoDateMode(it) }) },
-                    { SettingsSegmentedRow(Icons.Rounded.Image, "照片类型", settingsPhotoTypeLabel(settings.photoMediaType), settingsPhotoTypeOptions(), settings.photoMediaType, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoTypeFilter(it) }) },
-                    { SettingsSegmentedRow(Icons.Rounded.Tune, "排序", settingsSortLabel(settings.photoSortOrder), settingsSortOptions(), settings.photoSortOrder, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoSortOrder(it) }) },
-                    { SettingsStepperRow(Icons.Rounded.Layers, "本次整理目标", settings.photoBatchSize.toString() + " 张", color = Color(0xFF86A7FF), onDecrease = { onTick(); viewModel.setPhotoBatchSize(settings.photoBatchSize - 10) }, onIncrease = { onTick(); viewModel.setPhotoBatchSize(settings.photoBatchSize + 10) }) },
-                    { SettingsSegmentedRow(Icons.Rounded.CalendarToday, "那年今日入口", todayEntryModeLabel(settings.todayInHistoryEntryMode), todayEntryModeOptions(), settings.todayInHistoryEntryMode.name, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setTodayInHistoryEntryMode(TodayInHistoryEntryMode.valueOf(it)) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.CalendarToday, stringResource(R.string.settings_scope), organizerDateModeLabel(settings.photoDateMode), settingsDateModeOptions(), settings.photoDateMode, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoDateMode(it) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Image, stringResource(R.string.settings_photo_type), settingsPhotoTypeLabel(settings.photoMediaType), settingsPhotoTypeOptions(), settings.photoMediaType, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoTypeFilter(it) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Tune, stringResource(R.string.settings_sort), settingsSortLabel(settings.photoSortOrder), settingsSortOptions(), settings.photoSortOrder, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setPhotoSortOrder(it) }) },
+                    { SettingsStepperRow(Icons.Rounded.Layers, stringResource(R.string.settings_batch_target), stringResource(R.string.settings_batch_photos, settings.photoBatchSize), color = Color(0xFF86A7FF), onDecrease = { onTick(); viewModel.setPhotoBatchSize(settings.photoBatchSize - 10) }, onIncrease = { onTick(); viewModel.setPhotoBatchSize(settings.photoBatchSize + 10) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.CalendarToday, stringResource(R.string.settings_today_history_entry), todayEntryModeLabel(settings.todayInHistoryEntryMode), todayEntryModeOptions(), settings.todayInHistoryEntryMode.name, color = Color(0xFF86A7FF), onSelected = { onTick(); viewModel.setTodayInHistoryEntryMode(TodayInHistoryEntryMode.valueOf(it)) }) },
                 ))
-                SectionTitle("视频默认")
+                SectionTitle(stringResource(R.string.settings_video_defaults))
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsSegmentedRow(Icons.Rounded.CalendarToday, "整理范围", organizerDateModeLabel(settings.videoDateMode), settingsDateModeOptions(), settings.videoDateMode, color = Color(0xFFB8E95E), onSelected = { onTick(); viewModel.setVideoDateMode(it) }) },
-                    { SettingsSegmentedRow(Icons.Rounded.Tune, "排序", settingsSortLabel(settings.videoSortOrder), settingsSortOptions(), settings.videoSortOrder, color = Color(0xFFB8E95E), onSelected = { onTick(); viewModel.setVideoSortOrder(it) }) },
-                    { SettingsStepperRow(Icons.Rounded.Layers, "本次整理目标", settings.videoBatchSize.toString() + " 个", color = Color(0xFFB8E95E), onDecrease = { onTick(); viewModel.setVideoBatchSize(settings.videoBatchSize - 10) }, onIncrease = { onTick(); viewModel.setVideoBatchSize(settings.videoBatchSize + 10) }) },
-                    { SettingsSwitchRow(Icons.Rounded.Movie, "视频进度条", if (settings.videoShowProgressBar) "细条常驻显示" else "已隐藏", checked = settings.videoShowProgressBar, onCheckedChange = { onTick(); viewModel.setVideoShowProgressBar(it) }, color = Color(0xFFB8E95E)) },
+                    { SettingsSegmentedRow(Icons.Rounded.CalendarToday, stringResource(R.string.settings_scope), organizerDateModeLabel(settings.videoDateMode), settingsDateModeOptions(), settings.videoDateMode, color = Color(0xFFB8E95E), onSelected = { onTick(); viewModel.setVideoDateMode(it) }) },
+                    { SettingsSegmentedRow(Icons.Rounded.Tune, stringResource(R.string.settings_sort), settingsSortLabel(settings.videoSortOrder), settingsSortOptions(), settings.videoSortOrder, color = Color(0xFFB8E95E), onSelected = { onTick(); viewModel.setVideoSortOrder(it) }) },
+                    { SettingsStepperRow(Icons.Rounded.Layers, stringResource(R.string.settings_batch_target), stringResource(R.string.settings_batch_videos, settings.videoBatchSize), color = Color(0xFFB8E95E), onDecrease = { onTick(); viewModel.setVideoBatchSize(settings.videoBatchSize - 10) }, onIncrease = { onTick(); viewModel.setVideoBatchSize(settings.videoBatchSize + 10) }) },
+                    { SettingsSwitchRow(Icons.Rounded.Movie, stringResource(R.string.settings_video_progress), if (settings.videoShowProgressBar) stringResource(R.string.settings_video_progress_persistent) else stringResource(R.string.settings_hidden), checked = settings.videoShowProgressBar, onCheckedChange = { onTick(); viewModel.setVideoShowProgressBar(it) }, color = Color(0xFFB8E95E)) },
                 ))
-                SectionTitle("整理方式")
+                SectionTitle(stringResource(R.string.settings_cleaning_method))
                 SettingsGroup(listOf<@Composable () -> Unit>(
-                    { SettingsSegmentedRow(Icons.Rounded.Delete, "删除模式", stringResource(settings.deleteMode.labelRes), deleteModeOptions(), settings.deleteMode.name, color = Color(0xFFDD5A56), onSelected = { onTick(); viewModel.setDeleteMode(DeleteMode.valueOf(it)) }) },
-                    { SettingsSwitchRow(Icons.AutoMirrored.Rounded.DriveFileMove, "移动到文件夹时", if (settings.autoMoveOnKeepFavorite) "保留和收藏时允许指定归档移动" else "关闭后只记录整理状态，不移动原文件", checked = settings.autoMoveOnKeepFavorite, onCheckedChange = { onTick(); viewModel.setAutoMoveOnKeepFavorite(it) }, color = Color(0xFF55A6C8)) },
-                    { SettingsSwitchRow(Icons.Rounded.BrokenImage, "相似照片检测", "自动检测连拍、截图和相似照片", checked = settings.similarDetection, onCheckedChange = { onTick(); viewModel.setSimilarDetection(it) }, badge = "测试") },
+                    { SettingsSegmentedRow(Icons.Rounded.Delete, stringResource(R.string.settings_delete_mode), stringResource(settings.deleteMode.labelRes), deleteModeOptions(), settings.deleteMode.name, color = Color(0xFFDD5A56), onSelected = { onTick(); viewModel.setDeleteMode(DeleteMode.valueOf(it)) }) },
+                    { SettingsSwitchRow(Icons.AutoMirrored.Rounded.DriveFileMove, stringResource(R.string.settings_move_when), if (settings.autoMoveOnKeepFavorite) stringResource(R.string.settings_move_enabled) else stringResource(R.string.settings_move_disabled), checked = settings.autoMoveOnKeepFavorite, onCheckedChange = { onTick(); viewModel.setAutoMoveOnKeepFavorite(it) }, color = Color(0xFF55A6C8)) },
+                    { SettingsSwitchRow(Icons.Rounded.BrokenImage, stringResource(R.string.settings_similar_detection), stringResource(R.string.settings_similar_detection_desc), checked = settings.similarDetection, onCheckedChange = { onTick(); viewModel.setSimilarDetection(it) }, badge = stringResource(R.string.settings_test)) },
                 ))
             }
 
@@ -512,56 +515,64 @@ private fun SettingsPageContent(
     }
 }
 
+@Composable
 private fun cleaningDisplaySummary(settings: AppSettings): String {
-    val photo = if (settings.photoFocusMode) "照片专注" else "完整控制"
-    val video = if (settings.videoShowProgressBar) "视频细进度" else "视频极简"
+    val photo = stringResource(if (settings.photoFocusMode) R.string.settings_photo_focus else R.string.settings_full_controls)
+    val video = stringResource(if (settings.videoShowProgressBar) R.string.settings_video_fine_progress else R.string.settings_video_minimal)
     return photo + " · " + video
 }
 
-private fun settingsSortLabel(order: String): String = if (order == "newest") "最新在前" else "随机"
+@Composable
+private fun settingsSortLabel(order: String): String = stringResource(if (order == "newest") R.string.settings_newest_first else R.string.settings_random)
 
+@Composable
 private fun todayEntryModeLabel(mode: TodayInHistoryEntryMode): String = when (mode) {
-    TodayInHistoryEntryMode.MEMORY_PAGE -> "打开回忆页"
-    TodayInHistoryEntryMode.PINCH_MEMORY -> "打开沉浸回忆层"
+    TodayInHistoryEntryMode.MEMORY_PAGE -> stringResource(R.string.settings_open_memory_page)
+    TodayInHistoryEntryMode.PINCH_MEMORY -> stringResource(R.string.settings_open_immersive_memory)
 }
 
+@Composable
 private fun todayEntryModeOptions(): List<Pair<String, String>> = listOf(
-    TodayInHistoryEntryMode.MEMORY_PAGE.name to "回忆页",
-    TodayInHistoryEntryMode.PINCH_MEMORY.name to "沉浸层",
+    TodayInHistoryEntryMode.MEMORY_PAGE.name to stringResource(R.string.settings_memory_page),
+    TodayInHistoryEntryMode.PINCH_MEMORY.name to stringResource(R.string.settings_immersive_layer),
 )
 
+@Composable
 private fun settingsDateModeOptions(): List<Pair<String, String>> = listOf(
-    "all" to "全部",
-    "year" to "今年",
-    "month" to "本月",
-    "seven_days" to "7天",
-    "today_history" to "那年",
+    "all" to stringResource(R.string.settings_date_all),
+    "year" to stringResource(R.string.settings_date_year),
+    "month" to stringResource(R.string.settings_date_month),
+    "seven_days" to stringResource(R.string.settings_date_seven_days),
+    "today_history" to stringResource(R.string.settings_date_on_this_day),
 )
 
+@Composable
 private fun settingsSortOptions(): List<Pair<String, String>> = listOf(
-    "random" to "随机",
-    "newest" to "最新",
+    "random" to stringResource(R.string.settings_random),
+    "newest" to stringResource(R.string.settings_sort_newest),
 )
 
+@Composable
 private fun settingsPhotoTypeLabel(type: String): String = when (type) {
-    "normal" -> "普通照片"
-    "screenshot" -> "截屏"
-    "selfie" -> "自拍"
-    "motion" -> "实况"
-    "long" -> "长图"
-    "gif" -> "动图"
+    "normal" -> stringResource(R.string.settings_photo_type_normal)
+    "screenshot" -> stringResource(R.string.settings_photo_type_screenshot)
+    "selfie" -> stringResource(R.string.settings_photo_type_selfie)
+    "motion" -> stringResource(R.string.settings_photo_type_motion)
+    "long" -> stringResource(R.string.settings_photo_type_long)
+    "gif" -> stringResource(R.string.settings_photo_type_gif)
     "raw" -> "RAW"
-    else -> "全部照片"
+    else -> stringResource(R.string.settings_photo_type_all)
 }
 
+@Composable
 private fun settingsPhotoTypeOptions(): List<Pair<String, String>> = listOf(
-    "all" to "全部",
-    "normal" to "普通",
-    "screenshot" to "截图",
-    "selfie" to "自拍",
-    "motion" to "实况",
-    "gif" to "GIF",
-    "long" to "长图",
+    "all" to stringResource(R.string.photo_filter_all),
+    "normal" to stringResource(R.string.photo_filter_normal),
+    "screenshot" to stringResource(R.string.photo_filter_screenshot),
+    "selfie" to stringResource(R.string.photo_filter_selfie),
+    "motion" to stringResource(R.string.photo_filter_motion),
+    "gif" to stringResource(R.string.photo_filter_gif),
+    "long" to stringResource(R.string.photo_filter_long_image),
     "raw" to "RAW",
 )
 
@@ -634,7 +645,7 @@ private fun isKeepixIosSettingsStyle(): Boolean =
 
 @Composable
 private fun SettingsHeader(title: String, subtitle: String, onBack: () -> Unit) {
-    val isHome = title == SettingsPage.HOME.title
+    val isHome = title == stringResource(SettingsPage.HOME.titleRes)
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
