@@ -42,7 +42,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
 import com.futureape.kanleme.data.repository.DashboardStats
+import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
@@ -98,7 +100,7 @@ fun MeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            "我的",
+                            stringResource(R.string.me_title),
                             style = MaterialTheme.typography.headlineLarge,
                             color = Color.White,
                             fontWeight = FontWeight.Black,
@@ -118,7 +120,7 @@ fun MeScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         MediaStatCard(
                             icon = Icons.Rounded.Image,
-                            title = "照片",
+                            title = stringResource(R.string.me_photo),
                             viewed = dashboard.processedPhotoCount,
                             deleted = dashboard.photoPendingDeleteCount,
                             cleaned = dashboard.photoPendingDeleteBytes,
@@ -126,7 +128,7 @@ fun MeScreen(
                         )
                         MediaStatCard(
                             icon = Icons.Rounded.Movie,
-                            title = "视频",
+                            title = stringResource(R.string.me_video),
                             viewed = dashboard.processedVideoCount,
                             deleted = dashboard.videoPendingDeleteCount,
                             cleaned = dashboard.videoPendingDeleteBytes,
@@ -134,7 +136,7 @@ fun MeScreen(
                         )
                         MediaStatCard(
                             icon = Icons.Rounded.Image,
-                            title = "截屏",
+                            title = stringResource(R.string.me_screenshot),
                             viewed = photoTypeStats.screenshot,
                             deleted = 0,
                             cleaned = 0L,
@@ -147,22 +149,22 @@ fun MeScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         ProfileRow(
                             icon = Icons.Rounded.FavoriteBorder,
-                            title = "收藏",
-                            subtitle = dashboard.favoriteCount.toString() + " 个项目",
+                            title = stringResource(R.string.me_favorites),
+                            subtitle = stringResource(R.string.me_item_count, dashboard.favoriteCount),
                             accent = Color(0xFFFF6F7F),
                             onClick = onFavorites,
                         )
                         ProfileRow(
                             icon = Icons.Rounded.Delete,
-                            title = "回收站",
-                            subtitle = dashboard.trashCount.toString() + " 个待确认项目",
+                            title = stringResource(R.string.me_trash),
+                            subtitle = stringResource(R.string.me_pending_item_count, dashboard.trashCount),
                             accent = Color(0xFFE46A62),
                             onClick = onTrash,
                         )
                         ProfileRow(
                             icon = Icons.Rounded.History,
-                            title = "整理历史",
-                            subtitle = "最近整理过的照片",
+                            title = stringResource(R.string.me_history),
+                            subtitle = stringResource(R.string.me_recent_photo_history),
                             accent = Color(0xFF86A7FF),
                             onClick = onHistory,
                         )
@@ -194,21 +196,21 @@ private fun UsageHeroCard(
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text("使用统计", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Black)
+                    Text(stringResource(R.string.me_usage_stats), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Black)
                     Text(
                         formatSize(freed),
                         style = MaterialTheme.typography.headlineLarge,
                         color = Color.White,
                         fontWeight = FontWeight.Black,
                     )
-                    Text(if (historicalFreed > 0L) "累计记录释放" else "预计可释放", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.58f), fontWeight = FontWeight.Bold)
+                    Text(stringResource(if (historicalFreed > 0L) R.string.me_historical_freed else R.string.me_estimated_freed), style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.58f), fontWeight = FontWeight.Bold)
                 }
                 RoundIconSurface(icon = Icons.Rounded.Refresh, onClick = onRefresh)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                HeroMetric("已浏览", dashboard.processedCount.toString(), Modifier.weight(1f))
-                HeroMetric("待确认", dashboard.pendingDeleteCount.toString(), Modifier.weight(1f))
-                HeroMetric("回收站", dashboard.trashCount.toString(), Modifier.weight(1f))
+                HeroMetric(stringResource(R.string.me_browsed), dashboard.processedCount.toString(), Modifier.weight(1f))
+                HeroMetric(stringResource(R.string.me_pending), dashboard.pendingDeleteCount.toString(), Modifier.weight(1f))
+                HeroMetric(stringResource(R.string.me_trash), dashboard.trashCount.toString(), Modifier.weight(1f))
             }
             LinearProgressIndicator(
                 progress = { progress },
@@ -264,9 +266,9 @@ private fun MediaStatCard(
                 }
             }
             Text(title, modifier = Modifier.width(54.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, maxLines = 1)
-            StatColumn("浏览", viewed.toString(), Color(0xFF86A7FF), Modifier.weight(1f))
-            StatColumn("待确认", deleted.toString(), Color(0xFFFF7B70), Modifier.weight(1f))
-            StatColumn("预计释放", if (cleaned > 0L) formatSize(cleaned) else "0 字节", Color(0xFFC8EF67), Modifier.weight(1.15f))
+            StatColumn(stringResource(R.string.me_viewed), viewed.toString(), Color(0xFF86A7FF), Modifier.weight(1f))
+            StatColumn(stringResource(R.string.me_pending), deleted.toString(), Color(0xFFFF7B70), Modifier.weight(1f))
+            StatColumn(stringResource(R.string.me_releasable), if (cleaned > 0L) formatSize(cleaned) else stringResource(R.string.me_zero_bytes), Color(0xFFC8EF67), Modifier.weight(1.15f))
         }
     }
 }
@@ -293,7 +295,7 @@ private fun SpaceFreedCard(dashboard: DashboardStats) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Rounded.Storage, contentDescription = null, tint = Color.White.copy(alpha = 0.42f))
-                Text("预计释放", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+                Text(stringResource(R.string.me_releasable), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
             }
             Text(formatSize(total), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
             LinearProgressIndicator(
@@ -302,7 +304,7 @@ private fun SpaceFreedCard(dashboard: DashboardStats) {
                 color = Color(0xFF86A7FF),
                 trackColor = Color.White.copy(alpha = 0.10f),
             )
-            Text("照片待确认 " + (photoWeight * 100).toInt() + "%", style = MaterialTheme.typography.titleSmall, color = Color.White.copy(alpha = 0.58f))
+            Text(stringResource(R.string.me_photo_pending, (photoWeight * 100).toInt()), style = MaterialTheme.typography.titleSmall, color = Color.White.copy(alpha = 0.58f))
         }
     }
 }
