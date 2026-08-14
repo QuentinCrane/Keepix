@@ -319,6 +319,7 @@ private fun SettingsPageContent(
     viewModel: KanlemeViewModel,
 ) {
     val context = LocalContext.current
+    val noCrashLogsMessage = stringResource(R.string.settings_no_crash_logs)
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         when (page) {
             SettingsPage.HOME -> {
@@ -508,7 +509,7 @@ private fun SettingsPageContent(
                 SectionTitle(stringResource(R.string.settings_page_diagnosis))
                 SettingsGroup(listOf<@Composable () -> Unit>(
                     { SettingsSegmentedRow(Icons.Rounded.CleaningServices, stringResource(R.string.settings_photo_clean_mode), stringResource(settings.photoCleanMode.labelRes), photoCleanModeOptions(), settings.photoCleanMode.name, onSelected = { onSuccess(); viewModel.setPhotoCleanMode(PhotoCleanMode.valueOf(it)) }) },
-                    { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_export_crash_logs), stringResource(R.string.settings_export_crash_logs_desc), onClick = { onTick(); if (!shareCrashLogs(context)) viewModel.showMessage(context.getString(R.string.settings_no_crash_logs)) }) },
+                    { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_export_crash_logs), stringResource(R.string.settings_export_crash_logs_desc), onClick = { onTick(); if (!shareCrashLogs(context)) viewModel.showMessage(noCrashLogsMessage) }) },
                 ))
                 Text(stringResource(settings.photoCleanMode.descriptionRes), modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

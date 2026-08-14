@@ -141,6 +141,7 @@ fun CleanHomeScreen(
     val videoScope by viewModel.videoScope.collectAsStateWithLifecycle()
     val haptics = rememberHapticKit(settings)
     val context = LocalContext.current
+    val dailyReportExportErrorText = stringResource(R.string.daily_report_export_error)
     val scope = rememberCoroutineScope()
     var showDailyReport by remember { mutableStateOf(false) }
     var exportingDailyReport by remember { mutableStateOf(false) }
@@ -301,7 +302,7 @@ fun CleanHomeScreen(
                     }.onSuccess {
                         haptics.success()
                     }.onFailure {
-                        dailyReportExportError = context.getString(R.string.daily_report_export_error)
+                        dailyReportExportError = dailyReportExportErrorText
                     }
                     exportingDailyReport = false
                 }
