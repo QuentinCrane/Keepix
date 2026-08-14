@@ -17,6 +17,16 @@
 .\gradlew.bat :app:kapt
 ```
 
+## Benchmark 与 Baseline Profile 配置构建
+
+这两个任务只验证 benchmark 测试 APK 和 Baseline Profile 配置能够编译打包，不会在没有连接设备时生成真实 profile 或性能数据：
+
+```powershell
+.\gradlew.bat :benchmark:assembleBenchmarkRelease :benchmark:assembleNonMinifiedRelease
+```
+
+连接固定设备后，生成 profile 和 TTID/TTFD 对照请按 [Baseline Profile 状态](baseline_profile_status.md) 执行。
+
 Debug APK 输出位置：
 
 ```text

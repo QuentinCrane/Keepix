@@ -16,6 +16,16 @@ The current app version is `2.3.4`, `versionCode` is `60`, `minSdk = 30`, and bo
 .\gradlew.bat :app:assembleRelease
 ```
 
+## Benchmark and Baseline Profile Configuration Build
+
+These tasks only verify that the benchmark test APKs and Baseline Profile configuration compile and package. They do not generate a real profile or performance measurements without a connected device:
+
+```powershell
+.\gradlew.bat :benchmark:assembleBenchmarkRelease :benchmark:assembleNonMinifiedRelease
+```
+
+For profile generation and TTID/TTFD comparisons on a fixed device, follow the [Baseline Profile status](../baseline_profile_status.md) instructions.
+
 ## Output Paths
 
 Debug APK:

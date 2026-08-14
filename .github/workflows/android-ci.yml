@@ -44,3 +44,6 @@ jobs:
 
       - name: Build release APK
         run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Build benchmark APKs
+        run: ./gradlew :benchmark:assembleBenchmarkRelease :benchmark:assembleNonMinifiedRelease --stacktrace
