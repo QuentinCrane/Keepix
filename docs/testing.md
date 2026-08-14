@@ -37,6 +37,16 @@ Windows 使用 `gradlew.bat`，macOS/Linux 使用 `./gradlew`。
 adb devices
 ```
 
+## API 35 部分设备执行
+
+2026-08-14 在本机已有的 API 35 Google Play x86_64 system image 上建立临时 `KeepixApi35` AVD，设备为 `sdk_gphone64_x86_64`、Android 15/API 35、1080x2400、420 dpi。执行：
+
+```powershell
+.\gradlew.bat :app:connectedDebugAndroidTest --offline --configuration-cache --console=plain --no-daemon --max-workers=1
+```
+
+结果：明确返回 `Exit code: 0`，25 tests、0 failures、0 errors、0 skipped。该次运行证明当前 AndroidTest、Hilt runner、WorkManager 可用性、Compose 测试和 Room 测试能在 API35 模拟器执行；它不是 API30/API36 矩阵、真机/OEM 或系统 UI 验收。运行时工作树仍保留四个用户未提交的 UI 文件，它们未被本轮触碰或暂存，因此该结果也不等同于干净 Release 候选验收。
+
 ## Baseline Profile 与性能
 
 连接固定设备后，按 [Baseline Profile 状态](baseline_profile_status.md) 生成 profile，并记录无 profile、partial compilation、full compilation 三组 TTID/TTFD、首帧、PSS、帧时间、温度和电量。`performance_baseline.md` 中没有真实数值前，状态必须保持 `not-run`。
@@ -57,4 +67,4 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## 当前证据状态
 
-截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、app Release 门禁和 benchmark APK 构建均有明确成功退出码；`adb devices` 没有连接设备，也没有 API 30/API 36 AVD。因此最终设备验收仍保持待运行。
+截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API35 AVD 上的 25/25 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；本机仍没有 API30/API36 AVD。因此最终设备矩阵验收仍保持待运行。

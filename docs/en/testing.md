@@ -37,6 +37,16 @@ Windows uses `gradlew.bat`; macOS/Linux uses `./gradlew`.
 adb devices
 ```
 
+## Partial API 35 device execution
+
+On 2026-08-14, a temporary `KeepixApi35` AVD was created from the existing API 35 Google Play x86_64 system image. The device was `sdk_gphone64_x86_64`, Android 15/API 35, 1080x2400 at 420 dpi. The run used:
+
+```powershell
+.\gradlew.bat :app:connectedDebugAndroidTest --offline --configuration-cache --console=plain --no-daemon --max-workers=1
+```
+
+Result: explicit `Exit code: 0`, 25 tests, 0 failures, 0 errors, and 0 skipped. This proves that the current AndroidTest, Hilt runner, WorkManager availability, Compose tests, and Room tests can execute on an API 35 emulator; it is not the API 30/API 36 matrix, a physical-device/OEM check, or system-UI acceptance. The four user-owned unstaged UI files were still present and untouched during this run, so the result is not equivalent to clean Release-candidate acceptance.
+
 ## Baseline Profile and performance
 
 With a fixed device connected, follow [Baseline Profile status](../baseline_profile_status.md) and record three groups: no profile, partial compilation, and full compilation. Record TTID/TTFD, first frame, PSS, frame time, temperature, and battery. Until real values exist, `performance_baseline.md` must remain `not-run`.
@@ -57,4 +67,4 @@ Deletion/restore/move, partial media permissions, system authorization cancellat
 
 ## Current evidence status
 
-As of this snapshot, `lintDebug`, JVM unit tests, AndroidTest compilation, the app Release gate, and benchmark APK builds have explicit successful exit codes. `adb devices` has no connected device and there is no API 30/API 36 AVD, so final device acceptance remains pending.
+As of this snapshot, `lintDebug`, JVM unit tests, AndroidTest compilation, 25/25 AndroidTest execution on the API 35 AVD, the app Release gate, and benchmark APK builds have explicit successful exit codes. There is still no API 30/API 36 AVD, so final device-matrix acceptance remains pending.
