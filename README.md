@@ -140,6 +140,7 @@ Official Website:[Keepix — Organize your gallery like swiping short videos](ht
 - [Technical Overview](docs/en/technical_overview.md) - product scope, architecture notes, and behavior boundaries
 - [Privacy Notes](docs/en/privacy.md) - what the app reads, stores, and never sends off device
 - [Build Guide](docs/en/build.md) - debug and release commands, signing flow, and APK outputs
+- [Testing and Validation](docs/en/testing.md) - local tests, AndroidTest, benchmark, and device evidence boundaries
 - [Release Notes Draft](docs/en/release_notes.md) - current release copy and publish checklist
 - [AI Handoff Notes](docs/en/AI_HANDOFF.md) - public repo context for the next maintainer or agent
 

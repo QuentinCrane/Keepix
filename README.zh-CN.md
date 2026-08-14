@@ -141,6 +141,7 @@
 - [技术说明](docs/technical_overview.md) - 产品范围、架构要点和行为边界
 - [隐私说明](docs/privacy.md) - App 会读取、保存什么，以及不会发送什么
 - [构建说明](docs/build.md) - Debug / Release 构建命令、签名流程和产物位置
+- [测试与验收说明](docs/testing.md) - 本地单测、AndroidTest、benchmark 和真机证据边界
 - [发布说明](docs/release_notes.md) - 当前发布文案和发布检查清单
 - [交接文档](docs/AI_HANDOFF.md) - 给下一位维护者或 AI 的公开上下文
 
