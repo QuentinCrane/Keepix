@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,7 +38,6 @@ import com.futureape.kanleme.R
 import com.futureape.kanleme.data.media.MediaAccessState
 import com.futureape.kanleme.data.media.MediaAccessSnapshot
 import com.futureape.kanleme.ui.components.GlassSurface
-import com.futureape.kanleme.ui.i18n.Text
 
 /**
  * Android 13+ uses granular media permissions. Android 14+ can return either full
