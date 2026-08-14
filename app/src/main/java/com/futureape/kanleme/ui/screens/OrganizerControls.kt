@@ -55,6 +55,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,8 +79,18 @@ fun OrganizerProgressPill(
     progressLabel: String? = null,
 ) {
     val percent = progressPercent.coerceIn(0, 100)
+    val progressDescription = stringResource(
+        R.string.a11y_cleanup_progress,
+        percent,
+        remainingCount,
+        remainingLabel,
+        formatSize(releasableBytes),
+    )
     Surface(
-        modifier = modifier,
+        modifier = modifier.semantics {
+            contentDescription = progressDescription
+            progressBarRangeInfo = ProgressBarRangeInfo(percent / 100f, 0f..1f)
+        },
         shape = RoundedCornerShape(999.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
         contentColor = MaterialTheme.colorScheme.onSurface,

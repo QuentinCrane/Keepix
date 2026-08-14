@@ -602,6 +602,7 @@
     <string name="a11y_back_to_previous_video">Back to previous video</string>
     <string name="a11y_selected">Selected</string>
     <string name="a11y_not_selected">Not selected</string>
+    <string name="a11y_cleanup_progress">Cleanup progress %1$d%%, %2$d %3$s remaining, %4$s releasable</string>
     <string name="a11y_video_surface">Video playback area: %1$s</string>
     <string name="a11y_video_play">Play video</string>
     <string name="a11y_video_pause">Pause video</string>

@@ -602,6 +602,7 @@
     <string name="a11y_back_to_previous_video">回到上一部影片</string>
     <string name="a11y_selected">已選取</string>
     <string name="a11y_not_selected">未選取</string>
+    <string name="a11y_cleanup_progress">整理進度 %1$d%%，剩餘 %2$d %3$s，可釋放 %4$s</string>
     <string name="a11y_video_surface">影片播放區域：%1$s</string>
     <string name="a11y_video_play">播放影片</string>
     <string name="a11y_video_pause">暫停影片</string>
