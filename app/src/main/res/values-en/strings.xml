@@ -600,6 +600,16 @@
     <string name="a11y_play_motion">Play motion photo</string>
     <string name="a11y_close_motion">Close motion photo</string>
     <string name="a11y_back_to_previous_video">Back to previous video</string>
+    <string name="a11y_video_surface">Video playback area: %1$s</string>
+    <string name="a11y_video_play">Play video</string>
+    <string name="a11y_video_pause">Pause video</string>
+    <string name="a11y_video_playing">Playing</string>
+    <string name="a11y_video_paused">Paused</string>
+    <string name="a11y_video_toggle_controls">Show or hide video controls</string>
+    <string name="a11y_video_seek_back">Seek back 10 seconds</string>
+    <string name="a11y_video_seek_forward">Seek forward 10 seconds</string>
+    <string name="a11y_video_progress">Video playback progress</string>
+    <string name="a11y_video_progress_percent">Progress %1$d%%</string>
     <string name="settings_excluded_add_system">Add excluded folder with system picker</string>
     <string name="settings_excluded_system_subtitle">Use the Android folder picker first; the input below is a fallback</string>
     <string name="settings_excluded_status">Exclusion status</string>

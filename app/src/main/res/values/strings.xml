@@ -600,6 +600,16 @@
     <string name="a11y_play_motion">播放实况</string>
     <string name="a11y_close_motion">关闭实况</string>
     <string name="a11y_back_to_previous_video">回到上一条视频</string>
+    <string name="a11y_video_surface">视频播放区域：%1$s</string>
+    <string name="a11y_video_play">播放视频</string>
+    <string name="a11y_video_pause">暂停视频</string>
+    <string name="a11y_video_playing">播放中</string>
+    <string name="a11y_video_paused">已暂停</string>
+    <string name="a11y_video_toggle_controls">显示或隐藏视频控件</string>
+    <string name="a11y_video_seek_back">后退 10 秒</string>
+    <string name="a11y_video_seek_forward">前进 10 秒</string>
+    <string name="a11y_video_progress">视频播放进度</string>
+    <string name="a11y_video_progress_percent">进度 %1$d%%</string>
     <string name="settings_excluded_add_system">用系统选择器添加排除</string>
     <string name="settings_excluded_system_subtitle">优先调用安卓原生文件夹选择器；下方输入框仅作备用</string>
     <string name="settings_excluded_status">排除状态</string>

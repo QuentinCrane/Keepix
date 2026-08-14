@@ -91,6 +91,15 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -633,6 +642,16 @@ private fun VideoReelPage(
     val progress = (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
     var draggingProgress by remember(video.id) { mutableStateOf<Float?>(null) }
     val shownProgress = draggingProgress ?: progress
+    val videoSurfaceDescription = stringResource(R.string.a11y_video_surface, video.displayName)
+    val videoPlaybackStateDescription = stringResource(
+        if (shouldPlay) R.string.a11y_video_playing else R.string.a11y_video_paused,
+    )
+    val videoPlaybackActionLabel = stringResource(
+        if (shouldPlay) R.string.a11y_video_pause else R.string.a11y_video_play,
+    )
+    val videoControlsActionLabel = stringResource(R.string.a11y_video_toggle_controls)
+    val videoSeekBackActionLabel = stringResource(R.string.a11y_video_seek_back)
+    val videoSeekForwardActionLabel = stringResource(R.string.a11y_video_seek_forward)
 
     Box(Modifier.fillMaxSize()) {
         AsyncImage(
@@ -683,6 +702,54 @@ private fun VideoReelPage(
             Modifier
                 .fillMaxSize()
                 .padding(bottom = bottomContentPadding)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = videoSurfaceDescription
+                    stateDescription = videoPlaybackStateDescription
+                    role = Role.Button
+                    customActions = listOf(
+                        CustomAccessibilityAction(
+                            label = videoPlaybackActionLabel,
+                            action = {
+                                if (playbackFailed) {
+                                    playbackFailed = false
+                                    playbackUriIndex = 0
+                                    shouldPlay = true
+                                    player?.prepare()
+                                } else {
+                                    shouldPlay = !shouldPlay
+                                }
+                                haptics.tick()
+                                true
+                            },
+                        ),
+                        CustomAccessibilityAction(
+                            label = videoControlsActionLabel,
+                            action = {
+                                onChromeVisibilityChange(!chromeVisible)
+                                haptics.tick()
+                                true
+                            },
+                        ),
+                        CustomAccessibilityAction(
+                            label = videoSeekBackActionLabel,
+                            action = {
+                                val target = ((player?.currentPosition ?: position) - 10_000L).coerceAtLeast(0L)
+                                player?.seekTo(target)
+                                haptics.tick()
+                                true
+                            },
+                        ),
+                        CustomAccessibilityAction(
+                            label = videoSeekForwardActionLabel,
+                            action = {
+                                val target = ((player?.currentPosition ?: position) + 10_000L).coerceAtMost(duration)
+                                player?.seekTo(target)
+                                haptics.tick()
+                                true
+                            },
+                        ),
+                    )
+                }
                 .pointerInput(video.id, settings.videoSeekThresholdPx, player, chromeVisible) {
                     detectReelSurfaceGestures(
                         haptics = haptics,
@@ -863,9 +930,35 @@ private fun ThinVideoScrubber(
         targetValue = progress.coerceIn(0f, 1f),
         label = "thin_video_scrubber",
     )
+    val progressDescription = stringResource(R.string.a11y_video_progress)
+    val progressStateDescription = stringResource(
+        R.string.a11y_video_progress_percent,
+        (animatedProgress * 100f).roundToInt(),
+    )
+    val seekBackActionLabel = stringResource(R.string.a11y_video_seek_back)
+    val seekForwardActionLabel = stringResource(R.string.a11y_video_seek_forward)
+    fun adjustProgress(delta: Float) {
+        onValueChange((animatedProgress + delta).coerceIn(0f, 1f))
+        onValueChangeFinished()
+    }
     Canvas(
         modifier = modifier
             .height(22.dp)
+            .semantics {
+                contentDescription = progressDescription
+                stateDescription = progressStateDescription
+                progressBarRangeInfo = ProgressBarRangeInfo(animatedProgress, 0f..1f)
+                customActions = listOf(
+                    CustomAccessibilityAction(seekBackActionLabel) {
+                        adjustProgress(-0.1f)
+                        true
+                    },
+                    CustomAccessibilityAction(seekForwardActionLabel) {
+                        adjustProgress(0.1f)
+                        true
+                    },
+                )
+            }
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)

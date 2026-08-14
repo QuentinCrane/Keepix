@@ -600,6 +600,16 @@
     <string name="a11y_play_motion">播放原況照片</string>
     <string name="a11y_close_motion">關閉原況照片</string>
     <string name="a11y_back_to_previous_video">回到上一部影片</string>
+    <string name="a11y_video_surface">影片播放區域：%1$s</string>
+    <string name="a11y_video_play">播放影片</string>
+    <string name="a11y_video_pause">暫停影片</string>
+    <string name="a11y_video_playing">播放中</string>
+    <string name="a11y_video_paused">已暫停</string>
+    <string name="a11y_video_toggle_controls">顯示或隱藏影片控制項</string>
+    <string name="a11y_video_seek_back">後退 10 秒</string>
+    <string name="a11y_video_seek_forward">前進 10 秒</string>
+    <string name="a11y_video_progress">影片播放進度</string>
+    <string name="a11y_video_progress_percent">進度 %1$d%%</string>
     <string name="settings_excluded_add_system">使用系統選擇器新增排除</string>
     <string name="settings_excluded_system_subtitle">優先使用 Android 原生資料夾選擇器；下方輸入框僅作備用</string>
     <string name="settings_excluded_status">排除狀態</string>
