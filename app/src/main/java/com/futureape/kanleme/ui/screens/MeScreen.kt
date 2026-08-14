@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -48,7 +49,6 @@ import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
-import com.futureape.kanleme.ui.i18n.Text
 
 @Composable
 fun MeScreen(

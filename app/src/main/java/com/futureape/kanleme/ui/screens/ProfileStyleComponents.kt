@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,11 +27,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.futureape.kanleme.ui.components.AdaptiveCenter
-import com.futureape.kanleme.ui.i18n.Text
+import com.futureape.kanleme.R
 
 internal val ProfileScreenAccent = Color(0xFF86A7FF)
 internal val ProfileScreenSurface = Color(0xFF121417)
@@ -75,7 +77,7 @@ internal fun ProfilePageHeader(
     ) {
         ProfileRoundIconButton(
             icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-            contentDescription = "返回",
+            contentDescription = stringResource(R.string.a11y_back),
             onClick = onBack,
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {

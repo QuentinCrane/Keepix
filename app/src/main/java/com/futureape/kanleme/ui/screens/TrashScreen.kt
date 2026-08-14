@@ -57,6 +57,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -100,7 +101,6 @@ import com.futureape.kanleme.ui.util.trashImageRequest
 import com.futureape.kanleme.ui.util.trashThumbnailImageRequest
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.delay
-import com.futureape.kanleme.ui.i18n.Text
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
