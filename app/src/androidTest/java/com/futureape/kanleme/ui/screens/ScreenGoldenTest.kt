@@ -99,6 +99,30 @@ class ScreenGoldenTest {
     @Test
     fun todayHistoryTabletDarkGolden() = assertTodayHistoryGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
 
+    @Test
+    fun favoritesPhoneLightGolden() = assertFavoritesGolden(surface = "phone", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun favoritesPhoneDarkGolden() = assertFavoritesGolden(surface = "phone", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun favoritesTabletLightGolden() = assertFavoritesGolden(surface = "tablet", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun favoritesTabletDarkGolden() = assertFavoritesGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun trashPhoneLightGolden() = assertTrashGolden(surface = "phone", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun trashPhoneDarkGolden() = assertTrashGolden(surface = "phone", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun trashTabletLightGolden() = assertTrashGolden(surface = "tablet", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun trashTabletDarkGolden() = assertTrashGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
+
     private fun assertMeGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("me", surface, theme, themeMode) { viewModel ->
         MeScreen(
             viewModel = viewModel,
@@ -137,6 +161,14 @@ class ScreenGoldenTest {
 
     private fun assertTodayHistoryGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("today_history", surface, theme, themeMode) { viewModel ->
         TodayInHistoryScreen(viewModel = viewModel, onBack = {}, onOpenPhoto = {})
+    }
+
+    private fun assertFavoritesGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("favorites", surface, theme, themeMode) { viewModel ->
+        FavoritesScreen(viewModel = viewModel, onBack = {}, onToday = {})
+    }
+
+    private fun assertTrashGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("trash", surface, theme, themeMode) { viewModel ->
+        TrashScreen(viewModel = viewModel, onBack = {}, onToday = {})
     }
 
     private fun assertScreenGolden(
