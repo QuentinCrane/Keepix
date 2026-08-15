@@ -77,12 +77,15 @@ class SimilarAnalysisScheduler @Inject constructor(
                 }
             }
             .build()
-        val request: OneTimeWorkRequest = OneTimeWorkRequestBuilder<SimilarAnalysisWorker>()
+        val requestBuilder = OneTimeWorkRequestBuilder<SimilarAnalysisWorker>()
             .setInputData(Data.Builder().putString(SimilarAnalysisWorkContract.INPUT_MODE, SimilarAnalysisWorkContract.modeValue(mode)).build())
             .setConstraints(constraints)
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, spec.backoffSeconds, TimeUnit.SECONDS)
             .addTag(SimilarAnalysisWorkContract.UNIQUE_WORK_NAME)
-            .build()
+        // WorkManager rejects backoff criteria when a request requires device idle.
+        if (!spec.requiresDeviceIdle) {
+            requestBuilder.setBackoffCriteria(BackoffPolicy.EXPONENTIAL, spec.backoffSeconds, TimeUnit.SECONDS)
+        }
+        val request: OneTimeWorkRequest = requestBuilder.build()
         workManager.enqueueUniqueWork(SimilarAnalysisWorkContract.UNIQUE_WORK_NAME, spec.existingWorkPolicy, request)
     }
 
