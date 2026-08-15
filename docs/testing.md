@@ -64,7 +64,7 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## UI、窗口与无障碍验收
 
-规划矩阵覆盖 320/360/390/600/840dp、字体/显示 1.0/1.3/2.0、横竖屏、分屏/自由窗口、浅色/深色、高对比、触控、返回手势、TalkBack 和平板键盘/D-pad。当前代码已有 adaptive width 与 Compose/AndroidTest 契约，但没有可提交的 screenshot golden 或连接设备的 TalkBack/D-pad 结果。
+规划矩阵覆盖 320/360/390/600/840dp、字体/显示 1.0/1.3/2.0、横竖屏、分屏/自由窗口、浅色/深色、高对比、触控、返回手势、TalkBack 和平板键盘/D-pad。当前已增加 `AdaptiveRenderSmokeTest`：在 API30 AVD 上对 15 个宽度/字体组合完成真实 Compose 节点渲染与尺寸断言；它仍不是 screenshot golden diff，且没有替代连接设备的 TalkBack/D-pad 结果。
 
 截图目录中的图片是文档/历史参考，不自动证明当前 route、主题、数据 fixture 或设备布局正确。
 
