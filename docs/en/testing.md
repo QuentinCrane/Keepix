@@ -58,7 +58,7 @@ Manual permission observations: API 30 reached the home screen with `READ_EXTERN
 
 ## Baseline Profile and performance
 
-With a fixed device connected, follow [Baseline Profile status](../baseline_profile_status.md) and record three groups: no profile, partial compilation, and full compilation. Record TTID/TTFD, first frame, PSS, frame time, temperature, and battery. Until real values exist, `performance_baseline.md` must remain `not-run`.
+With a fixed physical device connected, follow [Baseline Profile status](../baseline_profile_status.md) and record three groups: no profile, partial compilation, and full compilation. The API 30 AVD Macrobenchmark run was rejected by AndroidX with `EMULATOR`; record TTID/TTFD, first frame, PSS, frame time, temperature, and battery only from a valid physical-device run. Until real values exist, `performance_baseline.md` must remain `not-run`.
 
 Passing the benchmark build does not prove that a profile was generated or that it improves startup. Host JVM/Gradle timings do not replace before/after measurements on the same Android device.
 

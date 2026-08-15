@@ -1,6 +1,6 @@
 # 性能实验室基线记录
 
-本文件是可重复记录模板，不是估算结果。D01 已创建 `:benchmark`、确定性元数据 fixture 和冷启动测量入口；2026-08-14 已在本机完成两个 benchmark Release 变体的配置构建，但当前工作环境没有连接 Android 设备，因此真实指标仍保持 `not-run`。
+本文件是可重复记录模板，不是估算结果。D01 已创建 `:benchmark`、确定性元数据 fixture 和冷启动测量入口；2026-08-14 曾在 API30 AVD 上触发 connected benchmark，但 AndroidX 以 `EMULATOR` 错误拒绝 Macrobenchmark，因此真实指标仍保持 `not-run`。
 
 本机配置构建命令：
 
@@ -9,6 +9,16 @@
 ```
 
 结果：明确返回 `Exit code: 0`，`BUILD SUCCESSFUL in 1m 59s`；这不是设备性能数据，也不填充下面的 Baseline CSV。
+
+## 设备尝试边界
+
+API30 `KeepixApi30` AVD 上的官方 Macrobenchmark 命令：
+
+```powershell
+.\gradlew.bat :benchmark:connectedBenchmarkReleaseAndroidTest --offline --no-configuration-cache --console=plain --no-daemon --max-workers=1
+```
+
+`coldStartup` 返回失败：`ERRORS (not suppressed): EMULATOR`。该失败是有效的质量边界，不能用 `androidx.benchmark.suppressErrors=EMULATOR` 把模拟器结果升级为真实性能结论；因此没有写入 TTID/TTFD、首帧、PSS、帧时间或收益数字。需要物理设备、固定 build/Git SHA、温度/电量和 no-profile/partial/full 三组结果后，才可填充下表。
 
 ## Fixture scales
 

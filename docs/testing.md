@@ -58,7 +58,7 @@ API 30 手动授权观察到 `READ_EXTERNAL_STORAGE` 的允许/拒绝状态；AP
 
 ## Baseline Profile 与性能
 
-连接固定设备后，按 [Baseline Profile 状态](baseline_profile_status.md) 生成 profile，并记录无 profile、partial compilation、full compilation 三组 TTID/TTFD、首帧、PSS、帧时间、温度和电量。`performance_baseline.md` 中没有真实数值前，状态必须保持 `not-run`。
+连接固定物理设备后，按 [Baseline Profile 状态](baseline_profile_status.md) 生成 profile，并记录无 profile、partial compilation、full compilation 三组 TTID/TTFD、首帧、PSS、帧时间、温度和电量。API30 AVD 的 Macrobenchmark 已被 AndroidX 以 `EMULATOR` 拒绝；`performance_baseline.md` 中没有真实数值前，状态必须保持 `not-run`。
 
 Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已证明；主机 JVM/Dart/Gradle 时间不能替代同一 Android 设备的前后对照。
 
