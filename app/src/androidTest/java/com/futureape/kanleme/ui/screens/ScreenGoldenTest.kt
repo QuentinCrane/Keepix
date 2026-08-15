@@ -62,6 +62,18 @@ class ScreenGoldenTest {
     @Test
     fun meTabletDarkGolden() = assertMeGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
 
+    @Test
+    fun homePhoneLightGolden() = assertHomeGolden(surface = "phone", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun homePhoneDarkGolden() = assertHomeGolden(surface = "phone", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun homeTabletLightGolden() = assertHomeGolden(surface = "tablet", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun homeTabletDarkGolden() = assertHomeGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
+
     private fun assertMeGolden(surface: String, theme: String, themeMode: ThemeMode) {
         val assetName = "screen_me_${surface}_${theme}_api${Build.VERSION.SDK_INT}.png"
         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
@@ -92,6 +104,108 @@ class ScreenGoldenTest {
                                 onPrivacy = {},
                                 onChangelog = {},
                                 onDiagnosis = {},
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val actual = composeRule.onNodeWithTag("screen-golden-root").captureToImage().asAndroidBitmap()
+        val outputDir = File(targetContext.filesDir, "screenshot-golden")
+        outputDir.mkdirs()
+        val actualFile = File(outputDir, "$assetName.actual.png")
+        actualFile.outputStream().use { actual.compress(Bitmap.CompressFormat.PNG, 100, it) }
+
+        if (InstrumentationRegistry.getArguments().getString("kanleme.screenshotMode") == "capture") {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, "$assetName.actual.png")
+                put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/kanleme-goldens")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val uri = requireNotNull(
+                targetContext.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values),
+            ) { "Unable to create capture asset $assetName" }
+            targetContext.contentResolver.openOutputStream(uri).use { output ->
+                requireNotNull(output) { "Unable to open capture asset $assetName" }
+                actual.compress(Bitmap.CompressFormat.PNG, 100, output)
+            }
+            targetContext.contentResolver.update(
+                uri,
+                ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) },
+                null,
+                null,
+            )
+            return
+        }
+
+        val expected = testContext.assets.open("goldens/$assetName").use(BitmapFactory::decodeStream)
+        assertEquals("Golden width mismatch for $assetName", expected.width, actual.width)
+        assertEquals("Golden height mismatch for $assetName", expected.height, actual.height)
+
+        val diff = Bitmap.createBitmap(actual.width, actual.height, Bitmap.Config.ARGB_8888)
+        val pixelCount = actual.width * actual.height
+        val expectedPixels = IntArray(pixelCount)
+        val actualPixels = IntArray(pixelCount)
+        val diffPixels = IntArray(pixelCount)
+        expected.getPixels(expectedPixels, 0, actual.width, 0, 0, actual.width, actual.height)
+        actual.getPixels(actualPixels, 0, actual.width, 0, 0, actual.width, actual.height)
+        var mismatchedPixels = 0
+        var maxChannelDelta = 0
+        for (index in 0 until pixelCount) {
+            val expectedPixel = expectedPixels[index]
+            val actualPixel = actualPixels[index]
+            val delta = max(
+                max(abs(Color.red(expectedPixel) - Color.red(actualPixel)), abs(Color.green(expectedPixel) - Color.green(actualPixel))),
+                max(abs(Color.blue(expectedPixel) - Color.blue(actualPixel)), abs(Color.alpha(expectedPixel) - Color.alpha(actualPixel))),
+            )
+            maxChannelDelta = max(maxChannelDelta, delta)
+            if (delta > 12) {
+                mismatchedPixels++
+                diffPixels[index] = Color.RED
+            } else {
+                diffPixels[index] = Color.TRANSPARENT
+            }
+        }
+        diff.setPixels(diffPixels, 0, actual.width, 0, 0, actual.width, actual.height)
+        val mismatchRatio = mismatchedPixels.toDouble() / (actual.width * actual.height).toDouble()
+        if (mismatchRatio > 0.002 || maxChannelDelta > 48) {
+            val diffFile = File(outputDir, "$assetName.diff.png")
+            diffFile.outputStream().use { diff.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            assertTrue(
+                "Golden mismatch for $assetName: ratio=$mismatchRatio maxChannelDelta=$maxChannelDelta actual=$actualFile",
+                false,
+            )
+        }
+    }
+
+    private fun assertHomeGolden(surface: String, theme: String, themeMode: ThemeMode) {
+        val assetName = "screen_home_${surface}_${theme}_api${Build.VERSION.SDK_INT}.png"
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val testContext = InstrumentationRegistry.getInstrumentation().context
+        composeRule.activityRule.scenario.onActivity { activity ->
+            activity.setContent {
+                CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                    KanlemeTheme(themeMode = themeMode) {
+                        Box(
+                            modifier = Modifier
+                                .width(if (surface == "phone") 390.dp else 840.dp)
+                                .height(780.dp)
+                                .background(androidx.compose.material3.MaterialTheme.colorScheme.background)
+                                .testTag("screen-golden-root"),
+                        ) {
+                            val viewModel: KanlemeViewModel = hiltViewModel()
+                            CleanHomeScreen(
+                                viewModel = viewModel,
+                                contentPadding = PaddingValues(),
+                                onPhoto = {},
+                                onVideo = {},
+                                onTimeline = {},
+                                onTrash = {},
+                                onFavorites = {},
+                                onToday = {},
+                                onSettings = {},
                             )
                         }
                     }
