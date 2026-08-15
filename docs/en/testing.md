@@ -51,8 +51,8 @@ The same gate was then executed on the two target API AVDs:
 
 | Device | Result | Report |
 | --- | --- | --- |
-| `KeepixApi30` / Android 11 API 30 / `sdk_gphone_x86_64` / 1080x2400 / 420 dpi | `Exit code: 0`, `BUILD SUCCESSFUL`, latest run 40 tests, 0 failures, 0 errors, 0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-KeepixApi30(AVD) - 11-_app-.xml` |
-| `medium_phone` / Android 16 API 36 / `sdk_gphone64_x86_64` / 1080x2400 / 420 dpi | `Exit code: 0`, `BUILD SUCCESSFUL`, 40 tests, 0 failures, 0 errors, 0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-medium_phone(AVD) - 16-_app-.xml` |
+| `KeepixApi30` / Android 11 API 30 / `sdk_gphone_x86_64` / 1080x2400 / 420 dpi | `Exit code: 0`, `BUILD SUCCESSFUL`, latest run 44 tests, 0 failures, 0 errors, 0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-KeepixApi30(AVD) - 11-_app-.xml` |
+| `medium_phone` / Android 16 API 36 / `sdk_gphone64_x86_64` / 1080x2400 / 420 dpi | `Exit code: 0`, `BUILD SUCCESSFUL`, 44 tests, 0 failures, 0 errors, 0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-medium_phone(AVD) - 16-_app-.xml` |
 
 Manual permission observations: API 30 reached the home screen with `READ_EXTERNAL_STORAGE` granted and returned to the authorization screen after denial. API 36 covered full access, partial access with `READ_MEDIA_VISUAL_USER_SELECTED` only (the app displayed `Selected media access` and `Re-select access`), and denied access. These are debug-AVD startup and permission observations, not physical-device/OEM, TalkBack/D-pad, delete-authorization, or full release-candidate acceptance. See the [release-candidate validation record](发布候选验证记录_2026-08-14.md) for the detailed matrix.
 
@@ -64,7 +64,7 @@ Passing the benchmark build does not prove that a profile was generated or that 
 
 ## UI, windows, and accessibility
 
-The planning matrix covers 320/360/390/600/840dp, font/display scales 1.0/1.3/2.0, portrait/landscape, split/freeform windows, light/dark/high-contrast modes, touch, back gestures, TalkBack, and tablet keyboard/D-pad input. `NavigationGoldenTest` and `ScreenGoldenTest` now compare 16 committed API30/API36 golden assets for phone/tablet navigation and the `MeScreen` page group in light/dark themes. Other full business-screen goldens, stable animation checkpoints, the complete font/window device matrix, and connected-device TalkBack/D-pad results remain open.
+The planning matrix covers 320/360/390/600/840dp, font/display scales 1.0/1.3/2.0, portrait/landscape, split/freeform windows, light/dark/high-contrast modes, touch, back gestures, TalkBack, and tablet keyboard/D-pad input. `NavigationGoldenTest` and `ScreenGoldenTest` now compare 24 committed API30/API36 golden assets for phone/tablet navigation, the `MeScreen` page group, and the `CleanHomeScreen` page group in light/dark themes. Other full business-screen goldens, stable animation checkpoints, the complete font/window device matrix, and connected-device TalkBack/D-pad results remain open.
 
 Images under `docs/screenshots` are documentation or historical references; they do not automatically prove the current route, theme, fixture, or device layout.
 
@@ -76,4 +76,4 @@ Deletion/restore/move, partial media permissions, system authorization cancellat
 
 ## Current evidence status
 
-As of this snapshot, `lintDebug`, JVM unit tests, AndroidTest compilation, API 30/API 35/API 36 AVD AndroidTest execution, the app Release gate, and benchmark APK builds have explicit successful exit codes. The latest API 30 and API 36 runs were both 40/40 and include the MediaStore URI contract, WorkManager process-recovery/constraint checks, adaptive rendering, focus semantics for phone and tablet navigation, Keep/Favorite/Delete action identity checks, and navigation-component plus `MeScreen` golden comparisons. API 30/API 36 startup and permission-state observations are also recorded. Final device-matrix acceptance remains pending because OEM/system-authorization failure paths, TalkBack/D-pad manual checks, full accessibility/window matrices, other full-page and animation screenshots, Media3, and real performance data are not closed.
+As of this snapshot, `lintDebug`, JVM unit tests, AndroidTest compilation, API 30/API 35/API 36 AVD AndroidTest execution, the app Release gate, and benchmark APK builds have explicit successful exit codes. The latest API 30 and API 36 runs were both 44/44 and include the MediaStore URI contract, WorkManager process-recovery/constraint checks, adaptive rendering, focus semantics for phone and tablet navigation, Keep/Favorite/Delete action identity checks, and navigation-component plus `MeScreen`/`CleanHomeScreen` golden comparisons. API 30/API 36 startup and permission-state observations are also recorded. Final device-matrix acceptance remains pending because OEM/system-authorization failure paths, TalkBack/D-pad manual checks, full accessibility/window matrices, other full-page and animation screenshots, Media3, and real performance data are not closed.
