@@ -147,6 +147,30 @@ class ScreenGoldenTest {
     @Test
     fun similarPhotosTabletDarkGolden() = assertSimilarPhotosGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
 
+    @Test
+    fun achievementsPhoneLightGolden() = assertAchievementsGolden(surface = "phone", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun achievementsPhoneDarkGolden() = assertAchievementsGolden(surface = "phone", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun achievementsTabletLightGolden() = assertAchievementsGolden(surface = "tablet", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun achievementsTabletDarkGolden() = assertAchievementsGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun annualReportPhoneLightGolden() = assertAnnualReportGolden(surface = "phone", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun annualReportPhoneDarkGolden() = assertAnnualReportGolden(surface = "phone", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun annualReportTabletLightGolden() = assertAnnualReportGolden(surface = "tablet", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun annualReportTabletDarkGolden() = assertAnnualReportGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
+
     private fun assertMeGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("me", surface, theme, themeMode) { viewModel ->
         MeScreen(
             viewModel = viewModel,
@@ -201,6 +225,14 @@ class ScreenGoldenTest {
 
     private fun assertSimilarPhotosGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("similar_photos", surface, theme, themeMode) { viewModel ->
         SimilarPhotosScreen(viewModel = viewModel, onBack = {}, onOpenPhoto = {})
+    }
+
+    private fun assertAchievementsGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("achievements", surface, theme, themeMode) { viewModel ->
+        AchievementsScreen(viewModel = viewModel, onBack = {})
+    }
+
+    private fun assertAnnualReportGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("annual_report", surface, theme, themeMode) { viewModel ->
+        AnnualReportScreen(viewModel = viewModel, onBack = {})
     }
 
     private fun assertScreenGolden(
