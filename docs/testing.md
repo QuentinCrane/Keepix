@@ -51,8 +51,8 @@ adb devices
 
 | 设备 | 结果 | 报告 |
 | --- | --- | --- |
-| `KeepixApi30` / Android 11 API 30 / `sdk_gphone_x86_64` / 1080×2400 / 420 dpi | 既有门禁为 `Exit code: 0`、52 项（基础 36 + 页面 golden 16）；本轮新增 Favorites/Trash 8 项定向运行也全部通过 | `app/build/outputs/androidTest-results/connected/debug/TEST-KeepixApi30(AVD) - 11-_app-.xml` |
-| `medium_phone` / Android 16 API 36 / `sdk_gphone64_x86_64` / 1080×2400 / 420 dpi | 既有门禁为 `Exit code: 0`、52 项；本轮新增 Favorites/Trash 8 项定向运行也全部通过 | `app/build/outputs/androidTest-results/connected/debug/TEST-medium_phone(AVD) - 16-_app-.xml` |
+| `KeepixApi30` / Android 11 API 30 / `sdk_gphone_x86_64` / 1080×2400 / 420 dpi | 既有门禁为 `Exit code: 0`、52 项（基础 36 + 页面 golden 16）；本轮 Favorites/Trash/Settings/SimilarPhotos 共 16 项定向运行也全部通过 | `app/build/outputs/androidTest-results/connected/debug/TEST-KeepixApi30(AVD) - 11-_app-.xml` |
+| `medium_phone` / Android 16 API 36 / `sdk_gphone64_x86_64` / 1080×2400 / 420 dpi | 既有门禁为 `Exit code: 0`、52 项；本轮 Favorites/Trash/Settings/SimilarPhotos 共 16 项定向运行也全部通过 | `app/build/outputs/androidTest-results/connected/debug/TEST-medium_phone(AVD) - 16-_app-.xml` |
 
 API 30 手动授权观察到 `READ_EXTERNAL_STORAGE` 的允许/拒绝状态；API 36 手动观察到 full、partial（`READ_MEDIA_VISUAL_USER_SELECTED` only）和 denied 三态，应用在 partial 状态显示 `Selected media access` 与 `Re-select access`。这些是 debug AVD 上的启动/授权观察，不等于物理设备、OEM、TalkBack/D-pad、删除系统授权或完整发布候选验收。详细记录见[发布候选验证记录](发布候选验证记录_2026-08-14.md)。
 
@@ -64,7 +64,7 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## UI、窗口与无障碍验收
 
-规划矩阵覆盖 320/360/390/600/840dp、字体/显示 1.0/1.3/2.0、横竖屏、分屏/自由窗口、浅色/深色、高对比、触控、返回手势、TalkBack 和平板键盘/D-pad。`AdaptiveRenderSmokeTest` 在 API30 AVD 上对 15 个宽度/字体组合完成真实 Compose 节点渲染与尺寸断言；`NavigationAccessibilityTest` 已覆盖手机胶囊和大屏侧栏，`MediaActionAccessibilityTest` 覆盖 Keep/Favorite/Delete，验证导航和核心操作节点可点击、带焦点语义且触控区域不小于 48dp。`NavigationGoldenTest` 和 `ScreenGoldenTest` 当前定义了 64 项 AndroidTest，其中 API30/API36 各有导航组件及 7 个页面组的手机/平板、light/dark golden；当前共有 64 个 PNG 位于 `app/src/androidTest/assets/goldens/`（导航 8 个、7 个页面组各 8 个）。本轮新增 Settings 8 项/设备的定向比较全部通过，但这仍不能替代其他完整业务页面、动画稳定节点、全字体/窗口设备矩阵或连接设备的 TalkBack/D-pad 结果。
+规划矩阵覆盖 320/360/390/600/840dp、字体/显示 1.0/1.3/2.0、横竖屏、分屏/自由窗口、浅色/深色、高对比、触控、返回手势、TalkBack 和平板键盘/D-pad。`AdaptiveRenderSmokeTest` 在 API30 AVD 上对 15 个宽度/字体组合完成真实 Compose 节点渲染与尺寸断言；`NavigationAccessibilityTest` 已覆盖手机胶囊和大屏侧栏，`MediaActionAccessibilityTest` 覆盖 Keep/Favorite/Delete，验证导航和核心操作节点可点击、带焦点语义且触控区域不小于 48dp。`NavigationGoldenTest` 和 `ScreenGoldenTest` 当前定义了 68 项 AndroidTest，其中 API30/API36 各有导航组件及 8 个页面组的手机/平板、light/dark golden；当前共有 72 个 PNG 位于 `app/src/androidTest/assets/goldens/`（导航 8 个、8 个页面组各 8 个）。本轮 Favorites/Trash/Settings/SimilarPhotos 共 16 项/设备的定向比较全部通过，但这仍不能替代其他完整业务页面、动画稳定节点、全字体/窗口设备矩阵或连接设备的 TalkBack/D-pad 结果。
 
 截图目录中的图片是文档/历史参考，不自动证明当前 route、主题、数据 fixture 或设备布局正确。
 
@@ -76,4 +76,4 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## 当前证据状态
 
-截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30 的既有基础 36 项与页面 golden 16 项、API36 的既有完整 52 项均通过，本轮新增 Favorites/Trash 与 Settings 定向比较也全部通过，当前测试定义为 64 项、golden 资产为 64 个。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、TalkBack/D-pad 人工验收、完整字体/窗口设备矩阵、其他完整页面与动画截图、Media3 和真实性能数据尚未闭环。
+截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30 的既有基础 36 项与页面 golden 16 项、API36 的既有完整 52 项均通过，本轮新增 Favorites/Trash/Settings/SimilarPhotos 定向比较也全部通过，当前测试定义为 68 项、golden 资产为 72 个。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、TalkBack/D-pad 人工验收、完整字体/窗口设备矩阵、其他完整页面与动画截图、Media3 和真实性能数据尚未闭环。

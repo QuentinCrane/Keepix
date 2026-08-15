@@ -6,7 +6,7 @@
 
 - 代码级窗口矩阵：已提交 `e4b5941`，覆盖 320/360/390/600/840dp × 字体 1.0/1.3/2.0 的 `AdaptiveWidthInfo` 边界
 - Android 设备：API30 `KeepixApi30` 与 API36 `medium_phone` AVD 已执行组件级导航 golden；当前没有连接物理设备
-- 组件/页面组截图 golden：`NavigationGoldenTest` 与 `ScreenGoldenTest` 当前定义 64 项 AndroidTest，覆盖手机/平板、light/dark；共 64 个 PNG（导航 8 个、7 个页面组各 8 个），资产位于 `app/src/androidTest/assets/goldens/`。Favorites/Trash/Settings 新增 12 项/设备的定向比较已通过
+- 组件/页面组截图 golden：`NavigationGoldenTest` 与 `ScreenGoldenTest` 当前定义 68 项 AndroidTest，覆盖手机/平板、light/dark；共 72 个 PNG（导航 8 个、8 个页面组各 8 个），资产位于 `app/src/androidTest/assets/goldens/`。Favorites/Trash/Settings/SimilarPhotos 新增 16 项/设备的定向比较已通过
 - 真机截图、TalkBack、D-pad、旋转、分屏和折叠状态：`not-run`
 - 未连接物理设备时不得把 Compose 编译成功、AVD 组件 golden、旧 APK 或历史截图记为真机通过
 
@@ -44,7 +44,7 @@ adb devices
 adb exec-out screencap -p > artifacts/ui-acceptance/<device>/<route>.png
 ```
 
-每次记录设备型号、Android/API、窗口 dp、字体缩放、主题、locale、Git SHA、fixture 标识、route、截图时间和测试结果。组件或页面组 golden 失败时保存 actual/expected/diff；截图目录和包含真实媒体的产物不得提交。当前 golden 覆盖导航组件、`MeScreen`、`CleanHomeScreen`、`TimelineScreen`、`TodayInHistoryScreen`、`FavoritesScreen`、`TrashScreen` 和 `SettingsScreen` 页面组，不代表下方其他业务页面已通过。
+每次记录设备型号、Android/API、窗口 dp、字体缩放、主题、locale、Git SHA、fixture 标识、route、截图时间和测试结果。组件或页面组 golden 失败时保存 actual/expected/diff；截图目录和包含真实媒体的产物不得提交。当前 golden 覆盖导航组件、`MeScreen`、`CleanHomeScreen`、`TimelineScreen`、`TodayInHistoryScreen`、`FavoritesScreen`、`TrashScreen`、`SettingsScreen` 和 `SimilarPhotosScreen` 页面组，不代表下方其他业务页面已通过。
 
 ## 通过条件
 
