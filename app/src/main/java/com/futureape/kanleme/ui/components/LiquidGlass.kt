@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -185,7 +186,8 @@ private fun RailBubble(selected: Boolean, label: String, icon: ImageVector, onCl
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
-            ),
+            )
+            .focusable(),
         shape = RoundedCornerShape(28.dp),
         color = selectedColor,
         contentColor = content,
@@ -220,7 +222,8 @@ private fun RowScope.NavBubble(selected: Boolean, label: String, icon: ImageVect
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
-            ),
+            )
+            .focusable(),
         shape = RoundedCornerShape(999.dp),
         color = selectedColor,
         contentColor = content,
