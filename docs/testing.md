@@ -64,7 +64,7 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## UI、窗口与无障碍验收
 
-规划矩阵覆盖 320/360/390/600/840dp、字体/显示 1.0/1.3/2.0、横竖屏、分屏/自由窗口、浅色/深色、高对比、触控、返回手势、TalkBack 和平板键盘/D-pad。当前已增加 `AdaptiveRenderSmokeTest`：在 API30 AVD 上对 15 个宽度/字体组合完成真实 Compose 节点渲染与尺寸断言；它仍不是 screenshot golden diff，且没有替代连接设备的 TalkBack/D-pad 结果。
+规划矩阵覆盖 320/360/390/600/840dp、字体/显示 1.0/1.3/2.0、横竖屏、分屏/自由窗口、浅色/深色、高对比、触控、返回手势、TalkBack 和平板键盘/D-pad。当前已增加 `AdaptiveRenderSmokeTest`：在 API30 AVD 上对 15 个宽度/字体组合完成真实 Compose 节点渲染与尺寸断言；`NavigationAccessibilityTest` 进一步验证导航语义节点可点击且触控区域不小于 48dp。它们仍不是 screenshot golden diff，且没有替代连接设备的 TalkBack/D-pad 结果。
 
 截图目录中的图片是文档/历史参考，不自动证明当前 route、主题、数据 fixture 或设备布局正确。
 
@@ -76,4 +76,4 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## 当前证据状态
 
-截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30/API36 的基础启动与权限状态也已观察。API30 另有 27/27 复跑，包含 WorkManager 唯一任务入队/取消集成测试。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、无障碍/窗口矩阵、WorkManager 进程重建、Media3、截图 golden 和真实性能数据尚未闭环。
+截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30/API36 的基础启动与权限状态也已观察。API30 最新复跑为 28/28，包含 WorkManager 入队/取消、渲染矩阵和导航无障碍语义测试。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、TalkBack/D-pad、窗口人工验收、WorkManager 进程重建、Media3、截图 golden 和真实性能数据尚未闭环。
