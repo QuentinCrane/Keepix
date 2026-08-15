@@ -172,7 +172,7 @@ class ScreenGoldenTest {
     @Test
     fun annualReportTabletDarkGolden() = assertAnnualReportGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
 
-    private fun assertMeGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("me", surface, theme, themeMode) { viewModel ->
+    private fun assertMeGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("me", surface, theme, themeMode, readyText = "我的") { viewModel ->
         MeScreen(
             viewModel = viewModel,
             contentPadding = PaddingValues(),
@@ -220,7 +220,7 @@ class ScreenGoldenTest {
         TrashScreen(viewModel = viewModel, onBack = {}, onToday = {})
     }
 
-    private fun assertSettingsGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("settings", surface, theme, themeMode) { viewModel ->
+    private fun assertSettingsGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("settings", surface, theme, themeMode, readyText = "设置") { viewModel ->
         SettingsScreen(viewModel = viewModel, onBack = {})
     }
 
