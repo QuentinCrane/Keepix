@@ -27,4 +27,4 @@
 
 ## 当前验证边界
 
-现有单元测试已经覆盖合成实况尾部的合法 `ftyp` + `moov` 与损坏 movie box。真实 OEM、HEIC/HEIF、RAW、超大尾部视频和设备 MediaStore 授权路径仍需要获许可样本与连接设备后执行；这部分在目录中保持明确的 `licensed sample required` 状态。
+现有单元测试已经覆盖合成实况尾部的合法 `ftyp` + `moov`、损坏 movie box、厂商命名提示、GIF/HEIC 分类和静态图片容器误判防护。真实 OEM、HEIC/HEIF、RAW、超大尾部视频和设备 MediaStore 授权路径仍需要获许可样本与连接设备后执行；这部分在目录中保持明确的 `licensed sample required` 状态。
