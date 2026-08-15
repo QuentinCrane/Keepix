@@ -123,6 +123,18 @@ class ScreenGoldenTest {
     @Test
     fun trashTabletDarkGolden() = assertTrashGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
 
+    @Test
+    fun settingsPhoneLightGolden() = assertSettingsGolden(surface = "phone", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun settingsPhoneDarkGolden() = assertSettingsGolden(surface = "phone", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun settingsTabletLightGolden() = assertSettingsGolden(surface = "tablet", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun settingsTabletDarkGolden() = assertSettingsGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
+
     private fun assertMeGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("me", surface, theme, themeMode) { viewModel ->
         MeScreen(
             viewModel = viewModel,
@@ -169,6 +181,10 @@ class ScreenGoldenTest {
 
     private fun assertTrashGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("trash", surface, theme, themeMode) { viewModel ->
         TrashScreen(viewModel = viewModel, onBack = {}, onToday = {})
+    }
+
+    private fun assertSettingsGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("settings", surface, theme, themeMode) { viewModel ->
+        SettingsScreen(viewModel = viewModel, onBack = {})
     }
 
     private fun assertScreenGolden(
