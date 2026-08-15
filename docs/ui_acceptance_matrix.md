@@ -6,7 +6,7 @@
 
 - 代码级窗口矩阵：已提交 `e4b5941`，覆盖 320/360/390/600/840dp × 字体 1.0/1.3/2.0 的 `AdaptiveWidthInfo` 边界
 - Android 设备：API30 `KeepixApi30` 与 API36 `medium_phone` AVD 已执行组件级导航 golden；当前没有连接物理设备
-- 组件/页面组截图 golden：`NavigationGoldenTest` 与 `ScreenGoldenTest` 已覆盖手机/平板、light/dark，每个 API 各 16 个 PNG，共 32 个；资产位于 `app/src/androidTest/assets/goldens/`
+- 组件/页面组截图 golden：`NavigationGoldenTest` 与 `ScreenGoldenTest` 当前定义 60 项 AndroidTest，覆盖手机/平板、light/dark；每个 API 各 24 个 PNG，共 48 个，资产位于 `app/src/androidTest/assets/goldens/`。Favorites/Trash 新增 8 项/设备的定向比较已通过
 - 真机截图、TalkBack、D-pad、旋转、分屏和折叠状态：`not-run`
 - 未连接物理设备时不得把 Compose 编译成功、AVD 组件 golden、旧 APK 或历史截图记为真机通过
 
@@ -20,7 +20,7 @@
 | M1 | 600dp | 1.0 / 1.3 / 2.0 | 中等窗口/分屏 | 控件是否错误缩小，列表与内容区是否保持可读 |
 | E1 | 840dp | 1.0 / 1.3 / 2.0 | 平板展开 | rail/two-pane、焦点顺序、横屏内容宽度 |
 
-每个宽度至少覆盖：浅色、深色；中文、英文；有数据、空态、加载中；照片清理、视频清理、我的、设置、回收站和大图查看器。旋转、自由窗口、分屏和折叠状态变化需要重复检查 route 与状态是否保持。
+每个宽度至少覆盖：浅色、深色；中文、英文；有数据、空态、加载中；照片清理、视频清理、我的、设置、回收站和大图查看器。当前 golden 页面组还未覆盖全部上述状态；旋转、自由窗口、分屏和折叠状态变化需要重复检查 route 与状态是否保持。
 
 ## 核心路径与稳定状态
 
@@ -44,7 +44,7 @@ adb devices
 adb exec-out screencap -p > artifacts/ui-acceptance/<device>/<route>.png
 ```
 
-每次记录设备型号、Android/API、窗口 dp、字体缩放、主题、locale、Git SHA、fixture 标识、route、截图时间和测试结果。组件或页面组 golden 失败时保存 actual/expected/diff；截图目录和包含真实媒体的产物不得提交。当前 golden 覆盖导航组件、`MeScreen`、`CleanHomeScreen`、`TimelineScreen` 和 `TodayInHistoryScreen` 页面组，不代表下方其他业务页面已通过。
+每次记录设备型号、Android/API、窗口 dp、字体缩放、主题、locale、Git SHA、fixture 标识、route、截图时间和测试结果。组件或页面组 golden 失败时保存 actual/expected/diff；截图目录和包含真实媒体的产物不得提交。当前 golden 覆盖导航组件、`MeScreen`、`CleanHomeScreen`、`TimelineScreen`、`TodayInHistoryScreen`、`FavoritesScreen` 和 `TrashScreen` 页面组，不代表下方其他业务页面已通过。
 
 ## 通过条件
 
