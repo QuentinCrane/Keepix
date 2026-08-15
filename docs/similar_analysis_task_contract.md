@@ -43,3 +43,21 @@ idle -> queued -> running -> completed
 - JVM：自动/手动约束、唯一工作名、KEEP/REPLACE 策略和退避合同
 - 构建：Debug/KAPT/Room schema 已通过；WorkManager 的强杀、重启、低电量和真实权限对话框仍需设备验收
 - 验证边界：单个 instrumentation 测试不能在 `am force-stop` 目标包后继续执行断言，因为强停会同时终止当前目标测试进程；进程重建必须由外部两阶段 runner 完成（阶段一入队并退出，外部强停/重启，阶段二重新安装或启动测试并读取唯一工作状态）。在该 runner 接入前，不把现有入队/取消测试当作进程重建证据。
+
+### 两阶段 AVD 验证入口
+
+`SimilarAnalysisSchedulerTest` 支持显式 runner 参数 `kanleme.processRecoveryPhase`，默认不改变普通测试行为。使用已安装的 Debug 与 AndroidTest APK 时，可执行：
+
+```powershell
+adb shell am instrument -w `
+  -e class com.futureape.kanleme.data.worker.SimilarAnalysisSchedulerTest `
+  -e kanleme.processRecoveryPhase enqueue `
+  com.futureape.kanleme.test/com.futureape.kanleme.HiltTestRunner
+adb shell am force-stop com.futureape.kanleme
+adb shell am instrument -w `
+  -e class com.futureape.kanleme.data.worker.SimilarAnalysisSchedulerTest `
+  -e kanleme.processRecoveryPhase verify `
+  com.futureape.kanleme.test/com.futureape.kanleme.HiltTestRunner
+```
+
+2026-08-15 在 `KeepixApi30` 上两阶段均返回 `OK (1 test)`；阶段二在目标包被强停后重新读取唯一任务并成功清理。该证据覆盖 WorkManager 数据持久化与应用进程停止/重新初始化，不覆盖低电量、设备空闲约束或 OEM 后台策略。
