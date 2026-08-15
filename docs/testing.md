@@ -64,7 +64,7 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## UI、窗口与无障碍验收
 
-规划矩阵覆盖 320/360/390/600/840dp、字体/显示 1.0/1.3/2.0、横竖屏、分屏/自由窗口、浅色/深色、高对比、触控、返回手势、TalkBack 和平板键盘/D-pad。`AdaptiveRenderSmokeTest` 在 API30 AVD 上对 15 个宽度/字体组合完成真实 Compose 节点渲染与尺寸断言；`NavigationAccessibilityTest` 已覆盖手机胶囊和大屏侧栏，`MediaActionAccessibilityTest` 覆盖 Keep/Favorite/Delete，验证导航和核心操作节点可点击、带焦点语义且触控区域不小于 48dp。`NavigationGoldenTest` 和 `ScreenGoldenTest` 当前定义了 60 项 AndroidTest，其中 API30/API36 各有导航组件及 6 个页面组的手机/平板、light/dark golden；既有 32 个资产加上本轮 Favorites/Trash 16 个资产，共 48 个 PNG 位于 `app/src/androidTest/assets/goldens/`。本轮新增 8 项/设备的定向比较全部通过，但这仍不能替代其他完整业务页面、动画稳定节点、全字体/窗口设备矩阵或连接设备的 TalkBack/D-pad 结果。
+规划矩阵覆盖 320/360/390/600/840dp、字体/显示 1.0/1.3/2.0、横竖屏、分屏/自由窗口、浅色/深色、高对比、触控、返回手势、TalkBack 和平板键盘/D-pad。`AdaptiveRenderSmokeTest` 在 API30 AVD 上对 15 个宽度/字体组合完成真实 Compose 节点渲染与尺寸断言；`NavigationAccessibilityTest` 已覆盖手机胶囊和大屏侧栏，`MediaActionAccessibilityTest` 覆盖 Keep/Favorite/Delete，验证导航和核心操作节点可点击、带焦点语义且触控区域不小于 48dp。`NavigationGoldenTest` 和 `ScreenGoldenTest` 当前定义了 60 项 AndroidTest，其中 API30/API36 各有导航组件及 6 个页面组的手机/平板、light/dark golden；当前共有 56 个 PNG 位于 `app/src/androidTest/assets/goldens/`（导航 8 个、6 个页面组各 8 个）。本轮新增 8 项/设备的定向比较全部通过，但这仍不能替代其他完整业务页面、动画稳定节点、全字体/窗口设备矩阵或连接设备的 TalkBack/D-pad 结果。
 
 截图目录中的图片是文档/历史参考，不自动证明当前 route、主题、数据 fixture 或设备布局正确。
 
@@ -76,4 +76,4 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## 当前证据状态
 
-截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30 的既有基础 36 项与页面 golden 16 项、API36 的既有完整 52 项均通过，本轮新增 Favorites/Trash 各 8 项定向比较也全部通过，当前测试定义为 60 项、golden 资产为 48 个。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、TalkBack/D-pad 人工验收、完整字体/窗口设备矩阵、其他完整页面与动画截图、Media3 和真实性能数据尚未闭环。
+截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30 的既有基础 36 项与页面 golden 16 项、API36 的既有完整 52 项均通过，本轮新增 Favorites/Trash 各 8 项定向比较也全部通过，当前测试定义为 60 项、golden 资产为 56 个。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、TalkBack/D-pad 人工验收、完整字体/窗口设备矩阵、其他完整页面与动画截图、Media3 和真实性能数据尚未闭环。
