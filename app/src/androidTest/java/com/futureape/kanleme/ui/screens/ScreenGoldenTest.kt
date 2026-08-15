@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -203,19 +204,19 @@ class ScreenGoldenTest {
         )
     }
 
-    private fun assertTimelineGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("timeline", surface, theme, themeMode) { viewModel ->
+    private fun assertTimelineGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("timeline", surface, theme, themeMode, readyText = "全相册时间轴") { viewModel ->
         TimelineScreen(viewModel = viewModel, onBack = {}, onOpenPhoto = {})
     }
 
-    private fun assertTodayHistoryGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("today_history", surface, theme, themeMode) { viewModel ->
+    private fun assertTodayHistoryGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("today_history", surface, theme, themeMode, readyText = "那年今日") { viewModel ->
         TodayInHistoryScreen(viewModel = viewModel, onBack = {}, onOpenPhoto = {})
     }
 
-    private fun assertFavoritesGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("favorites", surface, theme, themeMode) { viewModel ->
+    private fun assertFavoritesGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("favorites", surface, theme, themeMode, readyText = "我的收藏") { viewModel ->
         FavoritesScreen(viewModel = viewModel, onBack = {}, onToday = {})
     }
 
-    private fun assertTrashGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("trash", surface, theme, themeMode) { viewModel ->
+    private fun assertTrashGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("trash", surface, theme, themeMode, readyText = "照片回收站") { viewModel ->
         TrashScreen(viewModel = viewModel, onBack = {}, onToday = {})
     }
 
@@ -223,15 +224,15 @@ class ScreenGoldenTest {
         SettingsScreen(viewModel = viewModel, onBack = {})
     }
 
-    private fun assertSimilarPhotosGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("similar_photos", surface, theme, themeMode) { viewModel ->
+    private fun assertSimilarPhotosGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("similar_photos", surface, theme, themeMode, readyText = "相似照片") { viewModel ->
         SimilarPhotosScreen(viewModel = viewModel, onBack = {}, onOpenPhoto = {})
     }
 
-    private fun assertAchievementsGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("achievements", surface, theme, themeMode) { viewModel ->
+    private fun assertAchievementsGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("achievements", surface, theme, themeMode, readyText = "成就库") { viewModel ->
         AchievementsScreen(viewModel = viewModel, onBack = {})
     }
 
-    private fun assertAnnualReportGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("annual_report", surface, theme, themeMode) { viewModel ->
+    private fun assertAnnualReportGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("annual_report", surface, theme, themeMode, readyText = "年度报告") { viewModel ->
         AnnualReportScreen(viewModel = viewModel, onBack = {})
     }
 
@@ -240,6 +241,7 @@ class ScreenGoldenTest {
         surface: String,
         theme: String,
         themeMode: ThemeMode,
+        readyText: String? = null,
         content: @Composable (KanlemeViewModel) -> Unit,
     ) {
         val assetName = "screen_${screen}_${surface}_${theme}_api${Build.VERSION.SDK_INT}.png"
@@ -264,6 +266,7 @@ class ScreenGoldenTest {
             }
         }
         composeRule.waitForIdle()
+        readyText?.let { composeRule.onNodeWithText(it).fetchSemanticsNode() }
         val actual = composeRule.onNodeWithTag("screen-golden-root").captureToImage().asAndroidBitmap()
         val outputDir = File(targetContext.filesDir, "screenshot-golden")
         outputDir.mkdirs()
