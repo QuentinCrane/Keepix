@@ -25,6 +25,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -1120,7 +1121,7 @@ private fun ReelRailButton(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
             Surface(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(44.dp).focusable(),
                 shape = RoundedCornerShape(999.dp),
                 color = Color.White.copy(alpha = 0.12f),
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),

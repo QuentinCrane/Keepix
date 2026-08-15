@@ -12,6 +12,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -1195,7 +1196,7 @@ fun PhotoActionMiniRail(
 private fun RailIconCompact(icon: ImageVector, description: String, color: Color, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Surface(
-            modifier = Modifier.size(42.dp).clickable(onClick = onClick),
+            modifier = Modifier.size(42.dp).clickable(onClick = onClick).focusable(),
             shape = CircleShape,
             color = color.copy(alpha = 0.18f),
             border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.32f)),
@@ -1340,7 +1341,7 @@ fun MediaActionRow(onKeep: () -> Unit, onFavorite: () -> Unit, onDelete: () -> U
 @Composable
 private fun ActionBubble(icon: ImageVector, label: String, onClick: () -> Unit, large: Boolean = false) {
     Surface(
-        modifier = Modifier.size(if (large) 68.dp else 58.dp).clip(CircleShape).clickable(onClick = onClick),
+        modifier = Modifier.size(if (large) 68.dp else 58.dp).clip(CircleShape).clickable(onClick = onClick).focusable(),
         shape = CircleShape,
         color = adaptiveWhiteSurface(0.32f),
         border = androidx.compose.foundation.BorderStroke(1.dp, adaptiveWhiteBorder(0.38f)),
