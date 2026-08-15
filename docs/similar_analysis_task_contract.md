@@ -42,3 +42,4 @@ idle -> queued -> running -> completed
 - Room AndroidTest 源码覆盖：任务 token、权限/媒体版本、游标和取消标记可写入并恢复；当前门禁只完成 AndroidTest Kotlin 编译，真实设备执行仍待连接设备
 - JVM：自动/手动约束、唯一工作名、KEEP/REPLACE 策略和退避合同
 - 构建：Debug/KAPT/Room schema 已通过；WorkManager 的强杀、重启、低电量和真实权限对话框仍需设备验收
+- 验证边界：单个 instrumentation 测试不能在 `am force-stop` 目标包后继续执行断言，因为强停会同时终止当前目标测试进程；进程重建必须由外部两阶段 runner 完成（阶段一入队并退出，外部强停/重启，阶段二重新安装或启动测试并读取唯一工作状态）。在该 runner 接入前，不把现有入队/取消测试当作进程重建证据。
