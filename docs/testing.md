@@ -77,3 +77,5 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 ## 当前证据状态
 
 截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30 的既有基础 36 项与页面 golden 16 项、API36 的既有完整 52 项均通过，本轮新增 Favorites/Trash/Settings/SimilarPhotos/Achievements/AnnualReport 定向比较也全部通过，当前测试定义为 76 项、golden 资产为 88 个。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、TalkBack/D-pad 人工验收、完整字体/窗口设备矩阵、其他完整页面与动画截图、Media3 和真实性能数据尚未闭环。
+
+2026-08-16 尝试在 API30 AVD 上运行当前 76 项全量 instrumentation，300 秒内未完成；logcat 观察到 AVD 图形绘制 `Davey`、Activity 启动超时及截图稳定超时，因此该次不计为全量通过。targeted 页面 golden、JVM 单测和 AndroidTest 编译结果仍按各自成功退出码记录。

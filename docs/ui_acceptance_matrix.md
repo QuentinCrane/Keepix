@@ -7,6 +7,7 @@
 - 代码级窗口矩阵：已提交 `e4b5941`，覆盖 320/360/390/600/840dp × 字体 1.0/1.3/2.0 的 `AdaptiveWidthInfo` 边界
 - Android 设备：API30 `KeepixApi30` 与 API36 `medium_phone` AVD 已执行组件级导航 golden；当前没有连接物理设备
 - 组件/页面组截图 golden：`NavigationGoldenTest` 与 `ScreenGoldenTest` 当前定义 76 项 AndroidTest，覆盖手机/平板、light/dark；共 88 个 PNG（导航 8 个、10 个页面组各 8 个），资产位于 `app/src/androidTest/assets/goldens/`。Favorites/Trash/Settings/SimilarPhotos/Achievements/AnnualReport 新增 24 项/设备的定向比较已通过
+- 最新代码的 76 项全量 API30 instrumentation 曾尝试运行，但 300 秒内因 AVD 绘制/启动超时未完成；该结果不替代 targeted golden compare，也不计为全量通过
 - 真机截图、TalkBack、D-pad、旋转、分屏和折叠状态：`not-run`
 - 未连接物理设备时不得把 Compose 编译成功、AVD 组件 golden、旧 APK 或历史截图记为真机通过
 
