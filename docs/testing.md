@@ -51,8 +51,8 @@ adb devices
 
 | 设备 | 结果 | 报告 |
 | --- | --- | --- |
-| `KeepixApi30` / Android 11 API 30 / `sdk_gphone_x86_64` / 1080×2400 / 420 dpi | `Exit code: 0`，`BUILD SUCCESSFUL in 44s`，25 tests、0 failures、0 errors、0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-KeepixApi30(AVD) - 11-_app-.xml` |
-| `medium_phone` / Android 16 API 36 / `sdk_gphone64_x86_64` / 1080×2400 / 420 dpi | `Exit code: 0`，`BUILD SUCCESSFUL in 44s`，25 tests、0 failures、0 errors、0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-medium_phone(AVD) - 16-_app-.xml` |
+| `KeepixApi30` / Android 11 API 30 / `sdk_gphone_x86_64` / 1080×2400 / 420 dpi | `Exit code: 0`，`BUILD SUCCESSFUL`，30 tests、0 failures、0 errors、0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-KeepixApi30(AVD) - 11-_app-.xml` |
+| `medium_phone` / Android 16 API 36 / `sdk_gphone64_x86_64` / 1080×2400 / 420 dpi | `Exit code: 0`，`BUILD SUCCESSFUL`，30 tests、0 failures、0 errors、0 skipped | `app/build/outputs/androidTest-results/connected/debug/TEST-medium_phone(AVD) - 16-_app-.xml` |
 
 API 30 手动授权观察到 `READ_EXTERNAL_STORAGE` 的允许/拒绝状态；API 36 手动观察到 full、partial（`READ_MEDIA_VISUAL_USER_SELECTED` only）和 denied 三态，应用在 partial 状态显示 `Selected media access` 与 `Re-select access`。这些是 debug AVD 上的启动/授权观察，不等于物理设备、OEM、TalkBack/D-pad、删除系统授权或完整发布候选验收。详细记录见[发布候选验证记录](发布候选验证记录_2026-08-14.md)。
 
@@ -76,4 +76,4 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## 当前证据状态
 
-截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30/API36 的基础启动与权限状态也已观察。API30 最新复跑为 29/29，新增 MediaStore URI 合法性契约测试，并继续包含 WorkManager 入队/取消、渲染矩阵和导航无障碍语义测试。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、TalkBack/D-pad、窗口人工验收、WorkManager 进程重建、Media3、截图 golden 和真实性能数据尚未闭环。
+截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30/API36 的基础启动与权限状态也已观察。API30/API36 最新复跑均为 30/30，包含 MediaStore URI、WorkManager 进程恢复/约束、渲染矩阵和导航无障碍语义测试。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、TalkBack/D-pad、窗口人工验收、Media3、截图 golden 和真实性能数据尚未闭环。
