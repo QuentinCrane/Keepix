@@ -62,6 +62,33 @@ class SimilarAnalysisSchedulerTest {
         assertEquals(WorkInfo.State.CANCELLED, cancelled.state)
     }
 
+    @Test
+    fun workRequestsExposeModeSpecificRuntimeConstraints() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val workManager = WorkManager.getInstance(context)
+        val scheduler = SimilarAnalysisScheduler(context)
+
+        scheduler.cancel()
+        scheduler.enqueue(SimilarAnalysisWorkMode.AUTO)
+        val automatic = workManager
+            .getWorkInfosForUniqueWork(SimilarAnalysisWorkContract.UNIQUE_WORK_NAME)
+            .get()
+            .single()
+        assertTrue(automatic.constraints.requiresDeviceIdle())
+        assertTrue(automatic.constraints.requiresBatteryNotLow())
+        assertTrue(automatic.constraints.requiresStorageNotLow())
+
+        scheduler.enqueue(SimilarAnalysisWorkMode.MANUAL)
+        val manual = workManager
+            .getWorkInfosForUniqueWork(SimilarAnalysisWorkContract.UNIQUE_WORK_NAME)
+            .get()
+            .single()
+        assertTrue(!manual.constraints.requiresDeviceIdle())
+        assertTrue(manual.constraints.requiresBatteryNotLow())
+        assertTrue(manual.constraints.requiresStorageNotLow())
+        scheduler.cancel()
+    }
+
     private companion object {
         const val PROCESS_RECOVERY_PHASE = "kanleme.processRecoveryPhase"
         const val PHASE_ENQUEUE = "enqueue"
