@@ -5,9 +5,10 @@
 ## 当前状态
 
 - 代码级窗口矩阵：已提交 `e4b5941`，覆盖 320/360/390/600/840dp × 字体 1.0/1.3/2.0 的 `AdaptiveWidthInfo` 边界
-- Android 设备：当前 `adb devices` 没有连接设备
+- Android 设备：API30 `KeepixApi30` 与 API36 `medium_phone` AVD 已执行组件级导航 golden；当前没有连接物理设备
+- 组件级截图 golden：`NavigationGoldenTest` 已覆盖手机/平板侧栏、light/dark，每个 API 各 4 个 PNG；资产位于 `app/src/androidTest/assets/goldens/`
 - 真机截图、TalkBack、D-pad、旋转、分屏和折叠状态：`not-run`
-- 未连接设备时不得把 Compose 编译成功、旧 APK 或历史截图记为通过
+- 未连接物理设备时不得把 Compose 编译成功、AVD 组件 golden、旧 APK 或历史截图记为真机通过
 
 ## 尺寸与状态矩阵
 
@@ -43,7 +44,7 @@ adb devices
 adb exec-out screencap -p > artifacts/ui-acceptance/<device>/<route>.png
 ```
 
-每次记录设备型号、Android/API、窗口 dp、字体缩放、主题、locale、Git SHA、fixture 标识、route、截图时间和测试结果。失败时保存 actual/expected/diff；截图目录和包含真实媒体的产物不得提交。
+每次记录设备型号、Android/API、窗口 dp、字体缩放、主题、locale、Git SHA、fixture 标识、route、截图时间和测试结果。组件 golden 失败时保存 actual/expected/diff；截图目录和包含真实媒体的产物不得提交。当前 golden 只覆盖导航组件，不代表下方业务页面已通过。
 
 ## 通过条件
 
