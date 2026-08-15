@@ -135,6 +135,18 @@ class ScreenGoldenTest {
     @Test
     fun settingsTabletDarkGolden() = assertSettingsGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
 
+    @Test
+    fun similarPhotosPhoneLightGolden() = assertSimilarPhotosGolden(surface = "phone", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun similarPhotosPhoneDarkGolden() = assertSimilarPhotosGolden(surface = "phone", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun similarPhotosTabletLightGolden() = assertSimilarPhotosGolden(surface = "tablet", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun similarPhotosTabletDarkGolden() = assertSimilarPhotosGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
+
     private fun assertMeGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("me", surface, theme, themeMode) { viewModel ->
         MeScreen(
             viewModel = viewModel,
@@ -185,6 +197,10 @@ class ScreenGoldenTest {
 
     private fun assertSettingsGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("settings", surface, theme, themeMode) { viewModel ->
         SettingsScreen(viewModel = viewModel, onBack = {})
+    }
+
+    private fun assertSimilarPhotosGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("similar_photos", surface, theme, themeMode) { viewModel ->
+        SimilarPhotosScreen(viewModel = viewModel, onBack = {}, onOpenPhoto = {})
     }
 
     private fun assertScreenGolden(
