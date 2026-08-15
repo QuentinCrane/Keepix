@@ -45,7 +45,7 @@ class MediaStoreActions @Inject constructor(
         val uris = mediaUris.mapNotNull { rawUri ->
             runCatching { Uri.parse(rawUri) }.getOrNull()
         }.distinct()
-        if (uris.isEmpty() || uris.any { it.scheme != "content" || it.authority.isNullOrBlank() }) {
+        if (uris.isEmpty() || uris.any { !isValidMediaStoreUri(it) }) {
             return MediaAuthorizationResult.Failed(context.getString(R.string.media_error_invalid_uri))
         }
 
@@ -87,6 +87,9 @@ class MediaStoreActions @Inject constructor(
         val normalizedPath = normalizeRelativePath(targetRelativePath)
         val uri = runCatching { Uri.parse(mediaUri) }.getOrNull()
             ?: return MediaOperationResult.Failed(context.getString(R.string.media_error_invalid_uri))
+        if (!isValidMediaStoreUri(uri)) {
+            return MediaOperationResult.Failed(context.getString(R.string.media_error_invalid_uri))
+        }
 
         return try {
             val values = ContentValues().apply {
@@ -118,6 +121,9 @@ class MediaStoreActions @Inject constructor(
     )
 
     companion object {
+        internal fun isValidMediaStoreUri(uri: Uri): Boolean =
+            uri.scheme == "content" && !uri.authority.isNullOrBlank()
+
         fun normalizeRelativePath(path: String): String {
             val clean = path.trim().replace('\\', '/').trim('/')
             return when {
