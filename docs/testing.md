@@ -64,7 +64,7 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## UI、窗口与无障碍验收
 
-规划矩阵覆盖 320/360/390/600/840dp、字体/显示 1.0/1.3/2.0、横竖屏、分屏/自由窗口、浅色/深色、高对比、触控、返回手势、TalkBack 和平板键盘/D-pad。`AdaptiveRenderSmokeTest` 在 API30 AVD 上对 15 个宽度/字体组合完成真实 Compose 节点渲染与尺寸断言；`NavigationAccessibilityTest` 已覆盖手机胶囊和大屏侧栏，`MediaActionAccessibilityTest` 覆盖 Keep/Favorite/Delete，验证导航和核心操作节点可点击、带焦点语义且触控区域不小于 48dp。`NavigationGoldenTest` 和 `ScreenGoldenTest` 当前定义了 76 项 AndroidTest，其中 API30/API36 各有导航组件及 10 个页面组的手机/平板、light/dark golden；当前共有 88 个 PNG 位于 `app/src/androidTest/assets/goldens/`（导航 8 个、10 个页面组各 8 个）。本轮 Favorites/Trash/Settings/SimilarPhotos/Achievements/AnnualReport 共 24 项/设备的定向比较全部通过，但这仍不能替代其他完整业务页面、动画稳定节点、全字体/窗口设备矩阵或连接设备的 TalkBack/D-pad 结果。
+规划矩阵覆盖 320/360/390/600/840dp、字体/显示 1.0/1.3/2.0、横竖屏、分屏/自由窗口、浅色/深色、高对比、触控、返回手势、TalkBack 和平板键盘/D-pad。`AdaptiveRenderSmokeTest` 在 API30 AVD 上对 15 个宽度/字体组合完成真实 Compose 节点渲染与尺寸断言；`NavigationAccessibilityTest` 已覆盖手机胶囊和大屏侧栏，`MediaActionAccessibilityTest` 覆盖 Keep/Favorite/Delete，验证导航和核心操作节点可点击、带焦点语义且触控区域不小于 48dp。`NavigationGoldenTest` 和 `ScreenGoldenTest` 当前定义了 76 项 AndroidTest，其中 API30/API36 各有导航组件及 10 个页面组的手机/平板、light/dark golden；当前共有 88 个 PNG 位于 `app/src/androidTest/assets/goldens/`（导航 8 个、10 个页面组各 8 个）。本轮 Favorites/Trash/Settings/SimilarPhotos/Achievements/AnnualReport 共 24 项/设备的定向比较全部通过；提交 `99cbe1a`、`45a0ed9` 后，截图前还会通过语义树确认目标页面标题已出现。该断言补强了 route 稳定性，但仍不能替代其他完整业务页面、动画稳定节点、全字体/窗口设备矩阵或连接设备的 TalkBack/D-pad 结果。
 
 截图目录中的图片是文档/历史参考，不自动证明当前 route、主题、数据 fixture 或设备布局正确。
 
