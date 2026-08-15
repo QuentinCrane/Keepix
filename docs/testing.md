@@ -76,4 +76,4 @@ Benchmark 构建通过不等于 profile 已生成，也不等于性能收益已�
 
 ## 当前证据状态
 
-截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30/API36 的基础启动与权限状态也已观察。API30 最新复跑为 28/28，包含 WorkManager 入队/取消、渲染矩阵和导航无障碍语义测试。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、TalkBack/D-pad、窗口人工验收、WorkManager 进程重建、Media3、截图 golden 和真实性能数据尚未闭环。
+截至本快照，`lintDebug`、JVM 单测、AndroidTest 编译、API30/API35/API36 AVD 上的 AndroidTest、app Release 门禁和 benchmark APK 构建均有明确成功退出码；API30/API36 的基础启动与权限状态也已观察。API30 最新复跑为 29/29，新增 MediaStore URI 合法性契约测试，并继续包含 WorkManager 入队/取消、渲染矩阵和导航无障碍语义测试。最终设备矩阵验收仍保持未完成，因为 OEM/系统授权失败路径、TalkBack/D-pad、窗口人工验收、WorkManager 进程重建、Media3、截图 golden 和真实性能数据尚未闭环。
