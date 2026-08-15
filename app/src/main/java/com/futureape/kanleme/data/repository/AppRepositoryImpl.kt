@@ -970,7 +970,7 @@ class AppRepositoryImpl @Inject constructor(
                         )
                     }
                 }
-                MovePhotoResult(true, "已移动到 ${MediaStoreActions.folderNameOf(normalizedPath)}")
+                MovePhotoResult(true, "已移动到 " + MediaStoreActions.folderNameOf(normalizedPath))
             }
             is MediaOperationResult.Failed -> MovePhotoResult(false, result.reason)
         }
@@ -1020,7 +1020,7 @@ class AppRepositoryImpl @Inject constructor(
                         )
                     }
                 }
-                MovePhotoResult(true, "已移动到 ${MediaStoreActions.folderNameOf(normalizedPath)}")
+                MovePhotoResult(true, "已移动到 " + MediaStoreActions.folderNameOf(normalizedPath))
             }
             is MediaOperationResult.Failed -> MovePhotoResult(false, result.reason)
         }
@@ -1476,7 +1476,7 @@ class AppRepositoryImpl @Inject constructor(
                 else -> "稳健型整理者"
             },
             styleDescription = if (hasData) {
-                "这一年记录了 ${actionCount} 次本地整理动作，处理 ${clearedCount} 个媒体文件，最常涉及 ${folder}。"
+                "这一年记录了 " + actionCount + " 次本地整理动作，处理 " + clearedCount + " 个媒体文件，最常涉及 " + folder + "。"
             } else {
                 "这一年还没有可核对的本地整理事件，已有数据不会被当前媒体库状态冒充。"
             },
