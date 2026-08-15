@@ -75,6 +75,30 @@ class ScreenGoldenTest {
     @Test
     fun homeTabletDarkGolden() = assertHomeGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
 
+    @Test
+    fun timelinePhoneLightGolden() = assertTimelineGolden(surface = "phone", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun timelinePhoneDarkGolden() = assertTimelineGolden(surface = "phone", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun timelineTabletLightGolden() = assertTimelineGolden(surface = "tablet", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun timelineTabletDarkGolden() = assertTimelineGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun todayHistoryPhoneLightGolden() = assertTodayHistoryGolden(surface = "phone", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun todayHistoryPhoneDarkGolden() = assertTodayHistoryGolden(surface = "phone", theme = "dark", themeMode = ThemeMode.DARK)
+
+    @Test
+    fun todayHistoryTabletLightGolden() = assertTodayHistoryGolden(surface = "tablet", theme = "light", themeMode = ThemeMode.LIGHT)
+
+    @Test
+    fun todayHistoryTabletDarkGolden() = assertTodayHistoryGolden(surface = "tablet", theme = "dark", themeMode = ThemeMode.DARK)
+
     private fun assertMeGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("me", surface, theme, themeMode) { viewModel ->
         MeScreen(
             viewModel = viewModel,
@@ -105,6 +129,14 @@ class ScreenGoldenTest {
             onToday = {},
             onSettings = {},
         )
+    }
+
+    private fun assertTimelineGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("timeline", surface, theme, themeMode) { viewModel ->
+        TimelineScreen(viewModel = viewModel, onBack = {}, onOpenPhoto = {})
+    }
+
+    private fun assertTodayHistoryGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("today_history", surface, theme, themeMode) { viewModel ->
+        TodayInHistoryScreen(viewModel = viewModel, onBack = {}, onOpenPhoto = {})
     }
 
     private fun assertScreenGolden(
