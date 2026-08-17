@@ -137,6 +137,8 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
 
+private val PositionGuideAccent = Color(0xFF8FA8FF)
+
 @Composable
 fun ScreenHeader(title: String, subtitle: String? = null, onBack: (() -> Unit)? = null) {
     Row(
@@ -1267,11 +1269,13 @@ fun PhotoGuideDialog(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(0.86f),
         shape = RoundedCornerShape(34.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 28.dp,
+        color = Color(0xFF101923).copy(alpha = 0.96f),
+        contentColor = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+        shadowElevation = 0.dp,
     ) {
         Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(R.string.guide_title), style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.guide_title), style = MaterialTheme.typography.headlineSmall, color = Color.White)
             Spacer(Modifier.height(22.dp))
             GuideRow(Icons.Rounded.Visibility, stringResource(R.string.photo_guide_card_title), stringResource(R.string.photo_guide_card_body))
             GuideRow(Icons.Rounded.Visibility, stringResource(R.string.guide_double_tap), stringResource(R.string.guide_toggle_chrome))
@@ -1281,8 +1285,8 @@ fun PhotoGuideDialog(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
             Surface(
                 modifier = Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onDismiss),
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.48f),
-            ) { Box(contentAlignment = Alignment.Center) { Text(stringResource(R.string.photo_guide_done), color = Color.White, style = MaterialTheme.typography.titleMedium) } }
+                color = PositionGuideAccent,
+            ) { Box(contentAlignment = Alignment.Center) { Text(stringResource(R.string.photo_guide_done), color = Color(0xFF08111C), style = MaterialTheme.typography.titleMedium) } }
         }
     }
 }
@@ -1292,11 +1296,13 @@ fun VideoGuideDialog(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(0.86f),
         shape = RoundedCornerShape(34.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 28.dp,
+        color = Color(0xFF101923).copy(alpha = 0.96f),
+        contentColor = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+        shadowElevation = 0.dp,
     ) {
         Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(R.string.guide_title), style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.guide_title), style = MaterialTheme.typography.headlineSmall, color = Color.White)
             Spacer(Modifier.height(22.dp))
             GuideRow(Icons.Rounded.Swipe, stringResource(R.string.video_guide_swipe_vertical), stringResource(R.string.video_guide_swipe_vertical_body))
             GuideRow(Icons.Rounded.Swipe, stringResource(R.string.video_guide_swipe_horizontal), stringResource(R.string.video_guide_swipe_horizontal_body))
@@ -1306,8 +1312,8 @@ fun VideoGuideDialog(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
             Surface(
                 modifier = Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onDismiss),
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.48f),
-            ) { Box(contentAlignment = Alignment.Center) { Text(stringResource(R.string.video_guide_done), color = Color.White, style = MaterialTheme.typography.titleMedium) } }
+                color = PositionGuideAccent,
+            ) { Box(contentAlignment = Alignment.Center) { Text(stringResource(R.string.video_guide_done), color = Color(0xFF08111C), style = MaterialTheme.typography.titleMedium) } }
         }
     }
 }
@@ -1315,12 +1321,17 @@ fun VideoGuideDialog(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 private fun GuideRow(icon: ImageVector, title: String, text: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Surface(modifier = Modifier.size(56.dp), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)) {
-            Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+        Surface(
+            modifier = Modifier.size(56.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = PositionGuideAccent.copy(alpha = 0.14f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+        ) {
+            Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = PositionGuideAccent) }
         }
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Text(text, style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.70f))
         }
     }
 }
@@ -1332,9 +1343,9 @@ fun MediaActionRow(onKeep: () -> Unit, onFavorite: () -> Unit, onDelete: () -> U
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ActionBubble(Icons.Rounded.Close, "保留", onKeep)
-        ActionBubble(Icons.Rounded.FavoriteBorder, "收藏", onFavorite, large = true)
-        ActionBubble(Icons.Rounded.Delete, "待删", onDelete)
+        ActionBubble(Icons.Rounded.Close, stringResource(R.string.swipe_action_keep), onKeep)
+        ActionBubble(Icons.Rounded.FavoriteBorder, stringResource(R.string.swipe_action_favorite), onFavorite, large = true)
+        ActionBubble(Icons.Rounded.Delete, stringResource(R.string.swipe_action_delete), onDelete)
     }
 }
 
