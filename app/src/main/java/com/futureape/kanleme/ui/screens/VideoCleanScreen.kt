@@ -346,6 +346,7 @@ fun VideoCleanScreen(
                     deletedSizeBytes = dashboard.pendingDeleteBytes,
                     displayMode = settings.videoDisplayMode,
                     dateMode = scope.dateMode,
+                    showProgress = settings.videoShowTopBar,
                     showFolderChips = settings.videoShowFolderChips,
                     showShuffle = settings.videoShowShuffleButton,
                     onToggleDisplayMode = { haptics.tick(); viewModel.toggleVideoDisplayModeQuick() },
@@ -453,12 +454,13 @@ private fun VideoPositionGuideOverlay(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun VideoOrganizerTopRow(
+internal fun VideoOrganizerTopRow(
     progressPercent: Int,
     remainingCount: Int,
     deletedSizeBytes: Long,
     displayMode: VideoDisplayMode,
     dateMode: String,
+    showProgress: Boolean,
     showFolderChips: Boolean,
     showShuffle: Boolean,
     onToggleDisplayMode: () -> Unit,
@@ -466,10 +468,11 @@ private fun VideoOrganizerTopRow(
     onFolderClick: () -> Unit,
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
+    includeStatusBarsPadding: Boolean = true,
 ) {
     Row(
         modifier = modifier
-            .statusBarsPadding()
+            .then(if (includeStatusBarsPadding) Modifier.statusBarsPadding() else Modifier)
             .padding(vertical = 12.dp)
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
@@ -493,15 +496,17 @@ private fun VideoOrganizerTopRow(
                 onClick = onFolderClick,
             )
         }
-        OrganizerProgressPill(
-            progressPercent = progressPercent,
-            remainingCount = remainingCount,
-            remainingLabel = stringResource(R.string.video_count_unit),
-            releasableBytes = deletedSizeBytes,
-            modifier = Modifier.width(94.dp),
-            compact = true,
-            progressLabel = stringResource(R.string.video_progress_target),
-        )
+        if (showProgress) {
+            OrganizerProgressPill(
+                progressPercent = progressPercent,
+                remainingCount = remainingCount,
+                remainingLabel = stringResource(R.string.video_count_unit),
+                releasableBytes = deletedSizeBytes,
+                modifier = Modifier.width(94.dp),
+                compact = true,
+                progressLabel = stringResource(R.string.video_progress_target),
+            )
+        }
         if (showShuffle) {
             ShuffleSessionButton(
                 label = stringResource(R.string.photo_shuffle_title),
@@ -784,7 +789,6 @@ private fun VideoReelPage(
                 }
         )
 
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.06f)))
         androidx.compose.animation.AnimatedVisibility(
             visible = playbackFailed && isCurrent,
             enter = fadeIn(tween(180, easing = LinearOutSlowInEasing)),
@@ -821,20 +825,36 @@ private fun VideoReelPage(
                 }
             }
         }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    androidx.compose.ui.graphics.Brush.verticalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = 0.42f),
-                            Color.Transparent,
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.76f),
+        if (chromeVisible) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(176.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = 0.18f),
+                                Color.Transparent,
+                            )
                         )
                     )
-                )
-        )
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(236.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.48f),
+                            )
+                        )
+                    )
+            )
+        }
 
         androidx.compose.animation.AnimatedVisibility(
             visible = settings.videoShowActionRail,
