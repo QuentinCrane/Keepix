@@ -21,6 +21,15 @@
 - 回收站已经拆分照片 / 视频，预览页会根据来源场景显示分享、取消收藏、删除或从列表移除等操作。
 - 设置中心按常用设置、媒体范围、支持与维护重新组织，只保留实际影响整理、显示、媒体范围、触觉、外观或维护能力的设置项。
 
+
+## 2026-08-18 收尾
+
+- 照片/视频滑动引导弹窗改为深色玻璃卡片风格，操作按钮与说明文字改为可本地化文案（`8d6fa26`）。
+- 首次启动引导页改为固定深色渐变主题，矮屏自动使用紧凑间距与可滚动布局（`6535ee1`）。
+- 设置页“视频整理页实时预览”按容器宽度自适应高度，补齐深色操作栏与底部组件预览（`5b6e239`）。
+- 视频整理页顶部进度胶囊可跟随设置隐藏，顶部/底部渐变遮罩只在控制栏可见时叠加（`51f506a`）。
+- 使用历史 release keystore 签名构建 `app-release.apk` 并完成证书/元数据校验（`78a4789` 与本地发布记录）。
+
 ## 继续维护重点
 
 1. 在真机上复核 Android 13+ 的 `READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO` 权限和 Android 14+ 的部分媒体访问表现。
@@ -57,10 +66,9 @@
 .\gradlew.bat :app:assembleRelease --console=plain
 ```
 
-当前本地发布产物路径：
+当前本地发布产物：
 
-```text
-app/build/outputs/apk/release/app-release-unsigned.apk
-```
+- 未签名候选：`app/build/outputs/apk/release/app-release-unsigned.apk`
+- 已签名发布 APK：`app/build/outputs/apk/release/app-release.apk`（2026-08-18 使用历史 release keystore 签名，v2，证书 SHA-256 `ade29388…dbee`）
 
-仓库默认构建的是未签名 Release 候选；只有配置本机或 CI release keystore 后才会生成签名附件。构建产物不应提交进 Git。
+签名密钥、密码与 APK 均不提交进 Git；签名与元数据记录见 `docs/发布候选验证记录_2026-08-14.md`。
