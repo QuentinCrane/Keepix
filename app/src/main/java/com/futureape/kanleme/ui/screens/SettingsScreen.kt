@@ -22,17 +22,21 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -42,6 +46,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.rounded.DriveFileMove
 import androidx.compose.material.icons.automirrored.rounded.Help
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AspectRatio
 import androidx.compose.material.icons.rounded.Backup
@@ -52,6 +57,7 @@ import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Image
@@ -66,6 +72,9 @@ import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
@@ -1586,82 +1595,154 @@ private fun VideoOrganizerMockPreview(
     onToggleProgressBar: () -> Unit,
     onToggleShuffleButton: () -> Unit,
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(468.dp)
-            .clip(RoundedCornerShape(30.dp))
-            .background(Color.Black)
-            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(30.dp))
-            .padding(14.dp),
+            .heightIn(min = 420.dp, max = 620.dp),
     ) {
-        PreviewAreaTitle("视频整理页实时布局", "重新随机已经进入第一行；播放器只为当前页创建，减少闪退概率。")
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 58.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (settings.videoShowTopBar) PreviewDarkComponentBlock("顶部进度", "12/600 · 待删 3", onToggleTopBar, Modifier.weight(1f))
-            else PreviewDarkHiddenBlock("顶部进度已隐藏", onToggleTopBar, Modifier.weight(1f))
-            if (settings.videoShowFolderChips) PreviewDarkComponentBlock("文件夹", "指定归档", onToggleFolderChips, Modifier.width(104.dp))
-            else PreviewDarkHiddenBlock("文件夹", onToggleFolderChips, Modifier.width(104.dp))
-            if (settings.videoShowShuffleButton) PreviewDarkComponentBlock("重新随机", "第一行", onToggleShuffleButton, Modifier.width(116.dp))
-            else PreviewDarkHiddenBlock("随机按钮", onToggleShuffleButton, Modifier.width(116.dp))
-        }
+        val previewHeight = (maxWidth / 0.72f).coerceIn(420.dp, 620.dp)
+        val showTopControls = settings.videoShowTopBar || settings.videoShowFolderChips || settings.videoShowShuffleButton
 
         Box(
             modifier = Modifier
-                .align(Alignment.Center)
-                .width(156.dp)
-                .height(260.dp)
-                .clip(RoundedCornerShape(32.dp))
-                .background(Color.White.copy(alpha = 0.10f))
-                .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(32.dp)),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .height(previewHeight)
+                .clip(RoundedCornerShape(30.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF18263A), Color(0xFF0B111B), Color.Black),
+                    )
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(30.dp))
+                .padding(14.dp),
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.width(108.dp).height(190.dp).clip(RoundedCornerShape(24.dp)).background(Color.White.copy(alpha = 0.16f)))
-                Text("短视频画面", style = MaterialTheme.typography.titleMedium, color = Color.White)
-            }
-        }
-
-        if (settings.videoShowActionRail) {
-            Column(
-                modifier = Modifier.align(Alignment.CenterEnd).width(76.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .widthIn(min = 132.dp, max = 224.dp)
+                    .fillMaxHeight(0.66f)
+                    .clip(RoundedCornerShape(30.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0xFF536B89), Color(0xFF17263B), Color(0xFF090D14)),
+                        )
+                    )
+                    .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(30.dp)),
+                contentAlignment = Alignment.Center,
             ) {
-                PreviewMiniAction("声音", Color(0xFF67A9D6), onToggleActionRail)
-                PreviewMiniAction("收藏", Color(0xFFE0A342), onToggleActionRail)
-                PreviewMiniAction("待删", Color(0xFFE36A6A), onToggleActionRail)
-                PreviewMiniAction("分享", Color(0xFF93D08B), onToggleActionRail)
-            }
-        } else {
-            PreviewDarkHiddenBlock("右侧操作栏", onToggleActionRail, Modifier.align(Alignment.CenterEnd).width(96.dp))
-        }
-
-        Column(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (settings.videoShowInfoPanel) PreviewDarkComponentBlock("底部信息", "00:42 · 18MB · 长按 2 倍速", onToggleInfoPanel, Modifier.fillMaxWidth())
-            else PreviewDarkHiddenBlock("底部信息已隐藏", onToggleInfoPanel, Modifier.fillMaxWidth())
-            if (settings.videoShowProgressBar) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(18.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(Color.White.copy(alpha = 0.20f))
-                        .clickable(onClick = onToggleProgressBar),
-                ) {
-                    Box(Modifier.fillMaxWidth(0.46f).height(18.dp).background(MaterialTheme.colorScheme.primary))
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Rounded.Movie, contentDescription = null, modifier = Modifier.size(34.dp), tint = Color.White.copy(alpha = 0.86f))
+                    Text("当前视频", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                    Text(stringResource(settings.videoDisplayMode.labelRes), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.68f))
                 }
-            } else {
-                PreviewDarkHiddenBlock("进度条已隐藏", onToggleProgressBar, Modifier.fillMaxWidth())
             }
+
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(108.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = 0.16f), Color.Transparent),
+                        )
+                    )
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(148.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.44f)),
+                        )
+                    )
+            )
+
+            if (showTopControls) {
+                VideoOrganizerTopRow(
+                    progressPercent = 42,
+                    remainingCount = 120,
+                    deletedSizeBytes = 3L * 1024L * 1024L,
+                    displayMode = settings.videoDisplayMode,
+                    dateMode = "all",
+                    showProgress = settings.videoShowTopBar,
+                    showFolderChips = settings.videoShowFolderChips,
+                    showShuffle = settings.videoShowShuffleButton,
+                    onToggleDisplayMode = {},
+                    onDateClick = {},
+                    onFolderClick = onToggleFolderChips,
+                    onShuffle = onToggleShuffleButton,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    includeStatusBarsPadding = false,
+                )
+            }
+
+            if (settings.videoShowActionRail) {
+                PreviewDarkActionRail(
+                    onClick = onToggleActionRail,
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                )
+            } else {
+                PreviewDarkHiddenBlock("右侧操作栏", onToggleActionRail, Modifier.align(Alignment.CenterEnd).width(96.dp))
+            }
+
+            Column(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (settings.videoShowInfoPanel) PreviewDarkComponentBlock("底部信息", "00:42 · 18MB · 长按 2 倍速", onToggleInfoPanel, Modifier.fillMaxWidth())
+                else PreviewDarkHiddenBlock("底部信息已隐藏", onToggleInfoPanel, Modifier.fillMaxWidth())
+                if (settings.videoShowProgressBar) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(18.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Color.White.copy(alpha = 0.20f))
+                            .clickable(onClick = onToggleProgressBar),
+                    ) {
+                        Box(Modifier.fillMaxWidth(0.46f).height(18.dp).background(MaterialTheme.colorScheme.primary))
+                    }
+                } else {
+                    PreviewDarkHiddenBlock("进度条已隐藏", onToggleProgressBar, Modifier.fillMaxWidth())
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewDarkActionRail(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.width(58.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        PreviewDarkRailButton(Icons.AutoMirrored.Rounded.Undo, "撤回", onClick)
+        PreviewDarkRailButton(Icons.Rounded.VisibilityOff, "隐藏控制", onClick)
+        PreviewDarkRailButton(Icons.AutoMirrored.Rounded.VolumeOff, "静音", onClick)
+        PreviewDarkRailButton(Icons.Rounded.FavoriteBorder, "收藏", onClick)
+        PreviewDarkRailButton(Icons.Rounded.Delete, "待删", onClick)
+        PreviewDarkRailButton(Icons.Rounded.Share, "分享", onClick)
+    }
+}
+
+@Composable
+private fun PreviewDarkRailButton(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.10f),
+        contentColor = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp))
         }
     }
 }
