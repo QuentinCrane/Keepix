@@ -7,27 +7,30 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.DeleteSweep
-import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Swipe
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -42,14 +45,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
-import com.futureape.kanleme.ui.components.GlassSurface
 import com.futureape.kanleme.R
+
+private val OnboardingAccent = Color(0xFF8FA8FF)
+private val OnboardingText = Color(0xFFF4F7FA)
+private val OnboardingMuted = Color(0xFFB6C1CF)
 
 @Composable
 fun OnboardingScreen(onFinish: () -> Unit) {
@@ -85,29 +90,38 @@ fun OnboardingScreen(onFinish: () -> Unit) {
         ),
     )
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(onboardingBackgroundBrush())
-            .padding(22.dp),
+            .padding(16.dp),
         contentAlignment = Alignment.Center,
     ) {
-        GlassSurface(
-            modifier = Modifier.fillMaxWidth(),
+        val compact = maxHeight < 720.dp
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 760.dp)
+                .heightIn(max = (maxHeight - 8.dp).coerceAtLeast(0.dp)),
             shape = RoundedCornerShape(36.dp),
-            tonalAlpha = 0.82f,
+            color = Color.White.copy(alpha = 0.08f),
+            contentColor = OnboardingText,
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = if (compact) 18.dp else 28.dp, vertical = if (compact) 18.dp else 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 18.dp),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     pages.indices.forEach { index ->
                         Surface(
                             modifier = Modifier.size(width = if (index == page) 28.dp else 9.dp, height = 9.dp),
                             shape = RoundedCornerShape(999.dp),
-                            color = if (index == page) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                            color = if (index == page) OnboardingAccent else OnboardingAccent.copy(alpha = 0.24f),
                         ) {}
                     }
                 }
@@ -117,15 +131,17 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                     transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(140)) },
                     label = "onboarding_page",
                 ) { item ->
-                    OnboardingPageCard(item)
+                    OnboardingPageCard(item, compact)
                 }
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (page > 0) {
                         OutlinedButton(
                             onClick = { page -= 1 },
-                            modifier = Modifier.weight(1f).height(54.dp),
+                            modifier = Modifier.weight(1f).height(if (compact) 48.dp else 54.dp),
                             shape = RoundedCornerShape(999.dp),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.32f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = OnboardingText),
                         ) {
                             Text(stringResource(R.string.onboarding_previous))
                         }
@@ -134,8 +150,12 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                         onClick = {
                             if (page < pages.lastIndex) page += 1 else onFinish()
                         },
-                        modifier = Modifier.weight(1f).height(54.dp),
+                        modifier = Modifier.weight(1f).height(if (compact) 48.dp else 54.dp),
                         shape = RoundedCornerShape(999.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = OnboardingAccent,
+                            contentColor = Color(0xFF08111C),
+                        ),
                     ) {
                         Text(stringResource(if (page < pages.lastIndex) R.string.onboarding_next else R.string.onboarding_start))
                     }
@@ -144,7 +164,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 Text(
                     text = stringResource(R.string.onboarding_footer),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = OnboardingMuted,
                     textAlign = TextAlign.Center,
                 )
             }
@@ -153,29 +173,29 @@ fun OnboardingScreen(onFinish: () -> Unit) {
 }
 
 @Composable
-private fun OnboardingPageCard(page: OnboardingPage) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+private fun OnboardingPageCard(page: OnboardingPage, compact: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)) {
         Surface(
-            modifier = Modifier.size(88.dp),
+            modifier = Modifier.size(if (compact) 72.dp else 88.dp),
             shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-            border = BorderStroke(1.dp, onboardingBorderColor()),
+            color = OnboardingAccent.copy(alpha = 0.14f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.24f)),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(page.icon, contentDescription = null, modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.primary)
+                Icon(page.icon, contentDescription = null, modifier = Modifier.size(if (compact) 34.dp else 42.dp), tint = OnboardingAccent)
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(page.title), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            Text(stringResource(page.title), style = if (compact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.displaySmall, color = OnboardingText, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             Spacer(Modifier.height(4.dp))
-            Text(stringResource(page.subtitle), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
+            Text(stringResource(page.subtitle), style = MaterialTheme.typography.titleMedium, color = OnboardingAccent, textAlign = TextAlign.Center)
         }
-        Text(stringResource(page.body), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(stringResource(page.body), style = MaterialTheme.typography.bodyLarge, color = OnboardingMuted, textAlign = TextAlign.Center)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             page.bullets.forEach { bullet ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Surface(modifier = Modifier.size(8.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primary) {}
-                    Text(stringResource(bullet), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Surface(modifier = Modifier.size(8.dp), shape = CircleShape, color = OnboardingAccent) {}
+                    Text(stringResource(bullet), style = MaterialTheme.typography.titleMedium, color = OnboardingText, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -191,24 +211,10 @@ private data class OnboardingPage(
 )
 
 
-@Composable
-private fun onboardingBackgroundBrush(): Brush {
-    val oledDark = MaterialTheme.colorScheme.background.luminance() < 0.03f
-    return if (oledDark) {
-        Brush.verticalGradient(listOf(Color.Black, Color.Black))
-    } else {
-        Brush.verticalGradient(
-            listOf(
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                MaterialTheme.colorScheme.secondary.copy(alpha = 0.10f),
-            )
-        )
-    }
-}
-
-@Composable
-private fun onboardingBorderColor(): Color {
-    val oledDark = MaterialTheme.colorScheme.background.luminance() < 0.03f
-    return if (oledDark) MaterialTheme.colorScheme.outline.copy(alpha = 0.58f) else Color.White.copy(alpha = 0.48f)
-}
+private fun onboardingBackgroundBrush(): Brush = Brush.verticalGradient(
+    listOf(
+        Color(0xFF14223A),
+        Color(0xFF07111D),
+        Color.Black,
+    )
+)
