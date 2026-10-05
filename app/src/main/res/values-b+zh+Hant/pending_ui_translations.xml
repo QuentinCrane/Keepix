@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_photo_bullet_4">可在設定中排除不想整理的資料夾</string>
+    <string name="onboarding_skip">跳過</string>
+    <string name="onboarding_page_counter">%1$d / %2$d</string>
+    <string name="photo_guide_pinch_title">雙指捏合 · 那年今日</string>
+    <string name="photo_guide_pinch_body">在照片上雙指向內捏合，回到這張照片拍攝的那一天；放開即可進入，回顧並整理當天的照片，按返回鍵退出。</string>
+    <string name="photo_guide_practice_hint">在螢幕上雙指捏合試試</string>
+    <string name="photo_guide_practice_done">就是這樣！</string>
+    <string name="photo_guide_practice_pending">捏合後繼續</string>
+    <string name="video_guide_gesture_title">進階手勢</string>
+    <string name="video_guide_gesture_body">長按以 2 倍速播放，放開恢復原速；左右滑動可快轉或倒轉。</string>
+</resources>

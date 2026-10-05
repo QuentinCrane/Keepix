@@ -750,4 +750,15 @@
         <item>8. 回收站与撤销||误操作后优先使用撤销。|待删内容可在回收站恢复或永久删除，永久删除前请确认。</item>
         <item>9. 常见问题||队列数量不是相册总数，因为整理页使用连续缓冲并自动补充。|图片不显示时刷新媒体库并检查排除规则。|深色模式对比度异常时切换主题后重新进入页面。</item>
     </string-array>
+
+    <string name="onboarding_photo_bullet_4">可在设置里排除不想整理的文件夹</string>
+    <string name="onboarding_skip">跳过</string>
+    <string name="onboarding_page_counter">%1$d / %2$d</string>
+    <string name="photo_guide_pinch_title">双指捏合 · 那年今日</string>
+    <string name="photo_guide_pinch_body">在照片上双指捏合收缩，回到这张照片拍摄的那天；松手即可进入，回顾并整理当天的照片，按返回键退出。</string>
+    <string name="photo_guide_practice_hint">在屏幕上双指捏合试试</string>
+    <string name="photo_guide_practice_done">就是这样！</string>
+    <string name="photo_guide_practice_pending">捏合后继续</string>
+    <string name="video_guide_gesture_title">进阶手势</string>
+    <string name="video_guide_gesture_body">长按 2 倍速播放，松开恢复原速；左右滑快进或快退。</string>
 </resources>

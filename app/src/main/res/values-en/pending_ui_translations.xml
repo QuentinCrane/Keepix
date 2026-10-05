@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_photo_bullet_4">Exclude folders you do not want to review in Settings</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_page_counter">%1$d / %2$d</string>
+    <string name="photo_guide_pinch_title">Pinch · On this day</string>
+    <string name="photo_guide_pinch_body">Pinch inward on a photo to revisit the day it was taken. Release to open and review photos from that day. Press Back to exit.</string>
+    <string name="photo_guide_practice_hint">Try pinching inward on the screen</string>
+    <string name="photo_guide_practice_done">You got it!</string>
+    <string name="photo_guide_practice_pending">Pinch to continue</string>
+    <string name="video_guide_gesture_title">More gestures</string>
+    <string name="video_guide_gesture_body">Hold to play at 2× speed; release to return to normal speed. Swipe left or right to seek.</string>
+</resources>
