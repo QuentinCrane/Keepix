@@ -181,6 +181,7 @@ private fun RailBubble(selected: Boolean, label: String, icon: ImageVector, onCl
         modifier = Modifier
             .width(56.dp)
             .height(if (selected) 82.dp else 56.dp)
+            .morphAnchor("rail:" + label, 28.dp, icon = icon, tint = content)
             .clip(RoundedCornerShape(28.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -217,6 +218,7 @@ private fun RowScope.NavBubble(selected: Boolean, label: String, icon: ImageVect
         modifier = Modifier
             .height(50.dp)
             .width(width)
+            .morphAnchor("nav:" + label, 25.dp, icon = icon, tint = content)
             .clip(RoundedCornerShape(999.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },

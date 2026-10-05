@@ -1,5 +1,8 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.morphAnchor
+import com.futureape.kanleme.ui.util.photoDisplayAspectRatio
+
 import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -230,6 +233,7 @@ private fun TimelineThumb(
     Box(
         modifier = modifier
             .aspectRatio(1f)
+            .morphAnchor("timeline-photo:" + photo.id, 18.dp, image = photo.uri, imageAspectRatio = photoDisplayAspectRatio(photo))
             .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
     ) {

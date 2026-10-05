@@ -1,5 +1,7 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.morphAnchor
+
 import android.net.Uri
 import android.content.ContentUris
 import android.provider.MediaStore
@@ -312,6 +314,7 @@ private fun TodayMemoryTile(
     Box(
         modifier = modifier
             .aspectRatio(0.76f)
+            .morphAnchor("memory:" + item.stableId, 20.dp, image = item.uri)
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onClick),
     ) {

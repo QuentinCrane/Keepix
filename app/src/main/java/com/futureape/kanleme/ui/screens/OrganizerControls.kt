@@ -1,5 +1,7 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.MorphOverlay
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -144,11 +146,11 @@ fun OrganizerDatePickerAnimatedOverlay(
     onApply: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AnimatedVisibility(
+    MorphOverlay(
         visible = visible,
         modifier = Modifier.fillMaxSize(),
-        enter = slideInVertically(tween(260)) { it / 5 } + fadeIn(tween(180)),
-        exit = slideOutVertically(tween(220)) { it / 5 } + fadeOut(tween(170)),
+        background = MaterialTheme.colorScheme.background,
+        onDismiss = onDismiss,
     ) {
         OrganizerDatePickerOverlay(
             title = title,
@@ -368,10 +370,10 @@ fun OrganizerFolderPickerOverlay(
         if (!visible) pendingFolder = null
     }
 
-    AnimatedVisibility(
+    MorphOverlay(
         visible = visible,
-        enter = fadeIn(tween(160)) + slideInVertically(tween(220)) { it / 5 },
-        exit = fadeOut(tween(130)) + slideOutVertically(tween(180)) { it / 5 },
+        background = MaterialTheme.colorScheme.background,
+        onDismiss = onDismiss,
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),

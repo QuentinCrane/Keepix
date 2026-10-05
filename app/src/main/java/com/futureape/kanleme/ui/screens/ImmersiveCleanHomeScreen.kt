@@ -1,5 +1,8 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.morphAnchor
+import com.futureape.kanleme.ui.components.MorphPanel
+
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -191,18 +194,6 @@ internal fun ImmersiveCleanHomeScreen(
                 )
             )
         )
-        AnimatedVisibility(
-            visible = menuExpanded,
-            enter = fadeIn(tween(160)),
-            exit = fadeOut(tween(140)),
-            modifier = Modifier.fillMaxSize().zIndex(2f),
-        ) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.24f))
-            )
-        }
         AdaptiveCenter(maxWidth = 760.dp) {
             Box(Modifier.fillMaxSize()) {
                 LazyColumn(
@@ -242,15 +233,14 @@ internal fun ImmersiveCleanHomeScreen(
                         )
                     }
                 }
-                AnimatedVisibility(
+                MorphPanel(
                     visible = menuExpanded,
-                    enter = fadeIn(tween(160)) + expandVertically(tween(240), expandFrom = Alignment.Top),
-                    exit = fadeOut(tween(120)) + shrinkVertically(tween(180), shrinkTowards = Alignment.Top),
+                    background = Color(0xFF202020),
+                    alignment = Alignment.TopStart,
+                    onDismiss = { menuExpanded = false },
                     modifier = Modifier
-                        .align(Alignment.TopStart)
                         .padding(start = 22.dp, top = 58.dp)
-                        .fillMaxWidth(0.70f)
-                        .zIndex(3f),
+                        .fillMaxWidth(0.70f),
                 ) {
                     KeepixQueueMenu(
                         modifier = Modifier.fillMaxWidth(),
@@ -331,7 +321,8 @@ private fun KeepixQueueSelector(
 ) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.height(50.dp),
+        modifier = Modifier.height(50.dp).morphAnchor("queue-selector", 22.dp, color = Color(0xFF2D2D2D),
+            icon = if (selectedIsPhoto) Icons.Rounded.PhotoLibrary else Icons.Rounded.Movie),
         shape = RoundedCornerShape(22.dp),
         color = Color(0xFF2D2D2D).copy(alpha = 0.72f),
         contentColor = Color.White,
@@ -586,7 +577,7 @@ private fun nextDateMode(mode: String): String = when (mode) {
 private fun KeepixHomeCircle(icon: ImageVector, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.size(52.dp),
+        modifier = Modifier.size(52.dp).morphAnchor("home-icon:" + icon.name, 26.dp, icon = icon),
         shape = CircleShape,
         color = Color.White.copy(alpha = 0.13f),
         contentColor = Color.White,
@@ -613,49 +604,15 @@ private fun KeepixHomeDeck(
     val visibleKey = visibleItems.joinToString("|") { it.uri }
     val deckEntryOffsets = remember { List(3) { Animatable(0f) } }
     val deckEntryStartPx = with(density) { 420.dp.toPx() }
-    val deckOpenProgress = remember { Animatable(0f) }
-    var opening by remember { mutableStateOf(false) }
-    LaunchedEffect(visibleKey, deckEntryStartPx) {
-        if (visibleKey.isNotEmpty()) {
-            deckEntryOffsets.forEachIndexed { index, offset ->
-                offset.snapTo(deckEntryStartPx + index * with(density) { 42.dp.toPx() })
-            }
-            deckEntryOffsets.forEachIndexed { index, offset ->
-                launch {
-                    offset.animateTo(
-                        targetValue = 0f,
-                        animationSpec = tween(
-                            durationMillis = 620 + index * 60,
-                            delayMillis = index * 85,
-                            easing = FastOutSlowInEasing,
-                        ),
-                    )
-                }
-            }
-        }
-    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(650.dp)
-            .graphicsLayer {
-                val progress = deckOpenProgress.value
-                scaleX = 1f + progress * 0.14f
-                scaleY = 1f + progress * 0.14f
-            }
             .clickable(
                 interactionSource = deckClickSource,
                 indication = null,
                 onClick = {
-                    if (opening || !canOpen) return@clickable
-                    opening = true
-                    scope.launch {
-                        deckOpenProgress.animateTo(1f, tween(260, easing = FastOutSlowInEasing))
-                        onClick()
-                        delay(260)
-                        deckOpenProgress.snapTo(0f)
-                        opening = false
-                    }
+                    if (canOpen) onClick()
                 },
             ),
         contentAlignment = Alignment.Center,
@@ -713,6 +670,7 @@ private fun KeepixHomeDeck(
                             scaleX = baseScale * entryScale
                             scaleY = baseScale * entryScale
                         }
+                        .then(if (isTop) Modifier.morphAnchor("home-deck", 22.dp, image = item.uri, imageAspectRatio = item.aspectRatio) else Modifier)
                         .clip(shape),
                 ) {
                     val context = LocalContext.current

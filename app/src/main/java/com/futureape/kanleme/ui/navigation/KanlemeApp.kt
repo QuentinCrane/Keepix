@@ -6,6 +6,9 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -30,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +52,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NamedNavArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
@@ -57,6 +63,12 @@ import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.FloatingGlassNav
 import com.futureape.kanleme.ui.components.FloatingGlassRail
 import com.futureape.kanleme.ui.components.LiquidBackground
+import com.futureape.kanleme.ui.components.LocalMorphRegistry
+import com.futureape.kanleme.ui.components.LocalMorphOwner
+import com.futureape.kanleme.ui.components.LocalMorphAnimationsEnabled
+import com.futureape.kanleme.data.settings.PhotoCleanMode
+import com.futureape.kanleme.ui.components.MorphRegistry
+import com.futureape.kanleme.ui.components.MorphDestination
 import com.futureape.kanleme.ui.screens.CleanHomeScreen
 import com.futureape.kanleme.ui.screens.FavoritesScreen
 import com.futureape.kanleme.ui.screens.MeScreen
@@ -82,6 +94,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewModel: KanlemeViewModel = hiltViewModel()) {
     val navController = rememberNavController()
+    val morphRegistry = remember { MorphRegistry() }
     val message by viewModel.message.collectAsStateWithLifecycle()
     val pendingMediaAuthorization by viewModel.pendingMediaAuthorization.collectAsStateWithLifecycle()
     val mediaAuthorizationLauncher = rememberLauncherForActivityResult(
@@ -95,6 +108,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
     val todayInHistoryPhotos by viewModel.todayInHistoryPhotos.collectAsStateWithLifecycle()
     val todayInHistoryVideos by viewModel.todayInHistoryVideos.collectAsStateWithLifecycle()
     val backStack by navController.currentBackStackEntryAsState()
+    backStack?.let { morphRegistry.navigateTo(it.id) }
     val current = backStack?.destination?.route ?: Destinations.HOME
     val windowSize = LocalWindowInfo.current.containerSize
     val density = LocalDensity.current
@@ -157,18 +171,20 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                     viewModel.onMediaAccessReady(access, accessLabel)
                 },
             ) {
+            CompositionLocalProvider(LocalMorphRegistry provides morphRegistry, LocalMorphOwner provides (backStack?.id ?: "root"),
+                LocalMorphAnimationsEnabled provides (settings.photoCleanMode != PhotoCleanMode.PERFORMANCE)) {
             Box(Modifier.fillMaxSize().background(transitionBackdrop)) {
             NavHost(
                 navController = navController,
                 startDestination = Destinations.HOME,
-                modifier = (if (useSideRail) Modifier.fillMaxSize().padding(start = 92.dp) else Modifier.fillMaxSize())
+                modifier = Modifier.fillMaxSize()
                     .background(transitionBackdrop),
-                enterTransition = { hierarchyEnterTransition() },
-                exitTransition = { hierarchyExitTransition() },
-                popEnterTransition = { hierarchyEnterTransition() },
-                popExitTransition = { hierarchyExitTransition() },
+                enterTransition = { EnterTransition.None },
+                exitTransition = { ExitTransition.None },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition = { ExitTransition.None },
             ) {
-                composable(Destinations.HOME) {
+                morphComposable(Destinations.HOME) {
                     CleanHomeScreen(
                         viewModel = viewModel,
                         contentPadding = PaddingValues(bottom = homeBottomPadding),
@@ -187,7 +203,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onSettings = { navController.navigate(Destinations.SETTINGS) },
                     )
                 }
-                composable(Destinations.PHOTO) {
+                morphComposable(Destinations.PHOTO) {
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         PhotoCleanScreen(
                             viewModel = viewModel,
@@ -202,7 +218,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         )
                     }
                 }
-                composable(Destinations.VIDEO) {
+                morphComposable(Destinations.VIDEO) {
                     VideoCleanScreen(
                         viewModel,
                         bottomContentPadding = if (useSideRail) 28.dp else 112.dp,
@@ -212,14 +228,14 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         },
                     )
                 }
-                composable(Destinations.TIMELINE) {
+                morphComposable(Destinations.TIMELINE) {
                     TimelineScreen(
                         viewModel = viewModel,
                         onBack = { navController.popBackStack() },
                         onOpenPhoto = { photo -> navController.navigate(Destinations.photoViewer(photo.id)) },
                     )
                 }
-                composable(
+                morphComposable(
                     route = Destinations.VIEWER,
                     arguments = listOf(navArgument(Destinations.VIEWER_ARG_PHOTO_ID) { type = NavType.LongType }),
                 ) { entry ->
@@ -229,8 +245,8 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onBack = { navController.popBackStack() },
                     )
                 }
-                composable(Destinations.SIMILAR) { SimilarPhotosScreen(viewModel, onBack = { navController.popBackStack() }, onOpenPhoto = { id -> navController.navigate(Destinations.photoViewer(id)) }) }
-                composable(Destinations.ME) {
+                morphComposable(Destinations.SIMILAR) { SimilarPhotosScreen(viewModel, onBack = { navController.popBackStack() }, onOpenPhoto = { id -> navController.navigate(Destinations.photoViewer(id)) }) }
+                morphComposable(Destinations.ME) {
                     MeScreen(
                         viewModel = viewModel,
                         contentPadding = PaddingValues(bottom = homeBottomPadding),
@@ -247,21 +263,21 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onDiagnosis = { navController.navigate(Destinations.settingsPage("DIAGNOSIS")) },
                     )
                 }
-                composable(Destinations.FAVORITES) { FavoritesScreen(viewModel, onBack = { navController.popBackStack() }, onToday = openTodayInHistory) }
-                composable(Destinations.TRASH) { TrashScreen(viewModel, onBack = { navController.popBackStack() }, onToday = openTodayInHistory) }
-                composable(Destinations.PHOTO_HISTORY) {
+                morphComposable(Destinations.FAVORITES) { FavoritesScreen(viewModel, onBack = { navController.popBackStack() }, onToday = openTodayInHistory) }
+                morphComposable(Destinations.TRASH) { TrashScreen(viewModel, onBack = { navController.popBackStack() }, onToday = openTodayInHistory) }
+                morphComposable(Destinations.PHOTO_HISTORY) {
                     PhotoHistoryScreen(
                         viewModel = viewModel,
                         onBack = { navController.popBackStack() },
                         onOpenPhoto = { photo -> navController.navigate(Destinations.photoViewer(photo.id)) },
                     )
                 }
-                composable(Destinations.SETTINGS) {
+                morphComposable(Destinations.SETTINGS) {
                     Box(Modifier.fillMaxSize().background(transitionBackdrop)) {
                         SettingsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
                     }
                 }
-                composable(
+                morphComposable(
                     route = Destinations.SETTINGS_WITH_PAGE,
                     arguments = listOf(navArgument(Destinations.SETTINGS_PAGE_ARG) { type = NavType.StringType }),
                 ) { entry ->
@@ -273,18 +289,18 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         )
                     }
                 }
-                composable(Destinations.TODAY) {
+                morphComposable(Destinations.TODAY) {
                     TodayInHistoryScreen(
                         viewModel = viewModel,
                         onBack = { navController.popBackStack() },
                         onOpenPhoto = { photo -> navController.navigate(Destinations.photoViewer(photo.id)) },
                     )
                 }
-                composable(Destinations.ACHIEVEMENTS) { AchievementsScreen(viewModel, onBack = { navController.popBackStack() }) }
-                composable(Destinations.ANNUAL) { AnnualReportScreen(viewModel, onBack = { navController.popBackStack() }) }
+                morphComposable(Destinations.ACHIEVEMENTS) { AchievementsScreen(viewModel, onBack = { navController.popBackStack() }) }
+                morphComposable(Destinations.ANNUAL) { AnnualReportScreen(viewModel, onBack = { navController.popBackStack() }) }
             }
 
-            if (current in setOf(Destinations.HOME, Destinations.VIDEO, Destinations.ME)) {
+            if (current in setOf(Destinations.HOME, Destinations.VIDEO, Destinations.ME) && morphRegistry.modalDepth == 0) {
                 val navItems = listOf(
                     stringResource(R.string.nav_photos) to Icons.Rounded.PhotoLibrary,
                     stringResource(R.string.nav_videos) to Icons.Rounded.Movie,
@@ -365,6 +381,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
             )
         }
             }
+            }
         }
     }
 }
@@ -403,85 +420,22 @@ private fun NonBlockingStatusChip(
     }
 }
 
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.hierarchyEnterTransition() =
-    fadeIn(tween(150, easing = LinearOutSlowInEasing)) +
-        slideIntoContainer(
-            towards = hierarchySlideDirection(initialState.destination.route, targetState.destination.route),
-            animationSpec = tween(280, easing = FastOutSlowInEasing),
-        )
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.hierarchyExitTransition() =
-    fadeOut(tween(115, easing = FastOutSlowInEasing)) +
-        slideOutOfContainer(
-            towards = hierarchySlideDirection(initialState.destination.route, targetState.destination.route),
-            animationSpec = tween(260, easing = FastOutSlowInEasing),
-        )
-
-private fun hierarchySlideDirection(
-    fromRoute: String?,
-    toRoute: String?,
-): AnimatedContentTransitionScope.SlideDirection {
-    val fromTopLevel = topLevelRouteIndex(fromRoute)
-    val toTopLevel = topLevelRouteIndex(toRoute)
-    if (fromTopLevel != null && toTopLevel != null) {
-        return if (toTopLevel < fromTopLevel) {
-            AnimatedContentTransitionScope.SlideDirection.Right
-        } else {
-            AnimatedContentTransitionScope.SlideDirection.Left
+private fun NavGraphBuilder.morphComposable(
+    route: String,
+    arguments: List<NamedNavArgument> = emptyList(),
+    content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit,
+) {
+    composable(route = route, arguments = arguments) { entry ->
+        val animatedScope = this
+        val background = if (route in setOf(Destinations.PHOTO, Destinations.VIDEO, Destinations.VIEWER))
+            Color.Black else MaterialTheme.colorScheme.background
+        val window = LocalWindowInfo.current.containerSize
+        val density = LocalDensity.current
+        val useRail = with(density) { window.width.toDp() >= 840.dp } && window.width > window.height &&
+            route in setOf(Destinations.HOME, Destinations.ME)
+        // Keep the morph's coordinate space fixed when a destination changes navigation chrome.
+        MorphDestination(entry.id, animatedScope, background, imageDestination = route == Destinations.VIEWER) {
+            Box(Modifier.fillMaxSize().padding(start = if (useRail) 92.dp else 0.dp)) { content(animatedScope, entry) }
         }
     }
-
-    val fromDepth = routeDepth(fromRoute)
-    val toDepth = routeDepth(toRoute)
-    if (toDepth != fromDepth) {
-        return if (toDepth < fromDepth) {
-            AnimatedContentTransitionScope.SlideDirection.Right
-        } else {
-            AnimatedContentTransitionScope.SlideDirection.Left
-        }
-    }
-
-    return if (routeMotionRank(toRoute) < routeMotionRank(fromRoute)) {
-        AnimatedContentTransitionScope.SlideDirection.Right
-    } else {
-        AnimatedContentTransitionScope.SlideDirection.Left
-    }
 }
-
-private fun routeDepth(route: String?): Int = when (route) {
-    Destinations.HOME,
-    Destinations.VIDEO,
-    Destinations.ME -> 0
-    Destinations.VIEWER,
-    Destinations.SETTINGS_WITH_PAGE -> 2
-    else -> 1
-}
-
-private fun routeMotionRank(route: String?): Int = when (route) {
-    Destinations.HOME -> 0
-    Destinations.VIDEO -> 1
-    Destinations.ME -> 2
-    Destinations.PHOTO -> 10
-    Destinations.VIDEO -> 11
-    Destinations.TIMELINE -> 20
-    Destinations.TODAY -> 21
-    Destinations.VIEWER -> 30
-    Destinations.SIMILAR -> 40
-    Destinations.FAVORITES -> 41
-    Destinations.TRASH -> 42
-    Destinations.PHOTO_HISTORY -> 43
-    Destinations.SETTINGS -> 50
-    Destinations.SETTINGS_WITH_PAGE -> 51
-    Destinations.ACHIEVEMENTS -> 60
-    Destinations.ANNUAL -> 61
-    else -> Int.MAX_VALUE
-}
-
-private fun topLevelRouteIndex(route: String?): Int? = when (route) {
-    Destinations.HOME -> 0
-    Destinations.VIDEO -> 1
-    Destinations.ME -> 2
-    else -> null
-}
-
-

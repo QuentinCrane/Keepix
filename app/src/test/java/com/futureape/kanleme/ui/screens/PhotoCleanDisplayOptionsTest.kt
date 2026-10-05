@@ -22,9 +22,8 @@ class PhotoCleanDisplayOptionsTest {
             photoShowActionRail = false,
             photoShowInfoBar = false,
             photoShowGestureHint = false,
-            photoShowShuffleButton = false,
         ).toPhotoCleanDisplayOptions()
 
-        assertEquals(PhotoCleanDisplayOptions(false, false, false, false, false, false, false), options)
+        assertEquals(PhotoCleanDisplayOptions(false, false, false, false, false, false), options)
     }
 }

@@ -1,5 +1,7 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.morphAnchor
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -327,7 +329,8 @@ private fun ProfileRow(
 ) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().morphAnchor("profile:" + title, 26.dp,
+            color = Color(0xFF121417), icon = icon, tint = accent),
         shape = RoundedCornerShape(26.dp),
         color = Color(0xFF121417).copy(alpha = 0.90f),
         contentColor = Color.White,
@@ -356,7 +359,7 @@ private fun ProfileRow(
 private fun RoundIconSurface(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.size(52.dp),
+        modifier = Modifier.size(52.dp).morphAnchor("profile-icon:" + contentDescription, 26.dp, icon = icon),
         shape = CircleShape,
         color = Color.White.copy(alpha = 0.13f),
         contentColor = Color.White,

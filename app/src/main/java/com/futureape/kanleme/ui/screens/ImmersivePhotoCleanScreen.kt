@@ -1,5 +1,11 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.MorphOverlay
+import com.futureape.kanleme.ui.components.MorphOrigin
+import com.futureape.kanleme.ui.components.morphAnchor
+import com.futureape.kanleme.ui.util.pinchMorph
+import androidx.compose.material.icons.rounded.CalendarMonth
+
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
@@ -600,6 +606,8 @@ internal fun KeepixDayMemoryOverlay(
     entryProgress: Float = 1f,
     entryScale: Float = 1f,
     entryActive: Boolean = false,
+    morphSource: MorphOrigin? = null,
+    onClosed: () -> Unit = {},
     onDismiss: () -> Unit,
     onOpen: (PhotoEntity) -> Unit,
     onDelete: (PhotoEntity) -> Unit,
@@ -622,7 +630,7 @@ internal fun KeepixDayMemoryOverlay(
     }
     LaunchedEffect(visible, currentPhoto.id, photos) {
         if (visible) {
-            suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 980L
+            suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 120L
             if (!memoryLocallyEdited) {
                 val nextPhotos = buildMemoryPhotoWindow(currentPhoto, photos)
                 if (nextPhotos.map { it.id } != memoryPhotos.map { it.id }) {
@@ -632,10 +640,6 @@ internal fun KeepixDayMemoryOverlay(
                 lastDeletedMemory = null
                 restoringPhotoId = null
             }
-        } else {
-            memoryLocallyEdited = false
-            initialMemoryCentered = false
-            requestedMemoryScrollIndex = null
         }
     }
     LaunchedEffect(restoringPhotoId) {
@@ -648,6 +652,7 @@ internal fun KeepixDayMemoryOverlay(
         memoryPhotos.indexOfFirst { it.id == currentPhoto.id }.coerceAtLeast(0)
     }
     var memoryScale by remember(currentPhoto.id) { mutableFloatStateOf(1f) }
+    var returnMorphProgress by remember(currentPhoto.id) { mutableStateOf<Float?>(null) }
     LaunchedEffect(visible, entryScale, entryActive) {
         if (!visible) {
             memoryScale = 1f
@@ -707,70 +712,41 @@ internal fun KeepixDayMemoryOverlay(
     LaunchedEffect(memoryGridState) {
         snapshotFlow { memoryGridState.isScrollInProgress }.collect { scrolling ->
             if (scrolling) {
-                suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 520L
+                suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 120L
             }
         }
     }
-    val returnProgress = ((memoryScale - 1.10f) / 0.50f).coerceIn(0f, 1f)
-    val entryAlpha = entryProgress.coerceIn(0f, 1f)
-    val entryZoom = 0.88f + entryAlpha * 0.12f
     val scrollProgress = memoryProgressForIndex(selectedPhotoIndex, memoryDayRanges)
-    AnimatedVisibility(
+    MorphOverlay(
         visible = visible,
-        enter = fadeIn(tween(180)) + scaleIn(tween(240), initialScale = 0.86f),
-        exit = fadeOut(tween(160)) + scaleOut(tween(200), targetScale = 0.86f),
         modifier = Modifier.fillMaxSize().zIndex(20f),
+        source = morphSource,
+        gestureProgress = if (entryActive) entryProgress else returnMorphProgress,
+        onDismiss = onDismiss,
+        onClosed = {
+            memoryLocallyEdited = false
+            requestedMemoryScrollIndex = null
+            onClosed()
+        },
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer {
-                    alpha = (entryAlpha * (1f - returnProgress)).coerceIn(if (entryActive) 0f else 0.08f, 1f)
-                    scaleX = entryZoom
-                    scaleY = entryZoom
-                }
                 .background(Color.Black.copy(alpha = 0.90f))
                 .statusBarsPadding()
                 .padding(horizontal = 18.dp, vertical = 12.dp)
-                .pointerInput(currentPhoto.id, memoryPhotos.size) {
-                    awaitEachGesture {
-                        var initialDistance = 0f
-                        while (true) {
-                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                            val pressed = event.changes.filter { it.pressed }
-                            if (pressed.size < 2) {
-                                if (pressed.isEmpty()) {
-                                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 960L
-                                    break
-                                }
-                                continue
-                            }
-                            suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 960L
-                            val currentA = pressed[0].position
-                            val currentB = pressed[1].position
-                            val currentDistance = sqrt(
-                                (currentA.x - currentB.x) * (currentA.x - currentB.x) +
-                                    (currentA.y - currentB.y) * (currentA.y - currentB.y)
-                            ).coerceAtLeast(1f)
-                            if (initialDistance <= 0f) {
-                                initialDistance = currentDistance
-                                continue
-                            }
-                            val zoom = currentDistance / initialDistance.coerceAtLeast(1f)
-                            suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 960L
-                            memoryScale = zoom.coerceIn(0.66f, 1.42f)
-                            pressed.forEach { it.consume() }
-                            if (zoom >= 1.18f) {
-                                onDismiss()
-                                break
-                            }
-                            if (pressed.any { it.changedToUpIgnoreConsumed() }) {
-                                suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 960L
-                                break
-                            }
-                        }
-                    }
-                },
+                .pinchMorph(
+                    key = currentPhoto.id,
+                    opening = false,
+                    onAlternativeScale = { memoryScale = it.coerceIn(0.66f, 1f) },
+                    onProgress = { progress, _ ->
+                        returnMorphProgress = 1f - progress
+                    },
+                    onFinish = { commit ->
+                        returnMorphProgress = null
+                        if (commit) onDismiss()
+                    },
+                ),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().zIndex(2f),
@@ -843,7 +819,7 @@ internal fun KeepixDayMemoryOverlay(
                         requestedMemoryScrollIndex = null
                         return@LaunchedEffect
                     }
-                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 720L
+                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 120L
                     val targetIndex = requestedIndex.coerceIn(0, memoryPhotos.lastIndex)
                     val scrollIndex = (targetIndex - rowCount * 2).coerceAtLeast(0)
                     memoryGridState.animateScrollToItem(scrollIndex)
@@ -886,7 +862,7 @@ internal fun KeepixDayMemoryOverlay(
                                     memoryLocallyEdited = true
                                     memoryPlacementSequence += 1L
                                     memoryPhotos = memoryPhotos.filterNot { it.id == photo.id }
-                                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 760L
+                                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 160L
                                 }
                                 onDelete(photo)
                             },
@@ -934,11 +910,11 @@ internal fun KeepixDayMemoryOverlay(
                                 progress = scrollProgress,
                                 onDragStateChange = { dragging ->
                                     if (dragging) {
-                                        suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 720L
+                                        suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 120L
                                     }
                                 },
                                 onSelect = { fraction ->
-                                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 720L
+                                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 120L
                                     val targetIndex = memoryIndexForProgress(fraction, memoryDayRanges, initialPhotoIndex)
                                     val scrollIndex = (targetIndex - rowCount * 2).coerceAtLeast(0)
                                     if (scrollIndex != lastDensityScrollIndex) {
@@ -963,7 +939,7 @@ internal fun KeepixDayMemoryOverlay(
                                     memoryPhotos = memoryPhotos.toMutableList().apply { add(insertAt, deleted.photo) }
                                     restoringPhotoId = deleted.photo.id
                                     requestedMemoryScrollIndex = insertAt
-                                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 820L
+                                    suppressMemoryOpenUntil.longValue = SystemClock.uptimeMillis() + 160L
                                     lastDeletedMemory = null
                                 }
                                 onUndo()
@@ -998,6 +974,7 @@ private fun KeepixMemoryGridPhoto(
     val placementY = remember(photo.id) { Animatable(0f) }
     val restoreY = remember(photo.id) { Animatable(0f) }
     val restoreAlpha = remember(photo.id) { Animatable(1f) }
+    val latestOpenDeadline by rememberUpdatedState(openSuppressedUntilMillis)
     LaunchedEffect(restoring, photo.id) {
         if (restoring) {
             restoreY.snapTo(-640f)
@@ -1008,7 +985,7 @@ private fun KeepixMemoryGridPhoto(
     }
     val animatedY by animateFloatAsState(
         targetValue = if (dismissed) -920f else dragY,
-        animationSpec = tween(240, easing = FastOutSlowInEasing),
+        animationSpec = if (dismissed || dragY == 0f) tween(240, easing = FastOutSlowInEasing) else tween(0),
         label = "day_memory_photo_y",
     )
     val animatedAlpha by animateFloatAsState(
@@ -1055,10 +1032,11 @@ private fun KeepixMemoryGridPhoto(
                 scaleY = scale
             }
             .clip(shape)
-            .pointerInput(photo.id, openSuppressedUntilMillis) {
+                .morphAnchor("memory-photo:" + photo.id, image = photo.uri)
+                .pointerInput(photo.id) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    val gestureStartedSuppressed = SystemClock.uptimeMillis() < openSuppressedUntilMillis
+                    val gestureStartedSuppressed = SystemClock.uptimeMillis() < latestOpenDeadline
                     var totalX = 0f
                     var totalY = 0f
                     var deleting = false
@@ -1108,7 +1086,7 @@ private fun KeepixMemoryGridPhoto(
                         !cancelledTap &&
                         !consumedByParent &&
                         maxOf(abs(totalX), abs(totalY)) <= openSlop &&
-                        SystemClock.uptimeMillis() >= openSuppressedUntilMillis
+                        SystemClock.uptimeMillis() >= latestOpenDeadline
                     ) {
                         onOpen(photo)
                     } else {
@@ -1299,7 +1277,7 @@ private fun normalizeMediaMillis(value: Long): Long {
 private fun KeepixTopPill(label: String, trailing: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.height(38.dp),
+        modifier = Modifier.height(38.dp).morphAnchor("date:" + label, 19.dp, icon = Icons.Rounded.CalendarMonth),
         shape = RoundedCornerShape(999.dp),
         color = Color.White.copy(alpha = 0.13f),
         contentColor = Color.White,
@@ -1352,7 +1330,8 @@ internal fun KeepixRoundButton(
     val alpha = if (enabled) 1f else 0.42f
     Surface(
         onClick = onClick,
-        modifier = modifier.size(60.dp),
+        modifier = modifier.size(60.dp).morphAnchor("round:" + (contentDescription ?: icon.name), 30.dp,
+            color = Color(0xFF212121), icon = icon, tint = tint),
         enabled = enabled,
         shape = CircleShape,
         color = Color.White.copy(alpha = 0.13f * alpha),
@@ -1375,7 +1354,8 @@ private fun KeepixBottomInfoBar(
     val place = photo.locationName?.takeIf { it.isNotBlank() } ?: photo.folderName.ifBlank { stringResource(R.string.video_local_album) }
     val clickModifier = if (showFolder) Modifier.clickable(onClick = onClick) else Modifier
     Surface(
-        modifier = modifier.height(66.dp).then(clickModifier),
+        modifier = modifier.height(66.dp).morphAnchor("photo-folder:" + photo.id, 33.dp,
+            color = Color(0xFF151515), icon = Icons.Rounded.Folder).then(clickModifier),
         shape = RoundedCornerShape(999.dp),
         color = Color(0xFF151515).copy(alpha = 0.82f),
         contentColor = Color.White,

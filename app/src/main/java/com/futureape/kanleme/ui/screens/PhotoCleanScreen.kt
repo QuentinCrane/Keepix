@@ -1,5 +1,9 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.MorphOrigin
+import com.futureape.kanleme.ui.components.LocalMorphOwner
+import com.futureape.kanleme.ui.util.pinchMorph
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedVisibility
@@ -202,6 +206,9 @@ fun PhotoCleanScreen(
     var lastBatchDeleteBytes by rememberSaveable { mutableStateOf(0L) }
     var batchSummary by remember { mutableStateOf<PhotoBatchSummary?>(null) }
     var dayMemoryPinch by remember { mutableStateOf(DayMemoryPinchState()) }
+    var dayMemoryOriginPhoto by remember { mutableStateOf<PhotoEntity?>(null) }
+    var dayMemorySourceBounds by remember { mutableStateOf<Rect?>(null) }
+    val morphOwner = LocalMorphOwner.current
     var emptyStateVisible by remember { mutableStateOf(false) }
     var lastEmptyPhotoDeckPrepareKey by remember { mutableStateOf<Any?>(null) }
 
@@ -217,15 +224,18 @@ fun PhotoCleanScreen(
     fun closeDayMemory() {
         showDayMemory = false
         dayMemoryPinch = DayMemoryPinchState()
-        viewModel.clearPhotoDayMemoryWindow()
     }
 
     fun previewDayMemory(progress: Float, scale: Float) {
+        if (!dayMemoryPinch.active) {
+            dayMemoryOriginPhoto = deck.firstOrNull()
+            dayMemorySourceBounds = guideTargets[PhotoGuideTarget.PhotoCard]
+        }
         dayMemoryPinch = DayMemoryPinchState(progress = progress, scale = scale, active = true)
     }
 
     fun commitDayMemory() {
-        if (dayMemoryPinch.progress > 0.04f) {
+        if (dayMemoryPinch.active) {
             showDayMemory = true
             dayMemoryPinch = dayMemoryPinch.copy(progress = 1f, active = false)
             haptics.threshold()
@@ -241,8 +251,8 @@ fun PhotoCleanScreen(
         onBack()
     }
 
-    BackHandler(enabled = showDayMemory || dayMemoryPinch.progress > 0.001f, onBack = ::closeDayMemory)
-    BackHandler(enabled = !showDayMemory && dayMemoryPinch.progress <= 0.001f, onBack = ::leaveCleaning)
+    BackHandler(enabled = showDayMemory || dayMemoryPinch.active, onBack = ::closeDayMemory)
+    BackHandler(enabled = !showDayMemory && !dayMemoryPinch.active, onBack = ::leaveCleaning)
 
     LaunchedEffect(batchFinishing) {
         if (!batchFinishing) return@LaunchedEffect
@@ -432,7 +442,8 @@ fun PhotoCleanScreen(
     }
 
     val currentPhoto = deck.first()
-    val memoryPhotos = dayMemoryPhotos.ifEmpty { listOf(currentPhoto) }
+    val memoryOriginPhoto = dayMemoryOriginPhoto ?: currentPhoto
+    val memoryPhotos = dayMemoryPhotos.ifEmpty { listOf(memoryOriginPhoto) }
     val remainingPhotos = (dashboard.photoCount - dashboard.processedPhotoCount)
         .coerceAtLeast(0)
         .coerceAtLeast(deck.size)
@@ -443,14 +454,12 @@ fun PhotoCleanScreen(
     )
     val remainingInBatch = sessionProgress.remaining.coerceAtLeast(1)
     val visibleDeck = deck.take(remainingInBatch.coerceAtMost(3))
-    val dayMemoryVisible = showDayMemory || dayMemoryPinch.progress > 0.001f
+    val dayMemoryVisible = showDayMemory || dayMemoryPinch.active
     val dimAlpha by animateFloatAsState(targetValue = if (showGuide) 0.46f else 0f, label = "guide_dim")
 
-    LaunchedEffect(dayMemoryVisible, currentPhoto.id) {
+    LaunchedEffect(dayMemoryVisible, memoryOriginPhoto.id) {
         if (dayMemoryVisible) {
-            viewModel.loadPhotoDayMemoryWindow(currentPhoto)
-        } else {
-            viewModel.clearPhotoDayMemoryWindow()
+            viewModel.loadPhotoDayMemoryWindow(memoryOriginPhoto)
         }
     }
 
@@ -512,6 +521,8 @@ fun PhotoCleanScreen(
                 onSwipeFeedbackChanged = { photoSwipeFeedback = it },
                 photoSwipeFeedback = photoSwipeFeedback,
                 onOpenDayMemory = {
+                    dayMemoryOriginPhoto = currentPhoto
+                    dayMemorySourceBounds = null
                     dayMemoryPinch = DayMemoryPinchState(progress = 1f, scale = 1f, active = false)
                     showDayMemory = true
                 },
@@ -559,11 +570,22 @@ fun PhotoCleanScreen(
             )
             KeepixDayMemoryOverlay(
                 visible = dayMemoryVisible,
-                currentPhoto = currentPhoto,
+                currentPhoto = memoryOriginPhoto,
                 photos = memoryPhotos,
                 entryProgress = if (showDayMemory) 1f else dayMemoryPinch.progress,
                 entryScale = dayMemoryPinch.scale,
                 entryActive = dayMemoryPinch.active,
+                morphSource = dayMemorySourceBounds?.let { bounds ->
+                    MorphOrigin(morphOwner + "/photo:" + memoryOriginPhoto.id, morphOwner, bounds,
+                        image = memoryOriginPhoto.uri)
+                },
+                onClosed = {
+                    if (!dayMemoryPinch.active) {
+                        viewModel.clearPhotoDayMemoryWindow()
+                        dayMemoryOriginPhoto = null
+                        dayMemorySourceBounds = null
+                    }
+                },
                 onDismiss = ::closeDayMemory,
                 onOpen = { photo -> haptics.tick(); onOpenPhoto(photo) },
                 onDelete = { photo -> haptics.delete(); viewModel.markPhotoForTrashOutsideCleaning(photo) },
@@ -749,57 +771,8 @@ private fun Modifier.detectScreenPinchToMemory(
     onProgress: (Float, Float) -> Unit,
     onCommit: () -> Unit,
     onCancel: () -> Unit,
-): Modifier = if (disabled) {
-    this
-} else {
-    pointerInput(key) {
-        awaitEachGesture {
-            var initialDistance = 0f
-            var previousDistance = 0f
-            var cumulativeScale = 1f
-            var currentProgress = 0f
-            val slop = viewConfiguration.touchSlop
-            while (true) {
-                val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                val pressed = event.changes.filter { it.pressed }
-                if (pressed.size < 2) {
-                    if (pressed.isEmpty()) break
-                    continue
-                }
-                val a = pressed[0].position
-                val b = pressed[1].position
-                val dx = a.x - b.x
-                val dy = a.y - b.y
-                val distance = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
-                if (initialDistance <= 0f && distance > slop) {
-                    initialDistance = distance
-                    previousDistance = distance
-                } else if (previousDistance > 0f) {
-                    cumulativeScale *= distance / previousDistance.coerceAtLeast(1f)
-                    previousDistance = distance
-                }
-                if (initialDistance > 0f) {
-                    val ratio = (distance / initialDistance).coerceIn(0.62f, 1.18f)
-                    val shrink = maxOf(1f - ratio, 1f - cumulativeScale)
-                    currentProgress = (shrink / 0.26f).coerceIn(0f, 1f)
-                    if (currentProgress > 0f) {
-                        pressed.forEach { it.consume() }
-                        onProgress(currentProgress, ratio.coerceIn(0.66f, 1f))
-                    }
-                }
-            }
-            if (currentProgress > 0.04f) {
-                onCommit()
-            } else {
-                onCancel()
-            }
-        }
-    }
-}
-
-
-
-
+): Modifier = pinchMorph(key = key, enabled = !disabled, opening = true,
+    onProgress = onProgress, onFinish = { commit -> if (commit) onCommit() else onCancel() })
 private enum class PhotoGuideTarget { TopBar, PhotoCard, BottomInfo, AlbumButton }
 
 private data class PositionGuideStep(

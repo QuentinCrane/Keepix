@@ -1,5 +1,7 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.MorphPanel
+
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -277,8 +279,9 @@ fun CleanHomeScreen(
             showDailyReport = true
         },
     )
-    if (showDailyReport) {
+    run {
         DailyReportDialog(
+            visible = showDailyReport,
             todayPhotos = dashboard.todayPhotoCount,
             todayVideos = dashboard.todayVideoCount,
             todayActions = dashboard.todayActionCount,
@@ -313,6 +316,7 @@ fun CleanHomeScreen(
 
 @Composable
 private fun DailyReportDialog(
+    visible: Boolean,
     todayPhotos: Int,
     todayVideos: Int,
     todayActions: Int,
@@ -321,14 +325,13 @@ private fun DailyReportDialog(
     onDismiss: () -> Unit,
     onExport: () -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    MorphPanel(
+        visible = visible,
+        background = MaterialTheme.colorScheme.surface,
+        onDismiss = onDismiss,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 28.dp).widthIn(max = 420.dp).fillMaxWidth(),
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 28.dp),
             contentAlignment = Alignment.Center,
         ) {
             Surface(

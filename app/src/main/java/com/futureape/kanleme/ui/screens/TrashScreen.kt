@@ -1,5 +1,8 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.MorphOverlay
+import com.futureape.kanleme.ui.components.morphAnchor
+
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -109,6 +112,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val dayMemoryPhotos by viewModel.photoDayMemoryWindow.collectAsStateWithLifecycle()
     var previewItem by remember { mutableStateOf<TrashItemEntity?>(null) }
+    var previewVisible by remember { mutableStateOf(false) }
     var selectedMediaType by remember { mutableStateOf("photo") }
     val photoTrashItems = trashItems.filter { it.mediaType != "video" }
     val videoTrashItems = trashItems.filter { it.mediaType == "video" }
@@ -182,7 +186,7 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                                 ) {
                                     TrashGridTile(
                                         item = item,
-                                        onPreview = { previewItem = item },
+                                        onPreview = { previewItem = item; previewVisible = true },
                                         onDelete = { viewModel.requestPermanentDelete(listOf(item)) },
                                     )
                                 }
@@ -208,12 +212,14 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
         }
 
         previewItem?.let { item ->
+            MorphOverlay(visible = previewVisible, imageDestination = true, onDismiss = { previewVisible = false },
+                onClosed = { previewItem = null }) {
             TrashPreviewOverlay(
                 items = visibleTrashItems,
                 initialItem = item,
                 todayEntryMode = settings.todayInHistoryEntryMode,
                 dayMemoryPhotos = dayMemoryPhotos,
-                onClose = { previewItem = null },
+                onClose = { previewVisible = false },
                 onToday = onToday,
                 onOpenDayMemory = { viewModel.loadPhotoDayMemoryWindow(it) },
                 onClearDayMemory = { viewModel.clearPhotoDayMemoryWindow() },
@@ -222,12 +228,13 @@ fun TrashScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: () -> 
                 onDayMemoryApply = { onToday() },
                 onRestore = { target ->
                     viewModel.restoreTrash(target.id)
-                    previewItem = null
+                    previewVisible = false
                 },
                 onDelete = { target ->
                     viewModel.requestPermanentDelete(listOf(target))
                 },
             )
+            }
         }
     }
 }
@@ -305,6 +312,8 @@ private fun TrashGridTile(item: TrashItemEntity, onPreview: () -> Unit, onDelete
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(trashWallAspectRatio(item))
+            .morphAnchor("trash:" + item.id, 16.dp, image = thumbnailModel,
+                imageAspectRatio = (item.width.toFloat() / item.height.coerceAtLeast(1)).takeIf { it > 0f })
             .trashTileEnter(item.id)
             .clip(RoundedCornerShape(16.dp))
             .background(Color.White.copy(alpha = 0.08f))
@@ -489,10 +498,10 @@ private fun TrashPreviewOverlay(
     val pagerState = rememberPagerState(initialPage = startIndex) { items.size }
     val currentItem = items.getOrNull(pagerState.currentPage) ?: initialItem
     var dayMemoryAnchor by remember(initialItem.id) { mutableStateOf<PhotoEntity?>(null) }
+    var dayMemoryVisible by remember(initialItem.id) { mutableStateOf(false) }
 
     fun closeDayMemory() {
-        dayMemoryAnchor = null
-        onClearDayMemory()
+        dayMemoryVisible = false
     }
 
     BackHandler(enabled = dayMemoryAnchor != null, onBack = ::closeDayMemory)
@@ -601,6 +610,7 @@ private fun TrashPreviewOverlay(
                         if (todayEntryMode == TodayInHistoryEntryMode.PINCH_MEMORY && currentItem.mediaType != "video") {
                             val anchor = currentItem.toMemoryPhoto()
                             dayMemoryAnchor = anchor
+                            dayMemoryVisible = true
                             onOpenDayMemory(anchor)
                         } else {
                             onToday()
@@ -636,13 +646,14 @@ private fun TrashPreviewOverlay(
 
         dayMemoryAnchor?.let { anchor ->
             KeepixDayMemoryOverlay(
-                visible = true,
+                visible = dayMemoryVisible,
                 currentPhoto = anchor,
                 photos = dayMemoryPhotos.ifEmpty { listOf(anchor) },
                 entryProgress = 1f,
                 entryScale = 1f,
                 entryActive = false,
                 onDismiss = ::closeDayMemory,
+                onClosed = { dayMemoryAnchor = null; onClearDayMemory() },
                 onOpen = { target ->
                     closeDayMemory()
                     openPhotoInSystemGallery(context, target)
@@ -758,7 +769,9 @@ private fun TrashPreviewWideAction(
     onClick: () -> Unit,
 ) {
     Surface(
-        modifier = modifier.height(58.dp).clickable(onClick = onClick),
+        modifier = modifier.height(58.dp).morphAnchor("trash-action:" + text, 16.dp,
+            color = if (filled) color else Color.Transparent, icon = icon, tint = if (filled) Color.White else color)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = if (filled) color else Color.Transparent,
         contentColor = if (filled) Color.White else color,

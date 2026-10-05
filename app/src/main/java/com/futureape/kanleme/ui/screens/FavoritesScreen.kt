@@ -1,5 +1,9 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.MorphOverlay
+import com.futureape.kanleme.ui.components.morphAnchor
+import com.futureape.kanleme.ui.util.photoDisplayAspectRatio
+
 import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Size
@@ -125,6 +129,7 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: ()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val dayMemoryPhotos by viewModel.photoDayMemoryWindow.collectAsStateWithLifecycle()
     var previewPhoto by remember { mutableStateOf<PhotoEntity?>(null) }
+    var previewVisible by remember { mutableStateOf(false) }
     var photoColumnCount by rememberSaveable { mutableStateOf(3) }
     var selectedType by rememberSaveable { mutableStateOf("photo") }
 
@@ -195,7 +200,7 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: ()
                                 photos = photos,
                                 columnCount = photoColumnCount,
                                 modifier = Modifier.weight(1f),
-                                onPhotoClick = { previewPhoto = it },
+                                onPhotoClick = { previewPhoto = it; previewVisible = true },
                             )
                         }
                     } else {
@@ -213,11 +218,13 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: ()
         }
 
         previewPhoto?.let { photo ->
+            MorphOverlay(visible = previewVisible, imageDestination = true, onDismiss = { previewVisible = false },
+                onClosed = { previewPhoto = null }) {
             FavoritePhotoPreviewOverlay(
                 photo = photo,
                 todayEntryMode = settings.todayInHistoryEntryMode,
                 dayMemoryPhotos = dayMemoryPhotos,
-                onClose = { previewPhoto = null },
+                onClose = { previewVisible = false },
                 onToday = onToday,
                 onOpenDayMemory = { viewModel.loadPhotoDayMemoryWindow(it) },
                 onClearDayMemory = { viewModel.clearPhotoDayMemoryWindow() },
@@ -226,9 +233,10 @@ fun FavoritesScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onToday: ()
                 onDayMemoryApply = { onToday() },
                 onDelete = {
                     viewModel.onPhotoAction(photo, SwipeAction.Delete)
-                    previewPhoto = null
+                    previewVisible = false
                 },
             )
+            }
         }
     }
 }
@@ -491,6 +499,7 @@ private fun FavoritePhotoTile(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(favoriteOriginalAspectRatio(photo))
+            .morphAnchor("favorite-photo:" + photo.id, 16.dp, image = thumbnailModel, imageAspectRatio = photoDisplayAspectRatio(photo))
             .favoriteTileEnter(photo.id)
             .clip(shape)
             .background(Color.White.copy(alpha = 0.08f))
@@ -596,7 +605,6 @@ private fun FavoritePhotoPreviewOverlay(
 
     fun closeDayMemory() {
         showDayMemory = false
-        onClearDayMemory()
     }
 
     fun playMotion() {
@@ -711,6 +719,7 @@ private fun FavoritePhotoPreviewOverlay(
             entryScale = 1f,
             entryActive = false,
             onDismiss = ::closeDayMemory,
+            onClosed = onClearDayMemory,
             onOpen = { target ->
                 closeDayMemory()
                 openPhotoInSystemGallery(context, target)
@@ -802,7 +811,8 @@ private fun ZoomableFavoritePhoto(
 @Composable
 private fun FavoritePreviewAction(text: String, icon: ImageVector, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(52.dp)) {
+        FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(52.dp)
+            .morphAnchor("favorite-action:" + text, 26.dp, color = MaterialTheme.colorScheme.secondaryContainer, icon = icon)) {
             Icon(icon, contentDescription = text)
         }
         Spacer(Modifier.height(4.dp))

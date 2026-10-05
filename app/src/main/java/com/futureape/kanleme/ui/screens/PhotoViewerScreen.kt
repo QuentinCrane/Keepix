@@ -85,6 +85,8 @@ import com.futureape.kanleme.ui.util.photoImageRequest
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
+import com.futureape.kanleme.ui.components.MorphPanel
+import com.futureape.kanleme.ui.components.morphAnchor
 import com.futureape.kanleme.ui.util.shareMedia
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import androidx.media3.common.AudioAttributes
@@ -241,16 +243,18 @@ fun PhotoViewerScreen(
         }
     }
 
-    currentPhoto?.takeIf { showExifSheet }?.let { photo ->
+    currentPhoto?.let { photo ->
         PhotoExifSheet(
             photo = photo,
+            visible = showExifSheet,
             onDismiss = { showExifSheet = false },
         )
     }
 
-    currentPhoto?.takeIf { showMoveSheet }?.let { photo ->
+    currentPhoto?.let { photo ->
         MoveFolderSheet(
             currentPhoto = photo,
+            visible = showMoveSheet,
             knownFolders = folders,
             onDismiss = { showMoveSheet = false },
             onMove = { path ->
@@ -264,8 +268,9 @@ fun PhotoViewerScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PhotoExifSheet(photo: PhotoEntity, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+private fun PhotoExifSheet(photo: PhotoEntity, visible: Boolean, onDismiss: () -> Unit) {
+    MorphPanel(visible = visible, background = MaterialTheme.colorScheme.surface, onDismiss = onDismiss,
+        alignment = Alignment.BottomCenter, modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -327,7 +332,7 @@ private fun ViewerAction(
     onClick: () -> Unit,
 ) {
     Column(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.morphAnchor("viewer:" + label, 24.dp, icon = icon).clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
@@ -581,6 +586,7 @@ private fun MotionPhotoVideoPlayer(
 @Composable
 private fun MoveFolderSheet(
     currentPhoto: PhotoEntity,
+    visible: Boolean,
     knownFolders: List<String>,
     onDismiss: () -> Unit,
     onMove: (String) -> Unit,
@@ -593,7 +599,8 @@ private fun MoveFolderSheet(
     val options = (presets + knownFolders).distinct().filter { it.isNotBlank() }.take(12)
     var customPath by remember(currentPhoto.id) { mutableStateOf(currentPhoto.relativePath ?: "Pictures/Kanleme/Favorites/") }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    MorphPanel(visible = visible, background = MaterialTheme.colorScheme.surface, onDismiss = onDismiss,
+        alignment = Alignment.BottomCenter, modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

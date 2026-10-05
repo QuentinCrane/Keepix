@@ -1,5 +1,7 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.morphAnchor
+
 import android.net.Uri
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
@@ -662,6 +664,9 @@ fun SwipePhotoCard(
                 scaleX = dragScale * entryScale
                 scaleY = dragScale * entryScale
             }
+            .morphAnchor("photo:" + photo.id, 26.dp, image = remember(photo.mediaStoreId, photo.updatedAt) {
+                photoImageRequest(context, photo, "photo_fit", 1080, 1440)
+            }, imageAspectRatio = photoRatio)
             .then(
                 if (actionCommitted) {
                     Modifier
@@ -674,12 +679,19 @@ fun SwipePhotoCard(
                             var totalX = 0f
                             var totalY = 0f
                             var dragging = false
+                            var singlePointerCancelled = false
+                            var horizontalDrag = false
+                            var dragStartX = 0f
+                            var dragStartY = 0f
+                            val gestureBaseX = offsetX.value
+                            val gestureBaseY = offsetY.value
+                            var dragUpdateJob: kotlinx.coroutines.Job? = null
                             var initialPinchDistance = 0f
                             var previousPinchDistance = 0f
                             var cumulativePinchScale = 1f
                             var pinchHandled = false
                             val slop = viewConfiguration.touchSlop
-                            val dragStartSlop = slop * 1.35f
+                            val dragStartSlop = slop
                             val tapSlop = slop * 1.10f
                             val fastLongPressTimeout = 300L
                             var longPressHandled = false
@@ -692,13 +704,16 @@ fun SwipePhotoCard(
                                     startInlineMotionPreview(manual = true)
                                 }
                             }
+                            try {
                             while (true) {
                                 val event = awaitPointerEvent()
                                 val pressed = event.changes.filter { it.pressed }
                                 if (pinchToMemory == null && pressed.size >= 2) {
+                                    singlePointerCancelled = true
                                     longPressHandled = true
+                                    dragging = false
                                     longPressJob.cancel()
-                                    continue
+                                    break
                                 }
                                 if (pinchToMemory != null && !pinchHandled && pressed.size >= 2) {
                                     val a = pressed[0].position
@@ -734,6 +749,12 @@ fun SwipePhotoCard(
                                     cumulativePinchScale = 1f
                                 }
                                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (change.isConsumed) {
+                                    singlePointerCancelled = true
+                                    longPressHandled = true
+                                    dragging = false
+                                    break
+                                }
                                 if (change.changedToUpIgnoreConsumed()) break
                                 val delta = change.positionChange()
                                 if (delta.x != 0f || delta.y != 0f) {
@@ -746,19 +767,23 @@ fun SwipePhotoCard(
                                         haptics.threshold()
                                         scope.launch { startInlineMotionPreview(manual = true) }
                                     }
-                                    if (!dragging && max(abs(totalX), abs(totalY)) > dragStartSlop) {
+                                    val axisClear = abs(totalX) > abs(totalY) * 1.18f || abs(totalY) > abs(totalX) * 1.18f
+                                    if (!dragging && axisClear && max(abs(totalX), abs(totalY)) > dragStartSlop) {
                                         dragging = true
+                                        horizontalDrag = abs(totalX) > abs(totalY)
+                                        val dragDistance = sqrt(totalX * totalX + totalY * totalY).coerceAtLeast(1f)
+                                        dragStartX = totalX / dragDistance * dragStartSlop
+                                        dragStartY = totalY / dragDistance * dragStartSlop
                                         longPressJob.cancel()
                                         haptics.tick()
                                     }
                                     if (dragging) {
                                         change.consume()
-                                        val nextX = offsetX.value + delta.x
-                                        val nextY = offsetY.value + delta.y
+                                        val nextX = gestureBaseX + (totalX - dragStartX) * if (horizontalDrag) 1f else 0.20f
+                                        val nextY = gestureBaseY + (totalY - dragStartY) * if (horizontalDrag) 0.20f else 1f
                                         val zoneAction = classify(nextX, nextY)
                                         activeHint = zoneAction
                                         onSwipeFeedbackChanged(visualFeedback(nextX, nextY))
-                                        scope.launch { onDeckPromotionChanged(deckPromotionProgress(nextX, nextY)) }
                                         val zone = zoneAction?.name.orEmpty()
                                         if (zone.isNotEmpty() && zone != lastZone) {
                                             lastZone = zone
@@ -766,22 +791,29 @@ fun SwipePhotoCard(
                                         } else if (zone.isEmpty()) {
                                             lastZone = ""
                                         }
-                                        scope.launch {
+                                        dragUpdateJob?.cancel()
+                                        dragUpdateJob = scope.launch {
                                             offsetX.snapTo(nextX)
                                             offsetY.snapTo(nextY)
+                                            onDeckPromotionChanged(deckPromotionProgress(nextX, nextY))
                                         }
                                     }
                                 }
                             }
 
-                            longPressJob.cancel()
+                            } finally {
+                                longPressJob.cancel()
+                                dragUpdateJob?.cancel()
+                            }
 
-                            if (!dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop) {
+                            if (!singlePointerCancelled && !dragging && !longPressHandled && max(abs(totalX), abs(totalY)) <= tapSlop) {
                                 haptics.tick()
                                 onOpen()
                             } else {
                                 val velocity = velocityTracker.calculateVelocity()
-                                val action = if (dragging) classifyWithVelocity(offsetX.value, offsetY.value, velocity.x, velocity.y) else null
+                                val action = if (dragging && !singlePointerCancelled) classifyWithVelocity(offsetX.value, offsetY.value,
+                                    velocity.x * if (horizontalDrag) 1f else 0.20f,
+                                    velocity.y * if (horizontalDrag) 0.20f else 1f) else null
                                 if (action == null) {
                                     activeHint = null
                                     onSwipeFeedbackChanged(PhotoSwipeFeedback())
@@ -1385,7 +1417,8 @@ fun PhotoGrid(photos: List<PhotoEntity>, modifier: Modifier = Modifier, onPhotoC
             var motionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
             var motionLoading by remember(photo.id) { mutableStateOf(false) }
             Surface(
-                modifier = Modifier.aspectRatio(photoWallAspectRatio(photo)),
+                modifier = Modifier.aspectRatio(photoWallAspectRatio(photo)).morphAnchor("grid-photo:" + photo.id,
+                    image = thumbnailModel, imageAspectRatio = photoDisplayAspectRatio(photo)),
                 shape = shape,
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
                 shadowElevation = 0.dp,

@@ -1,5 +1,7 @@
 package com.futureape.kanleme.ui.screens
 
+import com.futureape.kanleme.ui.components.morphAnchor
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -98,7 +100,7 @@ fun SimilarPhotosScreen(viewModel: KanlemeViewModel, onBack: () -> Unit, onOpenP
                                 Text(group.type.toReadableGroupType(), style = MaterialTheme.typography.titleMedium)
                                 Text(stringResource(R.string.similar_average_best, (group.averageSimilarity * 100).toInt(), group.bestPhotoId), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Button(onClick = { onOpenPhoto(group.bestPhotoId) }) { Text(stringResource(R.string.similar_view)) }
+                            Button(modifier = Modifier.morphAnchor("similar:" + group.id), onClick = { onOpenPhoto(group.bestPhotoId) }) { Text(stringResource(R.string.similar_view)) }
                         }
                     }
                 }

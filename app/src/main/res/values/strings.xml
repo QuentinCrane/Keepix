@@ -355,6 +355,7 @@
     <string name="crash_log_clip_label">看了么闪退日志</string>
     <string name="crash_log_share_title">导出闪退日志</string>
     <string name="gallery_chooser_title">用相册查看</string>
+    <string name="gallery_open_failed">无法打开相册查看，请确认已安装相册应用、照片仍在本机，并已允许读取</string>
     <string name="media_file_title">媒体文件</string>
     <string name="motion_clip_title">%1$s 动态片段</string>
     <string name="media_kind_gif">GIF 动图</string>
@@ -365,7 +366,6 @@
     <string name="media_badge_motion_video">实况+视频</string>
     <string name="media_badge_motion">实况</string>
     <string name="annual_report_title">%1$d 看了么年度整理报告</string>
-    <string name="gallery_open_failed">无法打开相册查看，请确认已安装相册应用、照片仍在本机，并已允许读取</string>
     <string name="me_title">我的</string>
     <string name="me_photo">照片</string>
     <string name="me_video">视频</string>

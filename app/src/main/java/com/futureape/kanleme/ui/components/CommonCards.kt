@@ -27,7 +27,7 @@ fun ActionCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    GlassSurface(modifier = modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    GlassSurface(modifier = modifier.fillMaxWidth().morphAnchor("action:" + title, icon = icon).clickable(onClick = onClick)) {
         Row(
             modifier = Modifier.padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,

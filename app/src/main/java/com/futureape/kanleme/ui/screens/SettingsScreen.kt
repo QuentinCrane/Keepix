@@ -1,5 +1,18 @@
 package com.futureape.kanleme.ui.screens
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.futureape.kanleme.ui.components.LocalMorphRegistry
+import com.futureape.kanleme.ui.components.LocalMorphOwner
+import com.futureape.kanleme.ui.components.MorphRegistry
+import com.futureape.kanleme.ui.components.MorphDestination
+import com.futureape.kanleme.ui.components.MorphPanel
+import com.futureape.kanleme.ui.components.morphAnchor
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.rememberTransition
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -173,91 +186,52 @@ fun SettingsScreen(
         )
     }
     val page = runCatching { SettingsPage.valueOf(pageName) }.getOrDefault(SettingsPage.HOME)
+    val pageMorphs = remember { MorphRegistry() }
+    val pageTransitionState = remember { SeekableTransitionState(page) }
+    val pageTransition = rememberTransition(pageTransitionState, label = "settings_page_morph")
+    pageMorphs.navigateTo(pageTransitionState.targetState.name)
+    val pageScrollStates = SettingsPage.entries.map { rememberLazyListState() }
     var customizeTab by rememberSaveable { mutableStateOf("photo") }
     var manualExcludePath by remember { mutableStateOf("") }
     var showAllFolderRules by remember { mutableStateOf(false) }
-    var predictiveBackProgress by remember { mutableFloatStateOf(0f) }
-    var predictiveBackCompleting by remember { mutableStateOf(false) }
     var activeSheetName by rememberSaveable { mutableStateOf<String?>(null) }
     val activeSheet = activeSheetName?.let { runCatching { SettingsSheet.valueOf(it) }.getOrNull() }
 
     PredictiveBackHandler(enabled = page != SettingsPage.HOME && activeSheet == null) { backEvents ->
         try {
-            backEvents.collect { event -> predictiveBackProgress = event.progress }
-            predictiveBackCompleting = true
-            predictiveBackProgress = 0f
+            backEvents.collect { event -> pageTransitionState.seekTo(event.progress, SettingsPage.HOME) }
+            pageTransitionState.animateTo(SettingsPage.HOME)
             pageName = SettingsPage.HOME.name
         } catch (_: CancellationException) {
-            // Gesture cancelled; keep the current secondary page.
-        } finally {
-            predictiveBackProgress = 0f
+            withContext(NonCancellable) { pageTransitionState.animateTo(page) }
         }
     }
 
     fun goTo(target: SettingsPage) {
-        predictiveBackCompleting = false
         pageName = target.name
     }
 
-    LaunchedEffect(page, predictiveBackCompleting) {
-        if (page == SettingsPage.HOME && predictiveBackCompleting) {
-            predictiveBackCompleting = false
-        }
-    }
-
-    val activePredictiveBackProgress = if (predictiveBackCompleting) 0f else predictiveBackProgress
+    LaunchedEffect(page) { pageTransitionState.animateTo(page) }
 
     val baseSettingsColorScheme = MaterialTheme.colorScheme
     val settingsColorScheme = keepixIosSettingsColorScheme(baseSettingsColorScheme)
 
     MaterialTheme(colorScheme = settingsColorScheme) {
+        CompositionLocalProvider(LocalMorphRegistry provides pageMorphs, LocalMorphOwner provides page.name) {
         AdaptiveCenter(
             modifier = Modifier.background(MaterialTheme.colorScheme.background),
             maxWidth = 760.dp,
         ) {
             Box(Modifier.fillMaxSize()) {
-                AnimatedContent(
-                    targetState = page,
-                    transitionSpec = {
-                        val returningHome = targetState == SettingsPage.HOME
-                        val enteringChild = initialState == SettingsPage.HOME && targetState != SettingsPage.HOME
-                        if (predictiveBackCompleting && returningHome) {
-                            EnterTransition.None.togetherWith(ExitTransition.None)
-                        } else {
-                            val enter = fadeIn(tween(150, easing = FastOutSlowInEasing)) +
-                                slideInHorizontally(tween(260, easing = FastOutSlowInEasing)) { width ->
-                                    when {
-                                        enteringChild -> width / 4
-                                        returningHome -> -width / 7
-                                        targetState.ordinal > initialState.ordinal -> width / 7
-                                        else -> -width / 7
-                                    }
-                                }
-                            val exit = fadeOut(tween(120, easing = FastOutSlowInEasing)) +
-                                slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { width ->
-                                    when {
-                                        returningHome -> width / 4
-                                        enteringChild -> -width / 8
-                                        targetState.ordinal > initialState.ordinal -> -width / 8
-                                        else -> width / 8
-                                    }
-                                }
-                            enter.togetherWith(exit)
-                        }
-                    },
-                    label = "settings_page_transition",
+                pageTransition.AnimatedContent(
+                    transitionSpec = { EnterTransition.None.togetherWith(ExitTransition.None) },
                 ) { animatedPage ->
+                    MorphDestination(animatedPage.name, this, MaterialTheme.colorScheme.background) {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .statusBarsPadding()
-                            .graphicsLayer {
-                                translationX = activePredictiveBackProgress * size.width * 0.82f
-                                val scale = 1f - activePredictiveBackProgress * 0.035f
-                                scaleX = scale
-                                scaleY = scale
-                                alpha = 1f - activePredictiveBackProgress * 0.18f
-                            },
+                            .statusBarsPadding(),
+                        state = pageScrollStates[animatedPage.ordinal],
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 34.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
@@ -296,6 +270,7 @@ fun SettingsScreen(
                 }
             }
         }
+        }
         if (activeSheet != null) {
             SettingsBottomSheet(
                 sheet = activeSheet,
@@ -306,6 +281,7 @@ fun SettingsScreen(
                 viewModel = viewModel,
             )
         }
+    }
     }
 }
 
@@ -702,102 +678,30 @@ private fun SettingsBottomSheet(
     onSuccess: () -> Unit,
     viewModel: KanlemeViewModel,
 ) {
-    var visible by remember { mutableStateOf(false) }
-    var closing by remember { mutableStateOf(false) }
-    var sheetBackProgress by remember { mutableFloatStateOf(0f) }
-
-    fun requestClose() {
-        if (!closing) {
-            closing = true
-            visible = false
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        visible = true
-    }
-    LaunchedEffect(closing) {
-        if (closing) {
-            delay(230)
-            onDismiss()
-        }
-    }
-
-    PredictiveBackHandler(enabled = true) { backEvents ->
-        try {
-            backEvents.collect { event -> sheetBackProgress = event.progress }
-            requestClose()
-        } catch (_: CancellationException) {
-            sheetBackProgress = 0f
-            closing = false
-            visible = true
-        }
-    }
-
-    Dialog(
-        onDismissRequest = ::requestClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    var visible by remember { mutableStateOf(true) }
+    MorphPanel(
+        visible = visible,
+        background = MaterialTheme.colorScheme.background,
+        onDismiss = { visible = false },
+        onClosed = onDismiss,
+        alignment = Alignment.BottomCenter,
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize(),
-            contentAlignment = Alignment.BottomCenter,
+        Column(
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
         ) {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(tween(170)),
-                exit = fadeOut(tween(190)),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.34f * (1f - sheetBackProgress * 0.55f)))
-                        .clickable(onClick = ::requestClose)
-                )
-            }
-            AnimatedVisibility(
-                visible = visible,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically(tween(240)) { it / 3 } + fadeIn(tween(160)),
-                exit = slideOutVertically(tween(220)) { it / 2 } + fadeOut(tween(160)),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer {
-                            translationY = size.height * 0.22f * sheetBackProgress
-                            val scale = 1f - sheetBackProgress * 0.025f
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = 1f - sheetBackProgress * 0.26f
-                        }
-                        .clickable(onClick = {})
-                        .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                        .navigationBarsPadding()
-                        .padding(horizontal = 18.dp, vertical = 14.dp),
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .width(42.dp)
-                                .height(5.dp)
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.32f)),
-                        )
-                        when (sheet) {
-                            SettingsSheet.MOVE_PERMISSION -> MovePermissionSheet(settings, onTick, viewModel)
-                            SettingsSheet.PHOTO_CLEAN_MODE -> PhotoCleanModeSheet(settings, onSuccess, viewModel)
-                            SettingsSheet.HAPTIC -> HapticSettingsSheet(settings, onSuccess, viewModel)
-                        }
-                    }
-                }
+            Box(Modifier.align(Alignment.CenterHorizontally).width(42.dp).height(5.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.32f)))
+            when (sheet) {
+                SettingsSheet.MOVE_PERMISSION -> MovePermissionSheet(settings, onTick, viewModel)
+                SettingsSheet.PHOTO_CLEAN_MODE -> PhotoCleanModeSheet(settings, onSuccess, viewModel)
+                SettingsSheet.HAPTIC -> HapticSettingsSheet(settings, onSuccess, viewModel)
             }
         }
     }
 }
-
 @Composable
 private fun MovePermissionSheet(
     settings: AppSettings,
@@ -2072,6 +1976,7 @@ private fun SettingsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .morphAnchor("settings:" + title, 22.dp, color = MaterialTheme.colorScheme.surface, icon = icon, tint = color)
             .clickable(onClick = onClick)
             .padding(
                 horizontal = if (iosStyle) 18.dp else 22.dp,
