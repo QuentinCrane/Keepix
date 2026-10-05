@@ -84,6 +84,7 @@ import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.photoImageRequest
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
+import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
 import com.futureape.kanleme.ui.util.shareMedia
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import androidx.media3.common.AudioAttributes
@@ -234,7 +235,7 @@ fun PhotoViewerScreen(
                     ViewerAction(icon = Icons.Rounded.Folder, label = stringResource(R.string.viewer_action_move), modifier = Modifier.weight(1f)) { showMoveSheet = true }
                     ViewerAction(icon = Icons.Rounded.Delete, label = stringResource(R.string.viewer_action_pending_delete), modifier = Modifier.weight(1f)) { viewModel.onPhotoAction(photo, SwipeAction.Delete) }
                     ViewerAction(icon = Icons.Rounded.Info, label = stringResource(R.string.viewer_action_exif), modifier = Modifier.weight(1f)) { showExifSheet = true }
-                    ViewerAction(icon = Icons.Rounded.PhotoLibrary, label = stringResource(R.string.viewer_action_back_to_clean), modifier = Modifier.weight(1f)) { onBack() }
+                    ViewerAction(icon = Icons.Rounded.PhotoLibrary, label = stringResource(R.string.gallery_chooser_title), modifier = Modifier.weight(1f)) { openPhotoInSystemGallery(context, photo) }
                 }
             }
         }

@@ -355,6 +355,7 @@
     <string name="crash_log_clip_label">看了么閃退記錄</string>
     <string name="crash_log_share_title">匯出閃退記錄</string>
     <string name="gallery_chooser_title">用相簿查看</string>
+    <string name="gallery_open_failed">無法開啟相簿查看，請確認已安裝相簿應用程式、照片仍在本機，並已允許讀取</string>
     <string name="media_file_title">媒體檔案</string>
     <string name="motion_clip_title">%1$s 動態片段</string>
     <string name="media_kind_gif">GIF 動圖</string>

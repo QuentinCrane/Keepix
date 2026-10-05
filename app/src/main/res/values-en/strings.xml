@@ -355,6 +355,7 @@
     <string name="crash_log_clip_label">Keepix crash log</string>
     <string name="crash_log_share_title">Export crash log</string>
     <string name="gallery_chooser_title">Open in gallery</string>
+    <string name="gallery_open_failed">Unable to open in gallery. Check that a gallery app is installed, the photo is on this device, and read access is allowed.</string>
     <string name="media_file_title">Media file</string>
     <string name="motion_clip_title">%1$s motion clip</string>
     <string name="media_kind_gif">GIF</string>

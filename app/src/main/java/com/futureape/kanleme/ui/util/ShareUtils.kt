@@ -2,9 +2,11 @@ package com.futureape.kanleme.ui.util
 
 import com.futureape.kanleme.R
 import android.content.ActivityNotFoundException
+import android.app.Activity
 import android.content.ContentUris
 import android.content.ClipData
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -14,6 +16,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.net.Uri
 import android.provider.MediaStore
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.VideoEntity
@@ -73,40 +76,39 @@ suspend fun shareDailyReportImage(
 }
 
 fun openPhotoInSystemGallery(context: Context, photo: PhotoEntity) {
-    val mediaStoreUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, photo.mediaStoreId)
-    val storedUri = runCatching { Uri.parse(photo.uri) }.getOrElse { mediaStoreUri }
-    val companionVideoUri = photo.motionVideoUri
-        ?.takeIf { photo.isSeparateVideo && it.isNotBlank() }
-        ?.let { runCatching { Uri.parse(it) }.getOrNull() }
-    if (companionVideoUri != null) {
-        openMediaInSystemGallery(
-            context = context,
-            uri = companionVideoUri,
-            mimeType = "video/*",
-            title = context.getString(R.string.motion_clip_title, photo.displayName),
-            fallbackUri = mediaStoreUri,
-        )
+    // The stored URI identifies the selected original, including its storage volume.
+    // A motion photo's companion video is not a substitute for that photo.
+    val uri = galleryMediaUri(photo.uri, photo.mediaStoreId, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+    if (uri == null) {
+        showGalleryOpenError(context)
         return
     }
     openMediaInSystemGallery(
         context = context,
-        uri = mediaStoreUri,
+        uri = uri,
         mimeType = photo.mimeType.ifBlank { "image/*" },
         title = photo.displayName,
-        fallbackUri = storedUri,
     )
 }
 
 fun openVideoInSystemGallery(context: Context, video: VideoEntity) {
-    val mediaStoreUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, video.mediaStoreId)
-    val storedUri = runCatching { Uri.parse(video.uri) }.getOrElse { mediaStoreUri }
+    val uri = galleryMediaUri(video.uri, video.mediaStoreId, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+    if (uri == null) {
+        showGalleryOpenError(context)
+        return
+    }
     openMediaInSystemGallery(
         context = context,
-        uri = mediaStoreUri,
+        uri = uri,
         mimeType = video.mimeType.ifBlank { "video/*" },
         title = video.displayName,
-        fallbackUri = storedUri,
     )
+}
+
+private fun galleryMediaUri(storedUri: String, mediaStoreId: Long, collection: Uri): Uri? {
+    val parsed = Uri.parse(storedUri)
+    if (parsed.scheme == "content" && !parsed.authority.isNullOrBlank()) return parsed
+    return mediaStoreId.takeIf { it > 0 }?.let { ContentUris.withAppendedId(collection, it) }
 }
 
 fun openMediaInSystemGallery(
@@ -130,54 +132,49 @@ fun openMediaInSystemGallery(
     fun Intent.withMediaGrant(targetUri: Uri): Intent = apply {
         putExtra(Intent.EXTRA_STREAM, targetUri)
         putExtra(Intent.EXTRA_TITLE, title)
-        putExtra("android.intent.extra.STREAM", targetUri)
-        clipData = ClipData.newUri(context.contentResolver, title, targetUri)
+        clipData = ClipData.newRawUri(title, targetUri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (!context.hasActivity()) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 
     fun viewIntent(targetUri: Uri, type: String?): Intent = Intent(Intent.ACTION_VIEW).apply {
         if (type == null) data = targetUri else setDataAndType(targetUri, type)
     }.withMediaGrant(targetUri)
 
-    val reviewAction = "com.android.camera.action.REVIEW"
-    val candidates = listOf(
-        viewIntent(uri, broadType),
-        viewIntent(uri, resolvedType),
-        Intent(reviewAction).apply { setDataAndType(uri, broadType) }.withMediaGrant(uri),
-        viewIntent(uri, null),
-        viewIntent(fallbackUri, broadType),
-        viewIntent(fallbackUri, resolvedType),
-        viewIntent(fallbackUri, null),
-    )
+    val candidates = listOf(uri, fallbackUri).distinct().flatMap { target ->
+        listOf(
+            Intent(MediaStore.ACTION_REVIEW).apply { setDataAndType(target, resolvedType) }.withMediaGrant(target),
+            viewIntent(target, resolvedType),
+            viewIntent(target, broadType),
+            Intent("com.android.camera.action.REVIEW").apply { setDataAndType(target, broadType) }.withMediaGrant(target),
+        ).distinctBy { it.action to it.type }
+    }
 
-    val resolver = context.packageManager
-    val firstResolvable = candidates.firstOrNull { it.resolveActivity(resolver) != null }
-    if (firstResolvable != null) {
+    // Try each supported protocol on the same original. Do not open the gallery's
+    // home page or create a cache copy: either would lose the selected media item.
+    for (candidate in candidates) {
         try {
-            context.startActivity(firstResolvable)
+            context.startActivity(candidate)
             return
         } catch (_: ActivityNotFoundException) {
-            // Fall through to chooser.
+            // The gallery may support VIEW but not REVIEW.
         } catch (_: SecurityException) {
-            // Fall through to chooser.
+            // Try another gallery protocol with the same read grant.
         } catch (_: IllegalArgumentException) {
-            // Some vendor gallery apps reject otherwise-valid MediaStore Uris.
+            // Some vendor viewers accept only a broader MIME type.
         }
     }
+    showGalleryOpenError(context)
+}
 
-    val chooser = Intent.createChooser(candidates.first(), context.getString(R.string.gallery_chooser_title)).apply {
-        putExtra(Intent.EXTRA_INITIAL_INTENTS, candidates.drop(1).toTypedArray())
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        clipData = ClipData.newUri(context.contentResolver, title, uri)
-    }
-    try {
-        context.startActivity(chooser)
-    } catch (_: Exception) {
-        // Last resort: let Android route the broadest VIEW intent.
-        context.startActivity(viewIntent(uri, broadType))
-    }
+private fun Context.hasActivity(): Boolean = when (this) {
+    is Activity -> true
+    is ContextWrapper -> baseContext !== this && baseContext.hasActivity()
+    else -> false
+}
+
+private fun showGalleryOpenError(context: Context) {
+    Toast.makeText(context, R.string.gallery_open_failed, Toast.LENGTH_LONG).show()
 }
 
 private fun createDailyReportBitmap(

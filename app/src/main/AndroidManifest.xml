@@ -29,6 +29,14 @@
             <action android:name="com.android.camera.action.REVIEW" />
             <data android:mimeType="image/*" />
         </intent>
+        <intent>
+            <action android:name="android.provider.action.REVIEW" />
+            <data android:mimeType="image/*" />
+        </intent>
+        <intent>
+            <action android:name="android.provider.action.REVIEW" />
+            <data android:mimeType="video/*" />
+        </intent>
     </queries>
 
     <application
