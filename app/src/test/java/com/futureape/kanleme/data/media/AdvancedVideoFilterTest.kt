@@ -4,6 +4,29 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AdvancedVideoFilterTest {
+    @Test fun systemDocumentFoldersMapToMediaStoreVolumes() {
+        assertEquals(VideoFolderKey("external_primary", "Movies/精选/"), videoFolderFromDocumentId("primary:Movies/精选"))
+        assertEquals(VideoFolderKey("abcd-1234", "DCIM/Camera/"), videoFolderFromDocumentId("ABCD-1234:DCIM/Camera"))
+        assertEquals(VideoFolderKey("external_primary", "Documents/Saved/"), videoFolderFromDocumentId("home:Saved"))
+        assertEquals(VideoFolderKey("external_primary", "Movies/ name /"), videoFolderFromDocumentId("primary:Movies/ name "))
+        assertNull(videoFolderFromDocumentId("missing-colon"))
+        assertNull(videoFolderFromDocumentId("primary:Movies/../DCIM"))
+    }
+
+    @Test fun recursiveFolderScopeRespectsVolumeAndDirectoryBoundaries() {
+        val parent = VideoFolderKey("external_primary", "Movies/A/")
+        val child = parent.copy(relativePath = "Movies/A/Child/")
+        assertTrue(videoFolderInScope(child, setOf(parent), true))
+        assertFalse(videoFolderInScope(child, setOf(parent), false))
+        assertFalse(videoFolderInScope(parent.copy(relativePath = "Movies/AB/"), setOf(parent), true))
+        assertFalse(videoFolderInScope(child.copy(volume = "abcd-1234"), setOf(parent), true))
+    }
+    @Test fun movePathsRejectTraversalAndInvalidPaths() {
+        assertEquals("Movies/精选/", normalizeAdvancedVideoMovePath(" Movies\\精选 "))
+        listOf("", "/", "Movies/../DCIM", "Movies/./x", "Movies//x", "E:/Video", "Movies/\u0000x").forEach {
+            assertNull(normalizeAdvancedVideoMovePath(it))
+        }
+    }
     private val now = 1_800_000_000_000L
     private fun video(
         uri: String = "content://media/external_primary/video/media/1",

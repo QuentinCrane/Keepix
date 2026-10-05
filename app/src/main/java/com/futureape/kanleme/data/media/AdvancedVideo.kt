@@ -18,10 +18,39 @@ data class AdvancedVideo(
     val durationMs: Long,
     val dateAddedMs: Long,
     val mimeType: String,
+    val dateModifiedMs: Long = 0,
 ) {
+    val mediaStoreId: Long get() = uri.substringAfterLast('/').toLong()
     val shortEdge: Int get() = minOf(width, height)
     val extension: String get() = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
 }
+
+fun normalizeAdvancedVideoMovePath(input: String): String? {
+    val path = input.trim().replace('\\', '/').trim('/')
+    if (path.isEmpty() || path.split('/').any { it.isBlank() || it == "." || it == ".." }) return null
+    if (path.any { it == '\u0000' || it == ':' } || path.length > 240) return null
+    return path + "/"
+}
+
+fun videoFolderFromDocumentId(documentId: String): VideoFolderKey? {
+    val separator = documentId.indexOf(':')
+    if (separator < 1) return null
+    val root = documentId.substring(0, separator)
+    val rawPath = documentId.substring(separator + 1).trim('/')
+    val volume = when (root.lowercase(Locale.ROOT)) {
+        "primary", "home" -> "external_primary"
+        else -> root.lowercase(Locale.ROOT)
+    }
+    val path = if (root.equals("home", true)) "Documents/" + rawPath else rawPath
+    if (path.split('/').any { it == "." || it == ".." } || path.any { it == '\u0000' || it == ':' || it == '\\' }) return null
+    // Provider document IDs already contain literal filesystem names; keep their spaces intact.
+    val normalized = if (path.isEmpty()) "" else path.trimEnd('/') + "/"
+    return VideoFolderKey(volume, normalized)
+}
+
+fun videoFolderInScope(folder: VideoFolderKey, selected: Set<VideoFolderKey>, includeSubfolders: Boolean): Boolean =
+    selected.any { parent -> parent.volume == folder.volume &&
+        (parent.relativePath == folder.relativePath || (includeSubfolders && folder.relativePath.startsWith(parent.relativePath))) }
 
 enum class VideoResolution { ALL, BELOW_HD, HD, FULL_HD, UHD, UNKNOWN }
 enum class VideoDuration { ALL, SHORT, MEDIUM, LONG, UNKNOWN }

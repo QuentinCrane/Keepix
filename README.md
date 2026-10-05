@@ -43,7 +43,7 @@ Official Website:[Keepix — Organize your gallery like swiping short videos](ht
 
 - Photo cleanup with keep, favorite, delete, undo, and time-based filters.
 - Video cleanup with staged review, temporary keep, and commit-on-exit behavior.
-- Me > Advanced tools > Video explorer: scan all accessible videos or selected folders, combine resolution, size, duration, format, orientation, date-added and name filters, then use quick local playback or another viewer. Advanced photo tools are reserved for a future update.
+- Me > Advanced tools > Video explorer: scan all accessible videos or selected folders, combine resolution, size, duration, format, orientation, date-added and name filters, review covers and titles, then play locally, use another viewer, move to app trash or move to a folder. Advanced photo tools are reserved for a future update.
 - Similar photo detection with cached fingerprints and background progress.
 - Separate favorites and trash views for photos and videos.
 - A device-local settings center for layout, behavior, feedback, and maintenance.

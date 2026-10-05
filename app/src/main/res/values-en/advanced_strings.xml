@@ -20,7 +20,7 @@
     <string name="advanced_folder_search">Search folders</string>
     <string name="advanced_folder_empty">No folders with accessible videos found</string>
     <string name="advanced_refresh_folders">Refresh folders</string>
-    <string name="advanced_folder_direct">Scans selected directories only. Select subfolders separately.</string>
+    <string name="advanced_folder_direct">Include subfolders, or scan selected directories only.</string>
     <string name="advanced_apply">Apply</string>
     <string name="advanced_filter">Filters</string>
     <string name="advanced_search">Search video names</string>
@@ -83,4 +83,19 @@
     <string name="advanced_license_credit">AndroidX Media3 / ExoPlayer\nCopyright The Android Open Source Project\nApache License, Version 2.0\nUses the existing Media3 1.11.0 dependency. PlayerActivity initialization, audio focus, position saving and release patterns are adapted for a Compose local single-video viewer.</string>
     <string name="advanced_source">Upstream repository and sample</string>
     <string name="advanced_license_text">Apache 2.0 license text</string>
+    <string name="advanced_delete">Delete</string>
+    <string name="advanced_delete_title">Move to app trash?</string>
+    <string name="advanced_delete_body">%1$s\nYou can restore this video from Me &gt; Trash.</string>
+    <string name="advanced_delete_confirm">Move to trash</string>
+    <string name="advanced_delete_success">Moved to trash</string>
+    <string name="advanced_move">Move</string>
+    <string name="advanced_move_invalid">Choose a valid destination folder different from the current folder.</string>
+    <string name="advanced_action_error">Operation failed. Scan again and retry.</string>
+    <string name="advanced_busy">Working</string>
+    <string name="advanced_cover">Video cover: %1$s</string>
+    <string name="advanced_cover_missing">No cover available</string>
+    <string name="advanced_system_folder">Choose with Files</string>
+    <string name="advanced_include_subfolders">Include subfolders</string>
+    <string name="advanced_local_folder_only">Choose a folder in device storage or on a storage card.</string>
+    <string name="advanced_same_volume">Choose a destination on the same storage volume. Moving across volumes is not supported.</string>
 </resources>

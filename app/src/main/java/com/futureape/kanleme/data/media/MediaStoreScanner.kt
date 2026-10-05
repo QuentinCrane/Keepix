@@ -118,8 +118,9 @@ class MediaStoreScanner @Inject constructor(
         limit: Int? = null,
         afterGeneration: Long? = null,
         throughGeneration: Long? = null,
+        itemUri: String? = null,
     ): List<VideoEntity> {
-        val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        val collection = itemUri?.let(Uri::parse) ?: MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Video.Media._ID,
             MediaStore.Video.Media.DISPLAY_NAME,
@@ -132,6 +133,7 @@ class MediaStoreScanner @Inject constructor(
             MediaStore.Video.Media.MIME_TYPE,
             MediaStore.Video.Media.WIDTH,
             MediaStore.Video.Media.HEIGHT,
+            MediaStore.MediaColumns.VOLUME_NAME,
         )
         val result = mutableListOf<VideoEntity>()
         queryMedia(
@@ -158,7 +160,9 @@ class MediaStoreScanner @Inject constructor(
                 result += VideoEntity(
                     mediaStoreId = id,
                     stableMediaKey = "video:" + id + ":" + cursor.long(MediaStore.Video.Media.DATE_MODIFIED),
-                    uri = ContentUris.withAppendedId(collection, id).toString(),
+                    uri = if (itemUri == null) ContentUris.withAppendedId(collection, id).toString() else
+                        ContentUris.withAppendedId(MediaStore.Video.Media.getContentUri(
+                            cursor.string(MediaStore.MediaColumns.VOLUME_NAME) ?: collection.pathSegments.first()), id).toString(),
                     displayName = displayName,
                     size = cursor.long(MediaStore.Video.Media.SIZE),
                     duration = cursor.long(MediaStore.Video.Media.DURATION),

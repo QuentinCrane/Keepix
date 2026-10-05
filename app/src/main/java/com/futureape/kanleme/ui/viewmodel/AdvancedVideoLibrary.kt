@@ -5,6 +5,7 @@ import com.futureape.kanleme.data.media.AdvancedVideo
 import com.futureape.kanleme.data.media.AdvancedVideoFilter
 import com.futureape.kanleme.data.media.VideoFolder
 import com.futureape.kanleme.data.media.VideoFolderKey
+import com.futureape.kanleme.data.media.videoFolderInScope
 import com.futureape.kanleme.data.repository.AppRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +36,8 @@ data class AdvancedVideoScanState(
     val scannedCount: Int = 0,
     val hasScanned: Boolean = false,
     val errorRes: Int? = null,
+    val busyUris: Set<String> = emptySet(),
+    val includeSubfolders: Boolean = true,
 )
 
 data class AdvancedVideoResults(
@@ -53,6 +56,8 @@ class AdvancedVideoLibrary(private val scope: CoroutineScope, private val reposi
     val filter = mutableFilter.asStateFlow()
     private var scanJob: Job? = null
     private var folderJob: Job? = null
+    private var folderPickerVideo: AdvancedVideo? = null
+    private var scopePickerIncludeSubfolders = true
     @Volatile private var scanGeneration = 0L
 
     val results = combine(state, filter.debounce(120)) { state, filter -> state.videos to filter }
@@ -66,6 +71,32 @@ class AdvancedVideoLibrary(private val scope: CoroutineScope, private val reposi
         }.stateIn(scope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 0, replayExpirationMillis = 0), AdvancedVideoResults())
 
     fun updateFilter(filter: AdvancedVideoFilter) { mutableFilter.value = filter }
+
+    fun prepareFolderPicker(video: AdvancedVideo) { folderPickerVideo = video }
+    fun consumeFolderPickerVideo(): AdvancedVideo? = folderPickerVideo.also { folderPickerVideo = null }
+    fun prepareScopeFolderPicker(includeSubfolders: Boolean) { scopePickerIncludeSubfolders = includeSubfolders }
+    fun selectSystemFolder(folder: VideoFolderKey) { selectFolders(setOf(folder), scopePickerIncludeSubfolders) }
+
+    fun beginAction(uri: String): Boolean {
+        if (uri in state.value.busyUris) return false
+        cancelScan()
+        mutableState.update { it.copy(busyUris = it.busyUris + uri) }
+        return true
+    }
+
+    fun finishAction(uri: String) { mutableState.update { it.copy(busyUris = it.busyUris - uri) } }
+
+    fun removeVideo(uri: String) { mutableState.update { it.copy(videos = it.videos.filterNot { video -> video.uri == uri }) } }
+
+    fun replaceVideo(uri: String, video: AdvancedVideo) {
+        mutableState.update { state ->
+            val inScope = state.selectedFolders == null || videoFolderInScope(video.folder, state.selectedFolders, state.includeSubfolders)
+            state.copy(videos = state.videos.mapNotNull { old ->
+                if (old.uri != uri) old else if (inScope) video else null
+            })
+        }
+        loadFolders()
+    }
 
     fun loadFolders() {
         folderJob?.cancel()
@@ -82,11 +113,11 @@ class AdvancedVideoLibrary(private val scope: CoroutineScope, private val reposi
         }
     }
 
-    fun selectFolders(folders: Set<VideoFolderKey>?) {
+    fun selectFolders(folders: Set<VideoFolderKey>?, includeSubfolders: Boolean = state.value.includeSubfolders) {
         require(folders == null || folders.isNotEmpty())
-        if (folders == state.value.selectedFolders) return
+        if (folders == state.value.selectedFolders && includeSubfolders == state.value.includeSubfolders) return
         cancelScan()
-        mutableState.update { it.copy(selectedFolders = folders, videos = emptyList(), hasScanned = false,
+        mutableState.update { it.copy(selectedFolders = folders, includeSubfolders = includeSubfolders, videos = emptyList(), hasScanned = false,
             scannedCount = 0, errorRes = null) }
     }
 
@@ -97,7 +128,7 @@ class AdvancedVideoLibrary(private val scope: CoroutineScope, private val reposi
         scanJob = scope.launch {
             mutableState.update { it.copy(scanning = true, scannedCount = 0, errorRes = null) }
             try {
-                val videos = repository.scanAdvancedVideos(selected) { count ->
+                val videos = repository.scanAdvancedVideos(selected, state.value.includeSubfolders) { count ->
                     if (generation == scanGeneration) mutableState.update { it.copy(scannedCount = count) }
                 }
                 if (generation != scanGeneration) return@launch
@@ -124,15 +155,16 @@ class AdvancedVideoLibrary(private val scope: CoroutineScope, private val reposi
     fun invalidateAccess() {
         cancelScan()
         folderJob?.cancel()
-        mutableState.value = AdvancedVideoScanState(selectedFolders = state.value.selectedFolders)
+        mutableState.value = AdvancedVideoScanState(selectedFolders = state.value.selectedFolders, includeSubfolders = state.value.includeSubfolders)
         loadFolders()
     }
 
     fun leave(clearResults: Boolean = true) {
         cancelScan()
         folderJob?.cancel()
+        if (clearResults) folderPickerVideo = null
         mutableState.update {
-            if (clearResults) AdvancedVideoScanState(selectedFolders = it.selectedFolders)
+            if (clearResults) AdvancedVideoScanState(selectedFolders = it.selectedFolders, includeSubfolders = it.includeSubfolders)
             else it.copy(loadingFolders = false)
         }
     }

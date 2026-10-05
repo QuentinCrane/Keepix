@@ -10,6 +10,9 @@ import com.futureape.kanleme.data.local.SimilarAnalysisTaskStatus
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.media.MediaAccessState
+import com.futureape.kanleme.data.media.AdvancedVideo
+import com.futureape.kanleme.data.media.VideoFolderKey
+import com.futureape.kanleme.data.media.normalizeAdvancedVideoMovePath
 import com.futureape.kanleme.data.media.MediaAuthorizationResult
 import com.futureape.kanleme.data.media.MediaOperationKind
 import com.futureape.kanleme.data.media.MediaOperationRequest
@@ -157,6 +160,7 @@ sealed interface PendingMediaAuthorizationTarget {
     data class VideoMove(
         val video: VideoEntity,
         val targetRelativePath: String,
+        val advancedVideo: AdvancedVideo? = null,
     ) : PendingMediaAuthorizationTarget
 
     data class PhotoArchive(
@@ -592,9 +596,22 @@ class KanlemeViewModel @Inject constructor(
                 _message.value = dynamicUiText(result.message)
             }
             is PendingMediaAuthorizationTarget.VideoMove -> {
-                val result = repository.moveVideoToFolder(target.video, target.targetRelativePath, writeAuthorized = true)
-                if (!result.success) error(result.message)
-                _message.value = dynamicUiText(result.message)
+                try {
+                    val currentVideo = target.advancedVideo?.let { repository.prepareAdvancedVideoAction(it) } ?: target.video
+                    val result = repository.moveVideoToFolder(currentVideo, target.targetRelativePath, writeAuthorized = true)
+                    if (!result.success) error(result.message)
+                    target.advancedVideo?.let { advanced ->
+                        val fresh = repository.prepareAdvancedVideoAction(advanced, requireUnchanged = false)
+                        advancedVideos.replaceVideo(advanced.uri, advanced.copy(name = fresh.displayName,
+                            folder = VideoFolderKey(advanced.folder.volume, fresh.folderPath),
+                            sizeBytes = fresh.size, width = fresh.width, height = fresh.height,
+                            durationMs = fresh.duration, mimeType = fresh.mimeType,
+                            dateModifiedMs = fresh.dateModified * 1000L))
+                    }
+                    _message.value = dynamicUiText(result.message)
+                } finally {
+                    target.advancedVideo?.let { advancedVideos.finishAction(it.uri) }
+                }
             }
             is PendingMediaAuthorizationTarget.PhotoArchive -> commitPhotoArchive(target)
             is PendingMediaAuthorizationTarget.VideoArchive -> commitVideoArchive(target)
@@ -617,11 +634,13 @@ class KanlemeViewModel @Inject constructor(
                 invalidateVideoDeckLoads()
                 loadVideoDeck()
             }
+            is PendingMediaAuthorizationTarget.VideoMove -> {
+                target.advancedVideo?.let { advancedVideos.finishAction(it.uri) }
+            }
             is PendingMediaAuthorizationTarget.UndoOperation,
             is PendingMediaAuthorizationTarget.UndoLastAction,
             is PendingMediaAuthorizationTarget.PermanentDelete,
             is PendingMediaAuthorizationTarget.PhotoMove,
-            is PendingMediaAuthorizationTarget.VideoMove,
             is PendingMediaAuthorizationTarget.PhotoArchive,
             is PendingMediaAuthorizationTarget.VideoArchive,
             is PendingMediaAuthorizationTarget.PhotoActionWithMove,
@@ -1894,6 +1913,51 @@ class KanlemeViewModel @Inject constructor(
             isTrashed = false,
             target = PendingMediaAuthorizationTarget.VideoMove(video, relativePath),
         )
+    }
+
+    fun deleteAdvancedVideo(video: AdvancedVideo) = viewModelScope.launch {
+        if (!advancedVideos.beginAction(video.uri)) return@launch
+        try {
+            val entity = repository.prepareAdvancedVideoAction(video)
+            check(repository.handleVideoAction(entity, SwipeAction.Delete, appTrashOnly = true) > 0L) {
+                "视频未能移入回收站，请重新扫描后重试"
+            }
+            handledVideoActionMediaIds += entity.mediaStoreId
+            invalidateVideoDeckLoads()
+            _videoDeck.value = _videoDeck.value.filterNot { it.mediaStoreId == entity.mediaStoreId }
+            _videoDeckPreview.value = _videoDeckPreview.value.filterNot { it.mediaStoreId == entity.mediaStoreId }
+            advancedVideos.removeVideo(video.uri)
+            _message.value = uiText(R.string.advanced_delete_success)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            _message.value = error.message?.let(::dynamicUiText) ?: uiText(R.string.advanced_action_error)
+        } finally { advancedVideos.finishAction(video.uri) }
+    }
+
+    fun moveAdvancedVideo(video: AdvancedVideo, relativePath: String) = viewModelScope.launch {
+        val path = normalizeAdvancedVideoMovePath(relativePath)
+        if (path == null || path == video.folder.relativePath) {
+            _message.value = uiText(R.string.advanced_move_invalid)
+            return@launch
+        }
+        if (_pendingMediaAuthorization.value != null) {
+            _message.value = uiText(R.string.message_media_authorization_in_progress)
+            return@launch
+        }
+        if (!advancedVideos.beginAction(video.uri)) return@launch
+        try {
+            val entity = repository.prepareAdvancedVideoAction(video)
+            val target = PendingMediaAuthorizationTarget.VideoMove(entity, path, video)
+            requestMediaAuthorization(MediaOperationKind.WRITE, listOf(entity.uri), false, target)
+            if (_pendingMediaAuthorization.value?.target != target) advancedVideos.finishAction(video.uri)
+        } catch (cancelled: CancellationException) {
+            advancedVideos.finishAction(video.uri)
+            throw cancelled
+        } catch (error: Exception) {
+            advancedVideos.finishAction(video.uri)
+            _message.value = error.message?.let(::dynamicUiText) ?: uiText(R.string.advanced_action_error)
+        }
     }
 
     fun archivePhotoToFolder(photo: PhotoEntity, relativePath: String) = viewModelScope.launch {

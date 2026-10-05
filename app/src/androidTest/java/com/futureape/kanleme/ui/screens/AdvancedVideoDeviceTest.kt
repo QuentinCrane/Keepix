@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.view.inspector.WindowInspector
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -24,11 +25,20 @@ import com.futureape.kanleme.data.media.*
 import com.futureape.kanleme.data.settings.ThemeMode
 import com.futureape.kanleme.ui.theme.KanlemeTheme
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import com.futureape.kanleme.ui.navigation.KanlemeApp
 import com.futureape.kanleme.ui.util.advancedVideoViewIntent
 import com.futureape.kanleme.ui.util.openAdvancedVideoExternally
+import com.futureape.kanleme.ui.util.AdvancedVideoThumbnails
+import com.futureape.kanleme.data.repository.AppRepository
+import com.futureape.kanleme.data.repository.SwipeAction
+import com.futureape.kanleme.data.local.ProcessingStatus
+import com.futureape.kanleme.data.local.DeletionStatus
+import com.futureape.kanleme.data.settings.AppSettingsRepository
+import com.futureape.kanleme.data.settings.DeleteMode
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -43,15 +53,24 @@ class AdvancedVideoDeviceTest {
     @get:Rule(order = 0) val hiltRule = HiltAndroidRule(this)
     @get:Rule(order = 1) val composeRule = createAndroidComposeRule<MainActivity>()
     @Inject lateinit var scanner: AdvancedVideoScanner
+    @Inject lateinit var repository: AppRepository
+    @Inject lateinit var settingsRepository: AppSettingsRepository
+    @Inject lateinit var database: com.futureape.kanleme.data.local.AppDatabase
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private val fixtures = mutableListOf<Uri>()
     private lateinit var viewModel: KanlemeViewModel
+    private lateinit var originalDeleteMode: DeleteMode
     private fun label(res: Int) = context.getString(res)
 
-    @Before fun prepare() { hiltRule.inject() }
+    @Before fun prepare() {
+        hiltRule.inject()
+        originalDeleteMode = runBlocking { settingsRepository.settings.first().deleteMode }
+    }
     @After fun cleanOwnFixtures() {
         fixtures.forEach { context.contentResolver.delete(it, null, null) }
+        runBlocking { settingsRepository.setDeleteMode(originalDeleteMode) }
+        AdvancedVideoThumbnails.clear()
     }
 
     private fun insertVideo(path: String, name: String): Uri {
@@ -81,8 +100,8 @@ class AdvancedVideoDeviceTest {
         }
     }
 
-    private fun screenshot(name: String) {
-        composeRule.waitForIdle()
+    private fun screenshot(name: String, awaitCompose: Boolean = true) {
+        if (awaitCompose) composeRule.waitForIdle()
         instrumentation.waitForIdleSync()
         SystemClock.sleep(300) // Wait for the system compositor, including separate Dialog windows.
         val directory = File(context.getExternalFilesDir(null), "advanced-validation").apply { mkdirs() }
@@ -114,6 +133,44 @@ class AdvancedVideoDeviceTest {
             composeRule.onAllNodesWithText("TERMS AND CONDITIONS FOR USE", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
         screenshot("advanced-licenses")
+    }
+
+    @Test fun realNavigationOpensVideoAndLicenseAndReturnsToHub() {
+        fun settleMorph() {
+            composeRule.mainClock.advanceTimeBy(1_000)
+            composeRule.waitForIdle()
+            instrumentation.waitForIdleSync()
+        }
+        composeRule.activity.setContent {
+            KanlemeTheme(themeMode = ThemeMode.DARK) {
+                val vm: KanlemeViewModel = hiltViewModel()
+                LaunchedEffect(vm) { vm.markOnboardingShown() }
+                KanlemeApp(initialShortcutTarget = null, viewModel = vm)
+            }
+        }
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithContentDescription(label(R.string.nav_me)).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription(label(R.string.nav_me)).performClick()
+        settleMorph()
+        composeRule.onNodeWithText(label(R.string.advanced_title)).performScrollTo()
+        // LazyList's scroll-to only considers its viewport; reveal the last row above the floating dock.
+        composeRule.onRoot().performTouchInput { swipeUp(startY = height * 0.8f, endY = height * 0.4f) }
+        composeRule.onNodeWithText(label(R.string.advanced_title)).performClick()
+        settleMorph()
+        composeRule.onNodeWithText(label(R.string.advanced_video_title)).performClick()
+        settleMorph()
+        composeRule.onNodeWithText(label(R.string.advanced_search)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(label(R.string.a11y_back)).performClick()
+        settleMorph()
+        composeRule.onNodeWithText(label(R.string.advanced_licenses)).performClick()
+        settleMorph()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("TERMS AND CONDITIONS FOR USE", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription(label(R.string.a11y_back)).performClick()
+        settleMorph()
+        composeRule.onNodeWithText(label(R.string.advanced_photos_later)).assertIsDisplayed()
     }
 
     private fun allViews(root: View): Sequence<View> = sequence {
@@ -150,6 +207,9 @@ class AdvancedVideoDeviceTest {
         assertEquals(listOf("advanced-one.mp4"), viewModel.advancedVideos.state.value.videos.map { it.name })
         composeRule.onNodeWithText("advanced-one.mp4").assertExists()
         composeRule.onNodeWithText("advanced-two.mp4").assertDoesNotExist()
+        composeRule.onNodeWithText("advanced-one.mp4").performScrollTo()
+        composeRule.waitUntil(10_000) { AdvancedVideoThumbnails.cachedBytes() > 0 }
+        assertTrue(AdvancedVideoThumbnails.cachedBytes() <= 8 * 1024 * 1024)
         screenshot("video-scoped-results")
         composeRule.onNodeWithText(label(R.string.advanced_filter)).performClick()
         composeRule.onNodeWithText(label(R.string.advanced_resolution)).assertIsDisplayed()
@@ -221,6 +281,125 @@ class AdvancedVideoDeviceTest {
         screenshot("external-viewer-chooser")
         // Return through system Back; no login, network action or external-app mutation is performed.
         instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+    }
+
+    @Test fun deleteUsesAppTrashAndCanRestoreExistingFavorite(): Unit = runBlocking {
+        insertVideo("Movies/kanleme-advanced/trash/", "advanced-trash.mp4")
+        val video = scanner.scan(null) {}.first { it.name == "advanced-trash.mp4" }
+        val entity = repository.prepareAdvancedVideoAction(video)
+        repository.handleVideoAction(entity, SwipeAction.Favorite)
+        settingsRepository.setDeleteMode(DeleteMode.SYSTEM_TRASH)
+        showVideos()
+        composeRule.onNodeWithText(label(R.string.advanced_scan)).performClick()
+        composeRule.waitUntil(10_000) { ::viewModel.isInitialized && viewModel.advancedVideos.state.value.hasScanned }
+        composeRule.onNodeWithText(label(R.string.advanced_delete)).performScrollTo().performClick()
+        screenshot("video-delete-confirmation")
+        composeRule.onNodeWithText(label(R.string.advanced_delete_confirm)).performClick()
+        composeRule.waitUntil(10_000) {
+            viewModel.advancedVideos.state.value.videos.none { it.uri == video.uri } &&
+                viewModel.advancedVideos.state.value.busyUris.isEmpty()
+        }
+        assertNull(viewModel.pendingMediaAuthorization.value)
+        val trash = repository.observeTrash().first().first { it.mediaId == entity.id && it.mediaType == "video" }
+        assertEquals(DeletionStatus.PENDING, database.videoDao().byId(entity.id)?.deletionStatus)
+        context.contentResolver.openInputStream(video.uri.let(Uri::parse))!!.use { assertTrue(it.read() >= 0) }
+        assertTrue(repository.scanAdvancedVideos(null) {}.none { it.uri == video.uri })
+        repository.restoreTrashItem(trash.id)
+        val restored = repository.prepareAdvancedVideoAction(video)
+        assertEquals(entity.id, restored.id)
+        assertEquals(ProcessingStatus.FAVORITED, restored.processingStatus)
+        assertEquals(DeletionStatus.NONE, restored.deletionStatus)
+    }
+
+    @Test fun moveCancellationKeepsVideoAndApprovalUpdatesRealPath(): Unit = runBlocking {
+        val original = "Movies/kanleme-advanced/move-source/"
+        val target = "Movies/kanleme-advanced/move-target/"
+        insertVideo(original, "advanced-move.mp4")
+        insertVideo(target, "advanced-target-placeholder.mp4")
+        val video = scanner.scan(null) {}.first { it.name == "advanced-move.mp4" }
+        showVideos()
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { viewModel.advancedVideos.selectFolders(setOf(video.folder)); viewModel.advancedVideos.scan() }
+        composeRule.waitUntil(10_000) { viewModel.advancedVideos.state.value.hasScanned }
+        composeRule.onNodeWithText(label(R.string.advanced_move)).performScrollTo().performClick()
+        assertTrue(clickNativeText("move-target"))
+        screenshot("video-system-folder-picker", awaitCompose = false)
+        assertTrue(clickNativeText("Use this folder", "USE THIS FOLDER", "使用此文件夹"))
+        assertTrue(clickNativeText("Allow", "ALLOW", "允许"))
+        screenshot("video-system-folder-selected")
+        composeRule.waitUntil(10_000) { viewModel.pendingMediaAuthorization.value != null }
+        composeRule.runOnIdle { viewModel.onMediaAuthorizationResult(false) }
+        assertTrue(viewModel.advancedVideos.state.value.busyUris.isEmpty())
+        assertEquals(original, viewModel.advancedVideos.state.value.videos.single().folder.relativePath)
+        composeRule.runOnIdle { viewModel.moveAdvancedVideo(video, target) }
+        composeRule.waitUntil(10_000) { viewModel.pendingMediaAuthorization.value != null }
+        // The fixture is owned by the tested app. Simulate the shell's approval callback,
+        // then verify the same repository MediaStore update used after real user consent.
+        composeRule.runOnIdle { viewModel.onMediaAuthorizationResult(true) }
+        composeRule.waitUntil(10_000) { viewModel.advancedVideos.state.value.busyUris.isEmpty() }
+        context.contentResolver.query(Uri.parse(video.uri), arrayOf(MediaStore.Video.Media.RELATIVE_PATH), null, null, null)!!.use {
+            assertTrue(it.moveToFirst()); assertEquals(target, it.getString(0))
+        }
+        assertTrue(viewModel.advancedVideos.state.value.videos.isEmpty()) // Moved outside the selected scope.
+        val moved = repository.prepareAdvancedVideoAction(video.copy(folder = video.folder.copy(relativePath = target)), requireUnchanged = false)
+        assertEquals(target, moved.folderPath)
+    }
+
+    @Test fun staleVideoMetadataBlocksDestructiveActions(): Unit = runBlocking {
+        insertVideo("Movies/kanleme-advanced/stale/", "advanced-stale.mp4")
+        val video = scanner.scan(null) {}.first { it.name == "advanced-stale.mp4" }
+        assertTrue(runCatching { repository.prepareAdvancedVideoAction(video.copy(name = "stale-name.mp4")) }.isFailure)
+        assertTrue(runCatching { repository.prepareAdvancedVideoAction(video.copy(sizeBytes = video.sizeBytes + 1)) }.isFailure)
+        context.contentResolver.openInputStream(Uri.parse(video.uri))!!.use { assertTrue(it.read() >= 0) }
+    }
+
+    @Test fun coverCacheIsBoundedAndReleasesAllCachedBytes(): Unit = runBlocking {
+        insertVideo("Movies/kanleme-advanced/covers/", "advanced-cover.mp4")
+        val video = scanner.scan(null) {}.first { it.name == "advanced-cover.mp4" }
+        repeat(80) { version ->
+            val cover = AdvancedVideoThumbnails.load(context, video.copy(dateModifiedMs = video.dateModifiedMs + version))
+            assertNotNull(cover)
+            assertTrue(cover!!.width <= 256 && cover.height <= 160)
+            assertTrue(AdvancedVideoThumbnails.cachedBytes() <= 8 * 1024 * 1024)
+        }
+        assertTrue(AdvancedVideoThumbnails.cachedBytes() > 0)
+        AdvancedVideoThumbnails.clear()
+        assertEquals(0, AdvancedVideoThumbnails.cachedBytes())
+    }
+
+    private fun clickNativeText(vararg texts: String): Boolean {
+        val deadline = SystemClock.uptimeMillis() + 10_000
+        while (SystemClock.uptimeMillis() < deadline) {
+            val root = instrumentation.uiAutomation.rootInActiveWindow
+            if (root != null) for (text in texts) {
+                val nodes = root.findAccessibilityNodeInfosByText(text)
+                for (node in nodes) {
+                    var target: android.view.accessibility.AccessibilityNodeInfo? = node
+                    while (target != null && !target.isClickable) target = target.parent
+                    if (target?.isEnabled == true && target.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)) {
+                        SystemClock.sleep(250)
+                        return true
+                    }
+                }
+            }
+            SystemClock.sleep(100)
+        }
+        return false
+    }
+
+    @Test fun recursiveMediaStoreScopesEscapeWildcardsAndAvoidDuplicateRows(): Unit = runBlocking {
+        val parent = "Movies/kanleme-advanced/Scope%_/"
+        val child = parent + "Child/"
+        insertVideo(parent, "advanced-parent.mp4")
+        insertVideo(child, "advanced-child.mp4")
+        insertVideo("Movies/kanleme-advanced/ScopeAA/", "advanced-unrelated.mp4")
+        val folders = scanner.folders()
+        val parentKey = folders.first { it.key.relativePath == parent }.key
+        val childKey = folders.first { it.key.relativePath == child }.key
+        val recursive = scanner.scan(setOf(parentKey, childKey)) {}
+        assertEquals(setOf("advanced-parent.mp4", "advanced-child.mp4"), recursive.map { it.name }.toSet())
+        assertEquals(2, recursive.size)
+        assertEquals(listOf("advanced-parent.mp4"), scanner.scan(setOf(parentKey), includeSubfolders = false) {}.map { it.name })
     }
 }
 

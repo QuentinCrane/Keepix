@@ -20,7 +20,7 @@
     <string name="advanced_folder_search">搜尋資料夾</string>
     <string name="advanced_folder_empty">未找到含可讀取影片的資料夾</string>
     <string name="advanced_refresh_folders">重新整理資料夾</string>
-    <string name="advanced_folder_direct">僅掃描所選目錄，不自動包含子資料夾</string>
+    <string name="advanced_folder_direct">預設包含子資料夾，也可僅掃描所選資料夾</string>
     <string name="advanced_apply">套用</string>
     <string name="advanced_filter">篩選條件</string>
     <string name="advanced_search">搜尋影片名稱</string>
@@ -83,4 +83,19 @@
     <string name="advanced_license_credit">AndroidX Media3 / ExoPlayer\nCopyright The Android Open Source Project\nApache License, Version 2.0\n使用既有 Media3 1.11.0 相依套件，參考官方 PlayerActivity 的建立、音訊焦點、進度儲存與釋放流程，改寫為 Compose 本機單影片檢視器</string>
     <string name="advanced_source">上游儲存庫與範例</string>
     <string name="advanced_license_text">Apache 2.0 授權條款全文</string>
+    <string name="advanced_delete">刪除</string>
+    <string name="advanced_delete_title">移至垃圾桶？</string>
+    <string name="advanced_delete_body">%1$s\n影片將移至應用程式垃圾桶，可於「我的 → 垃圾桶」還原</string>
+    <string name="advanced_delete_confirm">移至垃圾桶</string>
+    <string name="advanced_delete_success">已移至垃圾桶</string>
+    <string name="advanced_move">移動</string>
+    <string name="advanced_move_invalid">請選擇與原資料夾不同的有效目標資料夾</string>
+    <string name="advanced_action_error">操作失敗，請重新掃描後重試</string>
+    <string name="advanced_busy">處理中</string>
+    <string name="advanced_cover">影片封面：%1$s</string>
+    <string name="advanced_cover_missing">暫無封面</string>
+    <string name="advanced_system_folder">使用系統選擇資料夾</string>
+    <string name="advanced_include_subfolders">包含子資料夾</string>
+    <string name="advanced_local_folder_only">請選擇裝置內部儲存空間或儲存卡中的資料夾</string>
+    <string name="advanced_same_volume">請選擇影片所在儲存磁碟區的目標資料夾，目前不支援跨磁碟區移動</string>
 </resources>

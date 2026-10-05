@@ -23,10 +23,37 @@ class AdvancedVideoLibraryTest {
         Proxy.newProxyInstance(AppRepository::class.java.classLoader, arrayOf(AppRepository::class.java)) { _, method, args ->
             when (method.name) {
                 "advancedVideoFolders" -> listOf(VideoFolder(folder, 1))
-                "scanAdvancedVideos" -> scan(args[1] as (Int) -> Unit)
+                "scanAdvancedVideos" -> scan(args[2] as (Int) -> Unit)
                 else -> throw UnsupportedOperationException(method.name)
             }
         } as AppRepository
+
+    @Test fun movedVideoLeavesSelectedScopeButAllScopeKeepsUpdatedTitle() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val library = AdvancedVideoLibrary(scope, repository { listOf(video) })
+            library.selectFolders(setOf(folder), includeSubfolders = false)
+            library.scan()
+            val moved = video.copy(name = "renamed.mp4", folder = folder.copy(relativePath = "Movies/Sorted/"))
+            library.replaceVideo(video.uri, moved)
+            assertTrue(library.state.value.videos.isEmpty())
+            library.selectFolders(null)
+            library.scan()
+            library.replaceVideo(video.uri, moved)
+            assertEquals(listOf(moved), library.state.value.videos)
+        } finally { scope.cancel() }
+    }
+
+    @Test fun duplicateActionsAreRejectedAndFinishedActionCanRetry() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val library = AdvancedVideoLibrary(scope, repository { listOf(video) })
+            assertTrue(library.beginAction(video.uri))
+            assertFalse(library.beginAction(video.uri))
+            library.finishAction(video.uri)
+            assertTrue(library.beginAction(video.uri))
+        } finally { scope.cancel() }
+    }
 
     @Test fun leavingReleasesFullMetadataAndFoldersButKeepsScope() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)

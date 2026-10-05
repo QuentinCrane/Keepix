@@ -271,6 +271,9 @@ interface PhotoDao {
 
 @Dao
 interface VideoDao {
+    @androidx.room.Update
+    suspend fun updateMetadata(video: VideoEntity)
+
     @Query("SELECT COUNT(*) FROM videos WHERE missing_since IS NULL")
     fun observeCount(): Flow<Int>
 

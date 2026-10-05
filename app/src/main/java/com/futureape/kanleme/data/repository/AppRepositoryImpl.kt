@@ -70,8 +70,46 @@ class AppRepositoryImpl @Inject constructor(
 ) : AppRepository {
     override suspend fun advancedVideoFolders(): List<VideoFolder> = advancedVideoScanner.folders()
     override suspend fun scanAdvancedVideos(
-        folders: Set<VideoFolderKey>?, onProgress: (Int) -> Unit,
-    ): List<AdvancedVideo> = advancedVideoScanner.scan(folders, onProgress)
+        folders: Set<VideoFolderKey>?, includeSubfolders: Boolean, onProgress: (Int) -> Unit,
+    ): List<AdvancedVideo> = withContext(Dispatchers.IO) {
+        val scanned = advancedVideoScanner.scan(folders, includeSubfolders, onProgress)
+        val trashed = scanned.map { it.mediaStoreId }.chunked(SQLITE_BIND_BATCH_SIZE)
+            .flatMap { videoDao.byMediaStoreIds(it) }.filter { it.deletionStatus != DeletionStatus.NONE }
+            .mapTo(mutableSetOf()) { it.mediaStoreId }
+        scanned.filterNot { it.mediaStoreId in trashed }
+    }
+
+    override suspend fun prepareAdvancedVideoAction(video: AdvancedVideo, requireUnchanged: Boolean): VideoEntity = withContext(Dispatchers.IO) {
+        val fresh = scanner.scanVideos(limit = 1, itemUri = video.uri).singleOrNull()
+            ?: throw IllegalStateException("视频已移除或无法读取，请重新扫描")
+        if (requireUnchanged) check(fresh.displayName == video.name && fresh.size == video.sizeBytes &&
+            fresh.folderPath == video.folder.relativePath &&
+            (video.dateModifiedMs <= 0 || fresh.dateModified * 1000L == video.dateModifiedMs)) {
+            "视频信息已变化，请重新扫描后再操作"
+        }
+        db.withTransaction {
+            val old = videoDao.byMediaStoreIds(listOf(fresh.mediaStoreId)).singleOrNull()
+            if (old != null) {
+                // Resolve legacy aggregate URIs before touching any app-owned state.
+                val oldUri = if (old.uri == fresh.uri) old.uri else
+                    scanner.scanVideos(limit = 1, itemUri = old.uri).singleOrNull()?.uri
+                check(oldUri == fresh.uri && (old.dateAdded <= 0 || fresh.dateAdded <= 0 || old.dateAdded == fresh.dateAdded)) {
+                    "视频身份已变化，请刷新媒体库后重试"
+                }
+                check(old.deletionStatus == DeletionStatus.NONE) { "视频已经在回收站中" }
+                val merged = old.copy(uri = fresh.uri, displayName = fresh.displayName, size = fresh.size,
+                    duration = fresh.duration, dateTaken = fresh.dateTaken, dateAdded = fresh.dateAdded,
+                    dateModified = fresh.dateModified, folderPath = fresh.folderPath, folderName = fresh.folderName,
+                    mimeType = fresh.mimeType, width = fresh.width, height = fresh.height,
+                    missingSince = null, updatedAt = System.currentTimeMillis())
+                videoDao.updateMetadata(merged)
+                merged
+            } else {
+                videoDao.upsertAll(listOf(fresh))
+                requireNotNull(videoDao.byMediaStoreIds(listOf(fresh.mediaStoreId)).singleOrNull())
+            }
+        }
+    }
 
     private companion object {
         const val SQLITE_BIND_BATCH_SIZE = 900
@@ -815,9 +853,10 @@ class AppRepositoryImpl @Inject constructor(
         video: VideoEntity,
         action: SwipeAction,
         systemTrashAuthorized: Boolean,
+        appTrashOnly: Boolean,
     ): Long = withContext(Dispatchers.IO) {
-        val settings = if (action == SwipeAction.Delete) settingsRepository.settings.first() else null
-        val systemTrashRequested = action == SwipeAction.Delete &&
+        val settings = if (action == SwipeAction.Delete && !appTrashOnly) settingsRepository.settings.first() else null
+        val systemTrashRequested = action == SwipeAction.Delete && !appTrashOnly &&
             (settings?.deleteMode == DeleteMode.SYSTEM_TRASH || systemTrashAuthorized)
         if (systemTrashRequested && !systemTrashAuthorized) {
             throw IllegalStateException("系统回收站操作需要先完成用户确认")

@@ -72,7 +72,7 @@ import com.futureape.kanleme.ui.util.openAdvancedVideoExternally
 @androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun LightweightVideoViewer(video: AdvancedVideo, onDismiss: () -> Unit) {
+fun LightweightVideoViewer(video: AdvancedVideo, onDismiss: () -> Unit, onDelete: (() -> Unit)? = null, onMove: (() -> Unit)? = null) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var position by rememberSaveable(video.uri) { mutableLongStateOf(0L) }
@@ -149,6 +149,8 @@ fun LightweightVideoViewer(video: AdvancedVideo, onDismiss: () -> Unit) {
                     resumePlaying = false
                     openAdvancedVideoExternally(context, video)
                 }) { Text(stringResource(R.string.advanced_external)) }
+                onMove?.let { TextButton(onClick = it) { Text(stringResource(R.string.advanced_move)) } }
+                onDelete?.let { TextButton(onClick = it) { Text(stringResource(R.string.advanced_delete), color = MaterialTheme.colorScheme.error) } }
             }
             Text(video.name, Modifier.padding(horizontal = 20.dp), color = Color.White,
                 style = MaterialTheme.typography.titleMedium, maxLines = 2)

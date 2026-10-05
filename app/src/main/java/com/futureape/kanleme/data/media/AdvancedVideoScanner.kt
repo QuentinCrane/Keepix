@@ -43,22 +43,31 @@ class AdvancedVideoScanner @Inject constructor(
     }
 
     /** null selects all volumes; an empty selection must never silently scan everything. */
-    suspend fun scan(folders: Set<VideoFolderKey>?, onProgress: (Int) -> Unit): List<AdvancedVideo> = withContext(Dispatchers.IO) {
+    suspend fun scan(folders: Set<VideoFolderKey>?, includeSubfolders: Boolean = true, onProgress: (Int) -> Unit): List<AdvancedVideo> = withContext(Dispatchers.IO) {
         requireVideoAccess()
         require(folders == null || folders.isNotEmpty())
         val result = mutableListOf<AdvancedVideo>()
         val projection = arrayOf("_id", "_display_name", "relative_path", "_size", "width", "height",
-            "duration", "date_added", "mime_type")
+            "duration", "date_added", "mime_type", "date_modified")
         for (volume in MediaStore.getExternalVolumeNames(context).sorted()) {
-            val paths = folders?.filter { it.volume == volume }?.map { it.relativePath }
+            val selectedPaths = folders?.filter { it.volume == volume }?.map { it.relativePath }?.sorted()
+            val paths = if (!includeSubfolders) selectedPaths else selectedPaths?.fold(mutableListOf<String>()) { accepted, path ->
+                if (accepted.lastOrNull()?.let { path.startsWith(it) } != true) accepted.add(path)
+                accepted
+            }
             if (paths != null && paths.isEmpty()) continue
             // Limit bind variables even when the user selects hundreds of folders.
             val batches: List<List<String>?> = paths?.chunked(100) ?: listOf(null)
             val collection = MediaStore.Video.Media.getContentUri(volume)
             for (batch in batches) {
-                val selection = visibleSelection + if (batch == null) "" else
-                    " AND COALESCE(relative_path, '') IN (" + batch.joinToString(",") { "?" } + ")"
-                query(collection, projection, selection, batch?.toTypedArray() ?: emptyArray()) { cursor, signal ->
+                val selection = visibleSelection + when {
+                    batch == null -> ""
+                    includeSubfolders -> " AND (" + batch.joinToString(" OR ") { "COALESCE(relative_path, '') LIKE ? ESCAPE '\\'" } + ")"
+                    else -> " AND COALESCE(relative_path, '') IN (" + batch.joinToString(",") { "?" } + ")"
+                }
+                val args = batch?.map { path -> if (!includeSubfolders) path else
+                    path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%" }?.toTypedArray() ?: emptyArray()
+                query(collection, projection, selection, args) { cursor, signal ->
                     // Resolve projection indices once per cursor, never once per row/field.
                     val columns = projection.associateWith { cursor.getColumnIndex(it) }
                     fun number(column: String): Long = columns.getValue(column).let {
@@ -81,6 +90,7 @@ class AdvancedVideoScanner @Inject constructor(
                             durationMs = number("duration").coerceAtLeast(0),
                             dateAddedMs = number("date_added") * 1000L,
                             mimeType = text("mime_type"),
+                            dateModifiedMs = number("date_modified") * 1000L,
                         )
                         if (result.size % 100 == 0) onProgress(result.size)
                     }

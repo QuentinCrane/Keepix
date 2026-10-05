@@ -4,6 +4,18 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,6 +37,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -43,6 +57,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -58,10 +73,12 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.futureape.kanleme.R
 import com.futureape.kanleme.data.media.*
-import com.futureape.kanleme.ui.util.formatDate
 import com.futureape.kanleme.ui.util.formatDuration
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.openAdvancedVideoExternally
+import com.futureape.kanleme.ui.util.AdvancedVideoThumbnails
+import com.futureape.kanleme.ui.util.advancedVideoFolderFromTree
+import com.futureape.kanleme.ui.util.advancedVideoInitialFolder
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 
 @Composable
@@ -81,9 +98,11 @@ private fun AdvancedVideoContent(viewModel: KanlemeViewModel, onBack: () -> Unit
     var folderSheet by remember { mutableStateOf(false) }
     var filterSheet by remember { mutableStateOf(false) }
     var viewingUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var deletingUri by rememberSaveable { mutableStateOf<String?>(null) }
     var firstResume by remember { mutableStateOf(true) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         access = MediaAccessSnapshot.current(context)
+        AdvancedVideoThumbnails.clear()
         library.invalidateAccess()
     }
     val requestAccess = {
@@ -93,14 +112,42 @@ private fun AdvancedVideoContent(viewModel: KanlemeViewModel, onBack: () -> Unit
         else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         permissionLauncher.launch(permissions)
     }
+    val moveFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val target = library.consumeFolderPickerVideo()
+        if (uri != null && target != null) {
+            val folder = advancedVideoFolderFromTree(uri)
+            when {
+                folder == null -> viewModel.showMessage(R.string.advanced_local_folder_only)
+                folder.volume != target.folder.volume -> viewModel.showMessage(R.string.advanced_same_volume)
+                else -> viewModel.moveAdvancedVideo(target, folder.relativePath)
+            }
+        }
+    }
+    val chooseMoveFolder: (AdvancedVideo) -> Unit = { video ->
+        viewingUri = null
+        library.prepareFolderPicker(video)
+        moveFolderLauncher.launch(advancedVideoInitialFolder(video.folder))
+    }
+    val scanFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let {
+            val folder = advancedVideoFolderFromTree(it)
+            if (folder == null) viewModel.showMessage(R.string.advanced_local_folder_only)
+            else library.selectSystemFolder(folder)
+        }
+    }
     LaunchedEffect(library) { library.loadFolders() }
     DisposableEffect(library, context) {
-        onDispose { library.leave(clearResults = !context.isAdvancedConfigurationChange()) }
+        onDispose {
+            val clear = !context.isAdvancedConfigurationChange()
+            library.leave(clearResults = clear)
+            if (clear) AdvancedVideoThumbnails.clear()
+        }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         val latest = MediaAccessSnapshot.current(context)
-        if (!firstResume && (latest.key != access.key || latest.canReadSelectedVisualMedia)) {
+        if (!firstResume && (latest.key != access.key || (!latest.canReadVideos && latest.canReadSelectedVisualMedia))) {
             viewingUri = null
+            AdvancedVideoThumbnails.clear()
             library.invalidateAccess()
         }
         access = latest
@@ -118,12 +165,12 @@ private fun AdvancedVideoContent(viewModel: KanlemeViewModel, onBack: () -> Unit
                         Text(stringResource(R.string.advanced_scope), style = MaterialTheme.typography.titleMedium)
                         Text(if (state.selectedFolders == null) stringResource(R.string.advanced_scope_all)
                             else pluralStringResource(R.plurals.advanced_scope_folders, state.selectedFolders!!.size, state.selectedFolders!!.size))
-                        Text(stringResource(R.string.advanced_scope_note), style = MaterialTheme.typography.bodySmall,
+                        if (!state.hasScanned) Text(stringResource(R.string.advanced_scope_note), style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            OutlinedButton(onClick = { folderSheet = true }) { Text(stringResource(R.string.advanced_select_folders)) }
+                            OutlinedButton(onClick = { folderSheet = true }, enabled = state.busyUris.isEmpty()) { Text(stringResource(R.string.advanced_select_folders)) }
                             Button(onClick = { if (state.scanning) library.cancelScan() else library.scan() },
-                                enabled = access.canReadVideos || access.canReadSelectedVisualMedia) {
+                                enabled = (access.canReadVideos || access.canReadSelectedVisualMedia) && state.busyUris.isEmpty()) {
                                 Text(stringResource(if (state.scanning) R.string.advanced_cancel
                                     else if (state.hasScanned) R.string.advanced_rescan else R.string.advanced_scan))
                             }
@@ -160,17 +207,22 @@ private fun AdvancedVideoContent(viewModel: KanlemeViewModel, onBack: () -> Unit
                     Text(stringResource(R.string.advanced_no_match_hint), Modifier.padding(top = 8.dp))
                 }
                 items(results.videos, key = { it.uri }) { video ->
-                    VideoMetadataRow(video, onView = { viewingUri = video.uri },
-                        onExternal = { openAdvancedVideoExternally(context, video) })
+                    VideoMetadataRow(video, busy = video.uri in state.busyUris,
+                        onView = { viewingUri = video.uri }, onExternal = { openAdvancedVideoExternally(context, video) },
+                        onDelete = { deletingUri = video.uri }, onMove = { chooseMoveFolder(video) })
                 }
             } else if (!state.scanning && !state.hasScanned) item {
                 Text(stringResource(R.string.advanced_start_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else if (!state.scanning) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         }
     }
-    if (folderSheet) VideoFolderSheet(state.folders, state.selectedFolders, state.loadingFolders,
-        onRefresh = library::loadFolders, onDismiss = { folderSheet = false }, onApply = {
-            library.selectFolders(it); folderSheet = false
+    if (folderSheet) VideoFolderSheet(state.folders, state.selectedFolders, state.includeSubfolders, state.loadingFolders,
+        onRefresh = library::loadFolders, onDismiss = { folderSheet = false }, onApply = { selected, include ->
+            library.selectFolders(selected, include); folderSheet = false
+        }, onSystemPicker = { include ->
+            library.prepareScopeFolderPicker(include)
+            folderSheet = false
+            scanFolderLauncher.launch(advancedVideoInitialFolder())
         })
     if (filterSheet) VideoFilterSheet(filter, onDismiss = { filterSheet = false }, onApply = {
         library.updateFilter(it); filterSheet = false
@@ -179,44 +231,89 @@ private fun AdvancedVideoContent(viewModel: KanlemeViewModel, onBack: () -> Unit
         viewingUri?.let { uri -> state.videos.firstOrNull { it.uri == uri } }
     }
     viewing?.let { video ->
-        LightweightVideoViewer(video, onDismiss = { viewingUri = null })
+        LightweightVideoViewer(video, onDismiss = { viewingUri = null },
+            onDelete = { viewingUri = null; deletingUri = video.uri }, onMove = { chooseMoveFolder(video) })
+    }
+    val deleting = remember(state.videos, deletingUri) { deletingUri?.let { uri -> state.videos.firstOrNull { it.uri == uri } } }
+    deleting?.let { video ->
+        AlertDialog(onDismissRequest = { deletingUri = null }, containerColor = ProfileScreenSurface,
+            title = { Text(stringResource(R.string.advanced_delete_title)) },
+            text = { Text(stringResource(R.string.advanced_delete_body, video.name)) },
+            confirmButton = {
+                TextButton(onClick = { deletingUri = null; viewModel.deleteAdvancedVideo(video) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                    Text(stringResource(R.string.advanced_delete_confirm))
+                }
+            }, dismissButton = { TextButton(onClick = { deletingUri = null }) { Text(stringResource(R.string.advanced_cancel)) } })
     }
 }
 
 @Composable
-private fun VideoMetadataRow(video: AdvancedVideo, onView: () -> Unit, onExternal: () -> Unit) {
+@OptIn(ExperimentalLayoutApi::class)
+private fun VideoMetadataRow(video: AdvancedVideo, busy: Boolean, onView: () -> Unit, onExternal: () -> Unit,
+    onDelete: () -> Unit, onMove: () -> Unit) {
     val unknown = stringResource(R.string.advanced_unknown)
     ProfilePanel(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth().clickable(onClick = onView).heightIn(min = 48.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Rounded.Movie, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text(video.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                AdvancedVideoCover(video, onView, Modifier.width(112.dp).height(72.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(video.name, Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onView),
+                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(stringResource(R.string.advanced_metadata,
+                        if (video.shortEdge > 0) video.width.toString() + " × " + video.height else unknown,
+                        if (video.sizeBytes > 0) formatSize(video.sizeBytes) else unknown,
+                        if (video.durationMs > 0) formatDuration(video.durationMs) else unknown),
+                        style = MaterialTheme.typography.bodySmall)
+                }
             }
-            Text(stringResource(R.string.advanced_metadata,
-                if (video.shortEdge > 0) video.width.toString() + " × " + video.height else unknown,
-                if (video.sizeBytes > 0) formatSize(video.sizeBytes) else unknown,
-                if (video.durationMs > 0) formatDuration(video.durationMs) else unknown))
-            Text(video.folder.volume + " / " + video.folder.relativePath,
+            Text(video.folder.relativePath,
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(formatDate(video.dateAddedMs), style = MaterialTheme.typography.bodySmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onView) { Text(stringResource(R.string.advanced_internal)) }
                 TextButton(onClick = onExternal) { Text(stringResource(R.string.advanced_external)) }
+                TextButton(onClick = onMove, enabled = !busy) { Text(stringResource(R.string.advanced_move)) }
+                TextButton(onClick = onDelete, enabled = !busy,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                    Text(stringResource(R.string.advanced_delete))
+                }
             }
+            if (busy) Text(stringResource(R.string.advanced_busy), color = ProfileScreenAccent)
         }
+    }
+}
+
+@Composable
+private fun AdvancedVideoCover(video: AdvancedVideo, onView: () -> Unit, modifier: Modifier) {
+    val context = LocalContext.current.applicationContext
+    val thumbnail by produceState<Bitmap?>(null, AdvancedVideoThumbnails.key(video)) {
+        value = AdvancedVideoThumbnails.load(context, video)
+    }
+    Box(modifier.clip(RoundedCornerShape(14.dp))
+        .background(Color.White.copy(alpha = 0.06f)).clickable(onClick = onView), contentAlignment = Alignment.Center) {
+        val bitmap = thumbnail
+        if (bitmap != null) Image(bitmap.asImageBitmap(), stringResource(R.string.advanced_cover, video.name),
+            Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+        else Icon(Icons.Rounded.Movie, stringResource(R.string.advanced_cover_missing) + ": " + video.name,
+            Modifier.size(28.dp), tint = ProfileScreenAccent)
+        Text(if (video.durationMs > 0) formatDuration(video.durationMs) else stringResource(R.string.advanced_unknown),
+            Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(6.dp)).padding(3.dp),
+            color = Color.White, style = MaterialTheme.typography.labelLarge)
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VideoFolderSheet(
-    folders: List<VideoFolder>, selected: Set<VideoFolderKey>?, loading: Boolean,
-    onRefresh: () -> Unit, onDismiss: () -> Unit, onApply: (Set<VideoFolderKey>?) -> Unit,
+    folders: List<VideoFolder>, selected: Set<VideoFolderKey>?, includeSubfolders: Boolean, loading: Boolean,
+    onRefresh: () -> Unit, onDismiss: () -> Unit, onApply: (Set<VideoFolderKey>?, Boolean) -> Unit,
+    onSystemPicker: (Boolean) -> Unit,
 ) {
     var all by remember { mutableStateOf(selected == null) }
     var draft by remember { mutableStateOf(selected.orEmpty()) }
     var query by remember { mutableStateOf("") }
+    var include by remember { mutableStateOf(includeSubfolders) }
     val visible = remember(folders, query) { folders.filter {
         (it.key.volume + "/" + it.key.relativePath).contains(query, ignoreCase = true)
     } }
@@ -227,6 +324,11 @@ private fun VideoFolderSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.advanced_select_folders), style = MaterialTheme.typography.titleLarge)
             Text(stringResource(R.string.advanced_folder_direct), style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = { onSystemPicker(include) }) { Text(stringResource(R.string.advanced_system_folder)) }
+            Row(Modifier.fillMaxWidth().clickable { include = !include }, verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(include, { include = it })
+                Text(stringResource(R.string.advanced_include_subfolders))
+            }
             FilterChip(selected = all, onClick = { all = !all }, label = { Text(stringResource(R.string.advanced_scope_all)) }, shape = RoundedCornerShape(999.dp))
             OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true,
                 label = { Text(stringResource(R.string.advanced_folder_search)) }, shape = RoundedCornerShape(22.dp))
@@ -251,7 +353,7 @@ private fun VideoFolderSheet(
             }
             Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(onClick = onRefresh, enabled = !loading) { Text(stringResource(R.string.advanced_refresh_folders)) }
-                Button(onClick = { onApply(if (all) null else draft) }, enabled = all || draft.isNotEmpty()) {
+                Button(onClick = { onApply(if (all) null else draft, include) }, enabled = all || draft.isNotEmpty()) {
                     Text(stringResource(R.string.advanced_apply))
                 }
             }
