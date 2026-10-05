@@ -1,6 +1,10 @@
 package com.futureape.kanleme.data.repository
 
 import androidx.room.withTransaction
+import com.futureape.kanleme.data.media.AdvancedVideoScanner
+import com.futureape.kanleme.data.media.AdvancedVideo
+import com.futureape.kanleme.data.media.VideoFolder
+import com.futureape.kanleme.data.media.VideoFolderKey
 import com.futureape.kanleme.data.local.AppDatabase
 import com.futureape.kanleme.data.local.AchievementProgressEntity
 import com.futureape.kanleme.data.local.CleanupEventEntity
@@ -62,7 +66,13 @@ class AppRepositoryImpl @Inject constructor(
     private val mediaStoreActions: MediaStoreActions,
     private val settingsRepository: AppSettingsRepository,
     private val similarPhotoAnalyzer: SimilarPhotoAnalyzer,
+    private val advancedVideoScanner: AdvancedVideoScanner,
 ) : AppRepository {
+    override suspend fun advancedVideoFolders(): List<VideoFolder> = advancedVideoScanner.folders()
+    override suspend fun scanAdvancedVideos(
+        folders: Set<VideoFolderKey>?, onProgress: (Int) -> Unit,
+    ): List<AdvancedVideo> = advancedVideoScanner.scan(folders, onProgress)
+
     private companion object {
         const val SQLITE_BIND_BATCH_SIZE = 900
     }

@@ -68,6 +68,8 @@ docs/*
 !docs/cleanup_session_targets.md
 !docs/cleanup_action_contract.md
 !docs/navigation_route_contract.md
+!docs/advanced_video.md
+!docs/third_party_notices.md
 !docs/similar_analysis_task_contract.md
 !docs/stats_event_contract.md
 !docs/database_table_ownership.md
@@ -95,6 +97,7 @@ docs/en/*
 !docs/en/*.md
 !docs/website/
 !docs/website/*.md
+!docs/screenshots/
 !docs/screenshots/*
 !docs/screenshots/README.md
 

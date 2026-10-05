@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="advanced_scope_folders">
+        <item quantity="one">%1$d folder selected</item>
+        <item quantity="other">%1$d folders selected</item>
+    </plurals>
+    <plurals name="advanced_progress">
+        <item quantity="one">%1$d video read</item>
+        <item quantity="other">%1$d videos read</item>
+    </plurals>
+    <plurals name="advanced_folder_count">
+        <item quantity="one">%1$d video</item>
+        <item quantity="other">%1$d videos</item>
+    </plurals>
+    <plurals name="advanced_result_count">
+        <item quantity="one">%1$d / %2$d video · %3$s</item>
+        <item quantity="other">%1$d / %2$d videos · %3$s</item>
+    </plurals>
+</resources>

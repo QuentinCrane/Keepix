@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
@@ -67,6 +68,7 @@ fun MeScreen(
     onPrivacy: () -> Unit,
     onChangelog: () -> Unit,
     onDiagnosis: () -> Unit,
+    onAdvanced: () -> Unit = {},
 ) {
     val screenState by viewModel.meScreenUiState.collectAsStateWithLifecycle()
     val dashboard = screenState.dashboard
@@ -173,6 +175,13 @@ fun MeScreen(
                             subtitle = stringResource(R.string.me_recent_photo_history),
                             accent = Color(0xFF86A7FF),
                             onClick = onHistory,
+                        )
+                        ProfileRow(
+                            icon = Icons.Rounded.Tune,
+                            title = stringResource(R.string.advanced_title),
+                            subtitle = stringResource(R.string.advanced_subtitle),
+                            accent = Color(0xFF86A7FF),
+                            onClick = onAdvanced,
                         )
                     }
                 }

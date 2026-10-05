@@ -72,6 +72,9 @@ import com.futureape.kanleme.ui.components.MorphDestination
 import com.futureape.kanleme.ui.screens.CleanHomeScreen
 import com.futureape.kanleme.ui.screens.FavoritesScreen
 import com.futureape.kanleme.ui.screens.MeScreen
+import com.futureape.kanleme.ui.screens.AdvancedFeaturesScreen
+import com.futureape.kanleme.ui.screens.AdvancedVideoScreen
+import com.futureape.kanleme.ui.screens.AdvancedLicensesScreen
 import com.futureape.kanleme.ui.screens.MediaPermissionGate
 import com.futureape.kanleme.ui.screens.OnboardingScreen
 import com.futureape.kanleme.ui.screens.PhotoHistoryScreen
@@ -253,6 +256,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         onFavorites = { navController.navigate(Destinations.FAVORITES) },
                         onTrash = { navController.navigate(Destinations.TRASH) },
                         onHistory = { navController.navigate(Destinations.PHOTO_HISTORY) },
+                        onAdvanced = { navController.navigate(Destinations.ADVANCED) },
                         onSettings = { navController.navigate(Destinations.SETTINGS) },
                         onSimilar = { navController.navigate(Destinations.SIMILAR) },
                         onAchievements = { navController.navigate(Destinations.ACHIEVEMENTS) },
@@ -264,6 +268,19 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                     )
                 }
                 morphComposable(Destinations.FAVORITES) { FavoritesScreen(viewModel, onBack = { navController.popBackStack() }, onToday = openTodayInHistory) }
+                morphComposable(Destinations.ADVANCED) {
+                    AdvancedFeaturesScreen(
+                        onBack = { navController.popBackStack() },
+                        onVideos = { navController.navigate(Destinations.ADVANCED_VIDEO) },
+                        onLicenses = { navController.navigate(Destinations.OPEN_SOURCE) },
+                    )
+                }
+                morphComposable(Destinations.ADVANCED_VIDEO) {
+                    AdvancedVideoScreen(viewModel, onBack = { navController.popBackStack() })
+                }
+                morphComposable(Destinations.OPEN_SOURCE) {
+                    AdvancedLicensesScreen(onBack = { navController.popBackStack() })
+                }
                 morphComposable(Destinations.TRASH) { TrashScreen(viewModel, onBack = { navController.popBackStack() }, onToday = openTodayInHistory) }
                 morphComposable(Destinations.PHOTO_HISTORY) {
                     PhotoHistoryScreen(
@@ -427,7 +444,8 @@ private fun NavGraphBuilder.morphComposable(
 ) {
     composable(route = route, arguments = arguments) { entry ->
         val animatedScope = this
-        val background = if (route in setOf(Destinations.PHOTO, Destinations.VIDEO, Destinations.VIEWER))
+        val background = if (route in setOf(Destinations.PHOTO, Destinations.VIDEO, Destinations.VIEWER,
+                Destinations.ADVANCED, Destinations.ADVANCED_VIDEO, Destinations.OPEN_SOURCE))
             Color.Black else MaterialTheme.colorScheme.background
         val window = LocalWindowInfo.current.containerSize
         val density = LocalDensity.current

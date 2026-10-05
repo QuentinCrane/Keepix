@@ -43,11 +43,14 @@ Official Website:[Keepix — Organize your gallery like swiping short videos](ht
 
 - Photo cleanup with keep, favorite, delete, undo, and time-based filters.
 - Video cleanup with staged review, temporary keep, and commit-on-exit behavior.
+- Me > Advanced tools > Video explorer: scan all accessible videos or selected folders, combine resolution, size, duration, format, orientation, date-added and name filters, then use quick local playback or another viewer. Advanced photo tools are reserved for a future update.
 - Similar photo detection with cached fingerprints and background progress.
 - Separate favorites and trash views for photos and videos.
 - A device-local settings center for layout, behavior, feedback, and maintenance.
 
 ### Language support
+
+See [video explorer](docs/advanced_video.md) for scope and behavior, and [third-party notices](docs/third_party_notices.md) for player sources, modifications and licenses. Attribution and the complete Apache 2.0 license are also available in the app under Advanced tools > Open source notices.
 
 - English, Simplified Chinese, and Traditional Chinese are supported through Android's standard locale resources.
 - App naming follows the active language: `Keepix` in English, `看了么` in Simplified Chinese, and `看了麼` in Traditional Chinese.

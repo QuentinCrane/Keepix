@@ -11,3 +11,19 @@ Audio notice
 No third-party sound-effect binary is bundled with the application. Photo swipe feedback uses
 Android platform sound effects through AudioManager; the system controls their availability,
 volume, and mute behavior.
+
+AndroidX Media3 / ExoPlayer notice
+---------------------------------
+This application uses AndroidX Media3 1.11.0 (media3-exoplayer and media3-ui).
+Copyright The Android Open Source Project. Licensed under the Apache License,
+Version 2.0. Upstream: https://github.com/androidx/media/tree/1.11.0
+
+LightweightVideoViewer.kt adapts the player creation, audio-focus handling,
+position saving and release patterns from the upstream demo PlayerActivity.java
+(Copyright (C) 2016 The Android Open Source Project). It has been rewritten for
+Compose, local single-video viewing and PlayerView controls. The upstream
+copyright and license header are retained in the adapted file.
+
+The full Apache 2.0 license is bundled at app/src/main/res/raw/apache_2_0.txt
+and is readable in the app at Advanced tools > Open source notices.
+See docs/third_party_notices.md for sources, versions and adaptation details.

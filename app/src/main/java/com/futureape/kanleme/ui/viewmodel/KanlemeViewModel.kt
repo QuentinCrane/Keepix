@@ -192,6 +192,8 @@ class KanlemeViewModel @Inject constructor(
     private val settingsRepository: AppSettingsRepository,
     private val similarAnalysisScheduler: SimilarAnalysisScheduler,
 ) : ViewModel() {
+    val advancedVideos = AdvancedVideoLibrary(viewModelScope, repository)
+
     private companion object {
         const val PHOTO_DECK_LOAD_WINDOW = 420
         const val VIDEO_DECK_LOAD_WINDOW = 240

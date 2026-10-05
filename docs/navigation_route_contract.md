@@ -26,6 +26,9 @@
                 ├── FAVORITES
                 ├── TRASH
                 ├── PHOTO_HISTORY
+                ├── ADVANCED
+                │   ├── ADVANCED_VIDEO（扫描、筛选、内部播放弹窗、外部打开）
+                │   └── OPEN_SOURCE（第三方归属与许可证全文）
                 ├── SIMILAR ──> VIEWER(photoId)
                 ├── ACHIEVEMENTS
                 ├── ANNUAL

@@ -129,6 +129,12 @@ data class PermanentDeleteFinalization(
 )
 
 interface AppRepository {
+    suspend fun advancedVideoFolders(): List<com.futureape.kanleme.data.media.VideoFolder>
+    suspend fun scanAdvancedVideos(
+        folders: Set<com.futureape.kanleme.data.media.VideoFolderKey>?,
+        onProgress: (Int) -> Unit,
+    ): List<com.futureape.kanleme.data.media.AdvancedVideo>
+
     fun observeDashboard(): Flow<DashboardStats>
     fun observePhotoTypeStats(): Flow<PhotoTypeStats>
     fun observeRecentPhotos(limit: Int = 50): Flow<List<PhotoEntity>>
