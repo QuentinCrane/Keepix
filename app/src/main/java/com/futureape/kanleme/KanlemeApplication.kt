@@ -14,7 +14,9 @@ import coil3.memory.MemoryCache
 import coil3.request.crossfade
 import com.futureape.kanleme.ui.util.IMAGE_DISK_CACHE_MAX_BYTES
 import com.futureape.kanleme.ui.util.ImageLoadMetrics
-import com.futureape.kanleme.ui.util.imageMemoryCachePercent
+import com.futureape.kanleme.ui.util.imageMemoryCacheMaxBytes
+import com.futureape.kanleme.ui.util.LocalMediaThumbnailFetcher
+import com.futureape.kanleme.ui.util.LocalMediaThumbnailKeyer
 import com.futureape.kanleme.ui.util.isLowRamDevice
 import com.futureape.kanleme.ui.util.installCrashLogger
 import com.futureape.kanleme.ui.util.trimAppCache
@@ -51,7 +53,7 @@ class KanlemeApplication : Application(), SingletonImageLoader.Factory, Configur
                 .crossfade(false)
                 .memoryCache {
                     MemoryCache.Builder()
-                        .maxSizePercent(context, imageMemoryCachePercent(isLowRamDevice()))
+                        .maxSizeBytes(imageMemoryCacheMaxBytes(Runtime.getRuntime().maxMemory(), isLowRamDevice()))
                         .build()
                 }
                 .diskCache {
@@ -62,6 +64,8 @@ class KanlemeApplication : Application(), SingletonImageLoader.Factory, Configur
                 }
                 .eventListenerFactory(ImageLoadMetrics.eventListenerFactory)
                 .components {
+                    add(LocalMediaThumbnailKeyer())
+                    add(LocalMediaThumbnailFetcher.Factory())
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                         add(AnimatedImageDecoder.Factory())
                     } else {

@@ -5,10 +5,16 @@ import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
 import coil3.ImageLoader
+import coil3.imageLoader
+import coil3.BitmapImage
+import coil3.request.SuccessResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.memory.MemoryCache
 import coil3.size.Precision
+import coil3.size.Scale
 import com.futureape.kanleme.data.local.PhotoEntity
 import com.futureape.kanleme.data.local.TrashItemEntity
 import com.futureape.kanleme.data.local.VideoEntity
@@ -17,25 +23,23 @@ private const val PHOTO_THUMB_CACHE_SUFFIX = "thumb"
 private const val TRASH_THUMB_CACHE_SUFFIX = "thumb"
 private const val PHOTO_THUMB_WIDTH = 420
 private const val PHOTO_THUMB_HEIGHT = 560
-private const val TRASH_THUMB_WIDTH = 420
-private const val TRASH_THUMB_HEIGHT = 560
 
 fun photoContentUri(photo: PhotoEntity): Uri =
-    if (photo.mediaStoreId > 0L) {
+    originalContentUri(photo.uri) ?: if (photo.mediaStoreId > 0L) {
         ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, photo.mediaStoreId)
     } else {
         Uri.parse(photo.uri)
     }
 
 fun videoContentUri(video: VideoEntity): Uri =
-    if (video.mediaStoreId > 0L) {
+    originalContentUri(video.uri) ?: if (video.mediaStoreId > 0L) {
         ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, video.mediaStoreId)
     } else {
         Uri.parse(video.uri)
     }
 
 fun trashContentUri(item: TrashItemEntity): Uri =
-    if (item.mediaStoreId > 0L) {
+    originalContentUri(item.uri) ?: if (item.mediaStoreId > 0L) {
         val baseUri = if (item.mediaType == "video") {
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         } else {
@@ -54,14 +58,19 @@ fun photoImageRequest(
     height: Int,
 ): ImageRequest {
     val uri = photoContentUri(photo)
-    val cacheKey = photoCacheKey(photo, normalizedPhotoCacheSuffix(cacheSuffix))
+    val suffix = normalizedPhotoCacheSuffix(cacheSuffix, photo.isGif)
+    if (suffix == PHOTO_THUMB_CACHE_SUFFIX) return photoThumbnailImageRequest(context, photo)
+    val cacheKey = photoCacheKey(photo, suffix)
+    val displayKey = photoCacheKey(photo, "display")
+    val placeholderKey = if (suffix == "preview" && context.imageLoader.memoryCache?.get(MemoryCache.Key(displayKey)) != null)
+        displayKey else photoThumbnailCacheKey(photo)
     return mediaImageRequest(
         context = context,
         uri = uri,
         cacheKey = cacheKey,
-        placeholderCacheKey = photoThumbnailCacheKey(photo),
-        width = width,
-        height = height,
+        placeholderCacheKey = placeholderKey,
+        width = if (suffix == "display") 1080 else width,
+        height = if (suffix == "display") 1440 else height,
     )
 }
 
@@ -70,13 +79,10 @@ fun photoThumbnailImageRequest(
     photo: PhotoEntity,
 ): ImageRequest {
     val uri = photoContentUri(photo)
-    return mediaImageRequest(
+    return localThumbnailImageRequest(
         context = context,
         uri = uri,
-        cacheKey = photoThumbnailCacheKey(photo),
-        placeholderCacheKey = photoThumbnailCacheKey(photo),
-        width = PHOTO_THUMB_WIDTH,
-        height = PHOTO_THUMB_HEIGHT,
+        versionKey = photoCacheKey(photo, PHOTO_THUMB_CACHE_SUFFIX),
     )
 }
 
@@ -88,6 +94,7 @@ fun trashImageRequest(
     height: Int,
 ): ImageRequest {
     val uri = trashContentUri(item)
+    if (normalizedTrashCacheSuffix(cacheSuffix) == TRASH_THUMB_CACHE_SUFFIX) return trashThumbnailImageRequest(context, item)
     val cacheKey = trashCacheKey(item, normalizedTrashCacheSuffix(cacheSuffix))
     return mediaImageRequest(
         context = context,
@@ -104,13 +111,10 @@ fun trashThumbnailImageRequest(
     item: TrashItemEntity,
 ): ImageRequest {
     val uri = trashContentUri(item)
-    return mediaImageRequest(
+    return localThumbnailImageRequest(
         context = context,
         uri = uri,
-        cacheKey = trashThumbnailCacheKey(item),
-        placeholderCacheKey = trashThumbnailCacheKey(item),
-        width = TRASH_THUMB_WIDTH,
-        height = TRASH_THUMB_HEIGHT,
+        versionKey = trashCacheKey(item, TRASH_THUMB_CACHE_SUFFIX),
     )
 }
 
@@ -127,7 +131,8 @@ fun mediaImageRequest(
     .diskCacheKey(cacheKey)
     .placeholderMemoryCacheKey(placeholderCacheKey)
     .size(width, height)
-    .precision(Precision.INEXACT)
+    .precision(Precision.EXACT)
+    .scale(Scale.FIT)
     .crossfade(false)
     .build()
 
@@ -138,25 +143,43 @@ fun mediaImageRequest(
 suspend fun ImageLoader.executeIfNotCached(request: ImageRequest): Boolean {
     val key = request.memoryCacheKey
     if (key != null && memoryCache?.get(MemoryCache.Key(key)) != null) return false
-    execute(request)
+    val result = execute(request)
+    if (result is SuccessResult) withContext(Dispatchers.IO) {
+        (result.image as? BitmapImage)?.bitmap?.prepareToDraw()
+    }
     return true
 }
 
 private fun photoThumbnailCacheKey(photo: PhotoEntity): String =
-    photoCacheKey(photo, PHOTO_THUMB_CACHE_SUFFIX)
+    LocalMediaThumbnail(photoContentUri(photo), photoCacheKey(photo, PHOTO_THUMB_CACHE_SUFFIX)).diskKey
 
 private fun trashThumbnailCacheKey(item: TrashItemEntity): String =
-    trashCacheKey(item, TRASH_THUMB_CACHE_SUFFIX)
+    LocalMediaThumbnail(trashContentUri(item), trashCacheKey(item, TRASH_THUMB_CACHE_SUFFIX)).diskKey
 
 private fun photoCacheKey(photo: PhotoEntity, suffix: String): String =
-    "photo:" + photo.mediaStoreId + ":" + photo.updatedAt + ":" + suffix
+    "photo:" + photo.uri + ":" + photo.mediaStoreId + ":" + photo.dateModified + ":" + photo.size +
+        ":" + photo.width + "x" + photo.height + ":" + photo.exifOrientation + ":" + suffix
 
 private fun trashCacheKey(item: TrashItemEntity, suffix: String): String =
-    "trash:" + item.mediaType + ":" + item.mediaStoreId + ":" + item.trashedAt + ":" + suffix
+    "trash:" + item.mediaType + ":" + item.uri + ":" + item.mediaStoreId + ":" + item.trashedAt +
+        ":" + item.size + ":" + suffix
 
-private fun normalizedPhotoCacheSuffix(cacheSuffix: String): String = when (cacheSuffix) {
+internal fun normalizedPhotoCacheSuffix(cacheSuffix: String, isGif: Boolean = false): String = when (cacheSuffix) {
     "favorite_photo_tile", "photo_grid", "day_memory_grid" -> PHOTO_THUMB_CACHE_SUFFIX
+    "photo_fit", "clean_prefetch" -> "display"
+    "clean_background" -> if (isGif) "gif_background" else "display"
+    "viewer_photo", "favorite_preview" -> "preview"
     else -> cacheSuffix
+}
+
+private fun originalContentUri(value: String): Uri? = Uri.parse(value)
+    .takeIf { it.scheme == "content" && !it.authority.isNullOrBlank() }
+
+private fun localThumbnailImageRequest(context: Context, uri: Uri, versionKey: String): ImageRequest {
+    val model = LocalMediaThumbnail(uri, versionKey, PHOTO_THUMB_WIDTH, PHOTO_THUMB_HEIGHT)
+    return ImageRequest.Builder(context).data(model)
+        .memoryCacheKey(model.diskKey).diskCacheKey(model.diskKey).placeholderMemoryCacheKey(model.diskKey)
+        .size(model.width, model.height).precision(Precision.INEXACT).crossfade(false).build()
 }
 
 private fun normalizedTrashCacheSuffix(cacheSuffix: String): String = when (cacheSuffix) {

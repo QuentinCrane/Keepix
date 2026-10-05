@@ -4,6 +4,7 @@ import com.futureape.kanleme.ui.components.MorphOverlay
 import com.futureape.kanleme.ui.components.MorphOrigin
 import com.futureape.kanleme.ui.components.morphAnchor
 import com.futureape.kanleme.ui.util.pinchMorph
+import com.futureape.kanleme.ui.util.MediaDayKeyCache
 import androidx.compose.material.icons.rounded.CalendarMonth
 
 import android.os.SystemClock
@@ -1259,7 +1260,7 @@ private fun KeepixMemoryDensityBar(
 }
 
 private fun memoryDayKey(photo: PhotoEntity): String {
-    return SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(memoryItemMillis(photo)))
+    return MediaDayKeyCache.dayKey(memoryItemMillis(photo))
 }
 
 private fun memoryItemMillis(photo: PhotoEntity): Long {

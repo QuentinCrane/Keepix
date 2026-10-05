@@ -36,6 +36,8 @@ internal object ImageLoadMetrics {
         errors = errors.get(),
         requestedPixels = requestedPixels.get(),
         decodedPixels = decodedPixels.get(),
+        thumbnailDiskHits = LocalThumbnailMetrics.diskHits.get(),
+        thumbnailGenerations = LocalThumbnailMetrics.generated.get(),
     )
 
     private fun maybeLog() {
@@ -107,6 +109,8 @@ internal data class ImageLoadSnapshot(
     val errors: Long,
     val requestedPixels: Long,
     val decodedPixels: Long,
+    val thumbnailDiskHits: Long,
+    val thumbnailGenerations: Long,
 )
 
 private fun Dimension.pixelsOrZero(): Int = (this as? Dimension.Pixels)?.px ?: 0

@@ -58,6 +58,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import coil3.size.Precision
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
 import kotlin.math.atan2
@@ -346,6 +350,14 @@ private fun MorphFrame(
     content: @Composable () -> Unit,
 ) {
     var hostBounds by remember { mutableStateOf(Rect.Zero) }
+    val context = LocalContext.current
+    val sourceImage = remember(origin?.image, origin?.bounds?.size) {
+        origin?.image?.let { model ->
+            if (model is ImageRequest) model else ImageRequest.Builder(context).data(model)
+                .size(origin.bounds.width.roundToInt().coerceAtLeast(1), origin.bounds.height.roundToInt().coerceAtLeast(1))
+                .precision(Precision.INEXACT).crossfade(false).build()
+        }
+    }
     val ready by remember(progress) { derivedStateOf { progress() >= 0.995f } }
     fun sourceBounds(target: Rect): Rect {
         val source = origin?.bounds?.translate(-hostBounds.topLeft)
@@ -391,7 +403,7 @@ private fun MorphFrame(
             Layout(
                 content = {
                     if (origin.image != null) {
-                        AsyncImage(model = origin.image, contentDescription = null, contentScale = ContentScale.Crop,
+                        AsyncImage(model = sourceImage, contentDescription = null, contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize())
                     } else if (origin.icon != null) {
                         Icon(origin.icon, contentDescription = null, tint = origin.tint, modifier = Modifier.size(30.dp))

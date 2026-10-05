@@ -5,6 +5,12 @@ import android.content.Context
 
 private const val NORMAL_MEMORY_CACHE_PERCENT = 0.30
 private const val LOW_RAM_MEMORY_CACHE_PERCENT = 0.15
+const val NORMAL_IMAGE_MEMORY_MAX_BYTES = 96L * 1024L * 1024L
+const val LOW_RAM_IMAGE_MEMORY_MAX_BYTES = 24L * 1024L * 1024L
+
+fun imageMemoryCacheMaxBytes(heapBytes: Long, isLowRamDevice: Boolean): Long =
+    (heapBytes * imageMemoryCachePercent(isLowRamDevice)).toLong().coerceAtLeast(1L)
+        .coerceAtMost(if (isLowRamDevice) LOW_RAM_IMAGE_MEMORY_MAX_BYTES else NORMAL_IMAGE_MEMORY_MAX_BYTES)
 
 /**
  * Device-aware bounds for image work. Normal devices retain the current

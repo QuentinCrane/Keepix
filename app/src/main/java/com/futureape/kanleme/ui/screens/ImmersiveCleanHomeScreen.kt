@@ -2,6 +2,7 @@ package com.futureape.kanleme.ui.screens
 
 import com.futureape.kanleme.ui.components.morphAnchor
 import com.futureape.kanleme.ui.components.MorphPanel
+import com.futureape.kanleme.ui.util.photoImageRequest
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
@@ -148,8 +149,10 @@ internal fun ImmersiveCleanHomeScreen(
     LaunchedEffect(menuExpanded) {
         if (!menuExpanded) menuPanel = KeepixMenuPanel.ROOT
     }
+    val previewContext = LocalContext.current
     val previews = if (selectedIsPhoto) {
-        photos.take(3).map { KeepixPreviewItem(it.uri, it.displayName, false, photoDisplayAspectRatio(it, minRatio = 0.42f, maxRatio = 2.20f)) }
+        photos.take(3).map { KeepixPreviewItem(it.uri, it.displayName, false, photoDisplayAspectRatio(it, minRatio = 0.42f, maxRatio = 2.20f),
+            photoImageRequest(previewContext, it, "photo_fit", 1080, 1440)) }
     } else {
         videos.take(3).map { KeepixPreviewItem(it.uri, it.displayName, true, keepixPhotoAspectRatio(it.width, it.height)) }
     }
@@ -162,7 +165,7 @@ internal fun ImmersiveCleanHomeScreen(
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (heroUri != null) {
             AsyncImage(
-                model = ImageRequest.Builder(context)
+                model = previews.firstOrNull()?.imageModel ?: ImageRequest.Builder(context)
                     .data(Uri.parse(heroUri))
                     .memoryCacheKey(heroUri + "#home_blur")
                     .diskCacheKey(heroUri)
@@ -308,6 +311,7 @@ private data class KeepixPreviewItem(
     val name: String,
     val video: Boolean,
     val aspectRatio: Float,
+    val imageModel: ImageRequest? = null,
 )
 
 private fun keepixPhotoAspectRatio(width: Int, height: Int): Float =
@@ -655,6 +659,11 @@ private fun KeepixHomeDeck(
                 val entryStart = deckEntryStartPx + originalIndex * with(density) { 42.dp.toPx() }
                 val entryOffset = deckEntryOffsets.getOrNull(originalIndex)?.value ?: 0f
                 val entryProgress = (1f - entryOffset / entryStart.coerceAtLeast(1f)).coerceIn(0f, 1f)
+                val context = LocalContext.current
+                val cardImage = item.imageModel ?: ImageRequest.Builder(context)
+                    .data(Uri.parse(item.uri)).memoryCacheKey(item.uri + "#home_deck")
+                    .diskCacheKey(item.uri).placeholderMemoryCacheKey(item.uri + "#home_deck")
+                    .size(900, 1200).crossfade(false).build()
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -670,19 +679,11 @@ private fun KeepixHomeDeck(
                             scaleX = baseScale * entryScale
                             scaleY = baseScale * entryScale
                         }
-                        .then(if (isTop) Modifier.morphAnchor("home-deck", 22.dp, image = item.uri, imageAspectRatio = item.aspectRatio) else Modifier)
+                        .then(if (isTop) Modifier.morphAnchor("home-deck", 22.dp, image = cardImage, imageAspectRatio = item.aspectRatio) else Modifier)
                         .clip(shape),
                 ) {
-                    val context = LocalContext.current
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(Uri.parse(item.uri))
-                            .memoryCacheKey(item.uri + "#home_deck")
-                            .diskCacheKey(item.uri)
-                            .placeholderMemoryCacheKey(item.uri + "#home_deck")
-                            .size(900, 1200)
-                            .crossfade(false)
-                            .build(),
+                        model = cardImage,
                         contentDescription = item.name,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
