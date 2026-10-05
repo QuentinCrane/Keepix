@@ -207,6 +207,7 @@ fun PhotoCleanScreen(
     var batchSummary by remember { mutableStateOf<PhotoBatchSummary?>(null) }
     var dayMemoryPinch by remember { mutableStateOf(DayMemoryPinchState()) }
     var dayMemoryOriginPhoto by remember { mutableStateOf<PhotoEntity?>(null) }
+    var pendingDayMemoryMode by remember { mutableStateOf<String?>(null) }
     var dayMemorySourceBounds by remember { mutableStateOf<Rect?>(null) }
     val morphOwner = LocalMorphOwner.current
     var emptyStateVisible by remember { mutableStateOf(false) }
@@ -405,7 +406,7 @@ fun PhotoCleanScreen(
         return
     }
 
-    if (deck.isEmpty()) {
+    if (deck.isEmpty() && dayMemoryOriginPhoto == null) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -441,7 +442,7 @@ fun PhotoCleanScreen(
         return
     }
 
-    val currentPhoto = deck.first()
+    val currentPhoto = deck.firstOrNull() ?: dayMemoryOriginPhoto ?: return
     val memoryOriginPhoto = dayMemoryOriginPhoto ?: currentPhoto
     val memoryPhotos = dayMemoryPhotos.ifEmpty { listOf(memoryOriginPhoto) }
     val remainingPhotos = (dashboard.photoCount - dashboard.processedPhotoCount)
@@ -584,6 +585,8 @@ fun PhotoCleanScreen(
                         viewModel.clearPhotoDayMemoryWindow()
                         dayMemoryOriginPhoto = null
                         dayMemorySourceBounds = null
+                        pendingDayMemoryMode?.let(viewModel::setPhotoSessionDateMode)
+                        pendingDayMemoryMode = null
                     }
                 },
                 onDismiss = ::closeDayMemory,
@@ -592,7 +595,7 @@ fun PhotoCleanScreen(
                 onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
                 onApply = { mode ->
                     haptics.threshold()
-                    viewModel.setPhotoSessionDateMode(mode)
+                    pendingDayMemoryMode = mode
                     closeDayMemory()
                 },
             )
