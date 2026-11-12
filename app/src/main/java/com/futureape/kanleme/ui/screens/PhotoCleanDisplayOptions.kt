@@ -18,7 +18,6 @@ data class PhotoCleanDisplayOptions(
     val showActionRail: Boolean = true,
     val showInfoBar: Boolean = true,
     val showGestureHint: Boolean = true,
-    val showShuffleButton: Boolean = true,
 )
 
 fun AppSettings.toPhotoCleanDisplayOptions(): PhotoCleanDisplayOptions =
@@ -29,5 +28,4 @@ fun AppSettings.toPhotoCleanDisplayOptions(): PhotoCleanDisplayOptions =
         showActionRail = photoShowActionRail,
         showInfoBar = photoShowInfoBar,
         showGestureHint = photoShowGestureHint,
-        showShuffleButton = photoShowShuffleButton,
     )

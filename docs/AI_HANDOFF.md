@@ -6,8 +6,8 @@
 
 - App 名称：看了么 / Keepix
 - 包名：`com.futureape.kanleme`
-- 当前版本：`2.3.4`
-- `versionCode`：`60`
+- 当前版本：`2.3.5`
+- `versionCode`：`61`
 - 最低系统：Android 11，`minSdk = 30`
 - 目标系统：`targetSdk = 36`
 

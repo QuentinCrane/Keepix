@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,6 +53,7 @@ import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.components.AdaptiveCenter
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
+import kotlin.math.roundToInt
 
 @Composable
 fun MeScreen(
@@ -200,7 +202,10 @@ private fun UsageHeroCard(
 ) {
     val historicalFreed = dashboard.userStats?.totalStorageFreed ?: 0L
     val freed = historicalFreed.takeIf { it > 0L } ?: dashboard.pendingDeleteBytes
-    val progress = dashboard.progress.coerceIn(0f, 1f)
+    val totalMedia = dashboard.totalCount.coerceAtLeast(0)
+    val processedMedia = dashboard.processedCount.coerceIn(0, totalMedia)
+    val progress = if (totalMedia == 0) 0f else processedMedia.toFloat() / totalMedia.toFloat()
+    val progressPercent = (progress * 100f).roundToInt()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(30.dp),
@@ -230,6 +235,21 @@ private fun UsageHeroCard(
                 HeroMetric(stringResource(R.string.me_browsed), dashboard.processedCount.toString(), Modifier.weight(1f))
                 HeroMetric(stringResource(R.string.me_pending), dashboard.pendingDeleteCount.toString(), Modifier.weight(1f))
                 HeroMetric(stringResource(R.string.me_trash), dashboard.trashCount.toString(), Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.me_progress_label),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.62f),
+                )
+                Text(
+                    if (totalMedia == 0) stringResource(R.string.me_progress_empty)
+                    else stringResource(R.string.me_progress_value, progressPercent, processedMedia, totalMedia),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.76f),
+                    textAlign = TextAlign.End,
+                )
             }
             LinearProgressIndicator(
                 progress = { progress },

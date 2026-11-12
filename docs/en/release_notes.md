@@ -1,23 +1,28 @@
-# Keepix 2.3.4
+# 看了么 2.3.5
 
-Version name: `2.3.4`, version code: `60`
+Version name: `2.3.5` · Version code: `61` · Android 11 or later
 
-## What's included
+## Advanced photo and video filters
 
-- Local-first operation with no account, subscription, or cloud sync
-- Continuous photo and video cleanup with keep, favorite, delete, and undo
-- App trash before permanent deletion through Android's system confirmation
-- Device-local favorites, similar photos, Today in History, statistics, and settings
-- Adaptive layouts for phones and tablets
+- Find photos by folder, type, resolution, size, format, orientation, and date, then browse the matching results. Photo previews support double-tap and pinch zoom, and long images use a tiled viewer.
+- Filter videos by folder, resolution, size, duration, format, orientation, and estimated bitrate. Switch between list and grid views and move between matching videos in the player.
+- Open results in another app, select a destination folder to move them, or send them to the app trash. Moving is subject to Android permissions and storage-volume restrictions; deletion first goes through the app trash.
 
-## 2026-08-18 update
+## Random folder playback
 
-- Photo/video swipe guide dialogs now use a dark glass style with localizable labels and button text.
-- Onboarding now uses a fixed dark gradient theme with a compact, scrollable layout on short screens.
-- The video organizer live preview in Settings now adapts its height to the container width and shows the dark action rail and bottom components.
-- The video organizer's top progress pill can be hidden by settings; top/bottom gradient overlays are only drawn while the chrome is visible, reducing occlusion of the video.
-- A release APK was signed locally with the historical release keystore (v2 signature, certificate SHA-256 `ade29388…dbee`); signing and metadata are recorded in `docs/发布候选验证记录_2026-08-14.md`.
+- Select a local folder with the system picker and choose whether to include subfolders. Discovered videos play in a shuffled loop with previous and next controls.
+- Reopen the current list after closing the player, or rescan to update and reshuffle it. Unplayable videos are skipped when possible, with a retry option if all items fail consecutively.
 
-## Privacy boundary
+## Playback and cleanup experience
 
-Photos, videos, cleanup records, and settings are processed and stored on the device. Nothing is uploaded to a server.
+- Manually switch the player between portrait and landscape. Rotation preserves playback position, playback state, volume, and speed; closing the player restores the previous orientation setting.
+- Double-tap to seek, drag to scrub, hold for temporary fast playback, and adjust player brightness and volume from the sides of the screen. Gesture instructions are available in the more menu.
+- Filter pages show the number of active conditions, offer a clear-search button, and adapt grid columns to the available width. Cleanup, onboarding, and preview interactions have also been refined.
+
+## Notes
+
+- When upgrading from versions 2.2.8–2.3.4, existing favorites, trash entries, and cleanup records are migrated. Original legacy statistics are retained; details the old version never recorded cannot be reconstructed.
+- If a much older database is unsupported or contains conflicting data that cannot be merged safely, the app may not open until the issue is resolved. The old database is not automatically erased; do not clear app data and contact the maintainer.
+- Photo and video filters scan items authorized in the system media library. Random folder playback uses the system folder grant and does not require videos to be indexed by MediaStore.
+- Some tablets may display landscape playback in a compatibility window. Split-screen or device policies can restrict rotation; the player provides feedback if the request is ignored.
+- Photos, videos, and cleanup records are processed locally and are not uploaded to a server. Items sent to the app trash can be reviewed or restored; permanent deletion still requires system confirmation.

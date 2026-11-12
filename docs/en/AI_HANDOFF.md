@@ -6,8 +6,8 @@ This document is a quick handoff for the next maintainer or AI assistant. It onl
 
 - App name: Keepix / 看了么
 - Package name: `com.futureape.kanleme`
-- Current version: `2.3.4`
-- `versionCode`: `60`
+- Current version: `2.3.5`
+- `versionCode`: `61`
 - Minimum OS: Android 11, `minSdk = 30`
 - Target OS: `targetSdk = 36`
 

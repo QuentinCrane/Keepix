@@ -108,6 +108,9 @@ import com.futureape.kanleme.ui.util.imagePrefetchPolicy
 import com.futureape.kanleme.ui.util.isLowRamDevice
 import com.futureape.kanleme.ui.util.photoDisplayAspectRatio
 import com.futureape.kanleme.ui.util.photoImageRequest
+import com.futureape.kanleme.ui.util.photoContentUri
+import com.futureape.kanleme.ui.components.LongImageViewer
+import com.futureape.kanleme.ui.components.isLongImageCandidate
 import com.futureape.kanleme.ui.util.photoThumbnailImageRequest
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
@@ -635,11 +638,25 @@ private fun FavoritePhotoPreviewOverlay(
                 onEnded = { motionSource = null },
             )
         } else {
-            ZoomableFavoritePhoto(
-                photo = photo,
-                modifier = Modifier.fillMaxSize(),
-                onLongPressMotion = ::playMotion,
-            )
+            val existingPreview: @Composable () -> Unit = {
+                ZoomableFavoritePhoto(
+                    photo = photo,
+                    modifier = Modifier.fillMaxSize(),
+                    onLongPressMotion = ::playMotion,
+                )
+            }
+            if (!photo.isGif && isLongImageCandidate(photo.width, photo.height, photo.mimeType)) {
+                LongImageViewer(
+                    uri = photoContentUri(photo),
+                    description = photo.displayName,
+                    modifier = Modifier.fillMaxSize(),
+                    mimeType = photo.mimeType,
+                    onLongPress = ::playMotion,
+                    fallback = existingPreview,
+                )
+            } else {
+                existingPreview()
+            }
         }
         Row(
             modifier = Modifier

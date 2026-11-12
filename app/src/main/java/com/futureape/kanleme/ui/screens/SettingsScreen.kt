@@ -172,6 +172,7 @@ fun SettingsScreen(
     initialPage: String? = null,
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val dashboard by viewModel.dashboard.collectAsStateWithLifecycle()
     val photoFolders by viewModel.photoFolders.collectAsStateWithLifecycle()
     val videoFolders by viewModel.videoFolders.collectAsStateWithLifecycle()
     val allFolders = (photoFolders + videoFolders).distinct().sorted()
@@ -251,6 +252,8 @@ fun SettingsScreen(
                             SettingsPageContent(
                                 page = animatedPage,
                                 settings = settings,
+                                cumulativePhotoCount = dashboard.userStats?.totalPhotosCleared ?: 0,
+                                cumulativeVideoCount = dashboard.userStats?.totalVideosCleared ?: 0,
                                 allFolders = allFolders,
                                 customizeTab = customizeTab,
                                 onSelectCustomizeTab = { customizeTab = it; haptics.tick() },
@@ -289,6 +292,8 @@ fun SettingsScreen(
 private fun SettingsPageContent(
     page: SettingsPage,
     settings: AppSettings,
+    cumulativePhotoCount: Int,
+    cumulativeVideoCount: Int,
     allFolders: List<String>,
     customizeTab: String,
     onSelectCustomizeTab: (String) -> Unit,
@@ -336,15 +341,14 @@ private fun SettingsPageContent(
                     onTogglePhotoTopBar = { onTick(); viewModel.setPhotoShowTopBar(!settings.photoShowTopBar) },
                     onTogglePhotoFilterChips = { onTick(); viewModel.setPhotoShowFilterChips(!settings.photoShowFilterChips) },
                     onTogglePhotoFolderChips = { onTick(); viewModel.setPhotoShowFolderChips(!settings.photoShowFolderChips) },
+                    onTogglePhotoActionRail = { onTick(); viewModel.setPhotoShowActionRail(!settings.photoShowActionRail) },
                     onTogglePhotoInfoBar = { onTick(); viewModel.setPhotoShowInfoBar(!settings.photoShowInfoBar) },
                     onTogglePhotoGestureHint = { onTick(); viewModel.setPhotoShowGestureHint(!settings.photoShowGestureHint) },
-                    onTogglePhotoShuffleButton = { onTick(); viewModel.setPhotoShowShuffleButton(!settings.photoShowShuffleButton) },
                     onToggleVideoTopBar = { onTick(); viewModel.setVideoShowTopBar(!settings.videoShowTopBar) },
                     onToggleVideoActionRail = { onTick(); viewModel.setVideoShowActionRail(!settings.videoShowActionRail) },
                     onToggleVideoInfoPanel = { onTick(); viewModel.setVideoShowInfoPanel(!settings.videoShowInfoPanel) },
                     onToggleVideoFolderChips = { onTick(); viewModel.setVideoShowFolderChips(!settings.videoShowFolderChips) },
                     onToggleVideoProgressBar = { onTick(); viewModel.setVideoShowProgressBar(!settings.videoShowProgressBar) },
-                    onToggleVideoShuffleButton = { onTick(); viewModel.setVideoShowShuffleButton(!settings.videoShowShuffleButton) },
                 )
             }
 
@@ -459,7 +463,6 @@ private fun SettingsPageContent(
                     { SettingsSegmentedRow(Icons.Rounded.MusicNote, stringResource(R.string.settings_sound_style), stringResource(settings.swipeSoundStyle.descriptionRes), swipeSoundStyleOptions(), settings.swipeSoundStyle.name, color = Color(0xFFE8A93B), onSelected = { onTick(); viewModel.setSwipeSoundStyle(SwipeSoundStyle.valueOf(it)) }) },
                     { SettingsSwitchRow(Icons.Rounded.MusicNote, stringResource(R.string.settings_video_default_muted), stringResource(R.string.settings_video_default_muted_desc), checked = settings.videoDefaultMuted, onCheckedChange = { onTick(); viewModel.setVideoDefaultMuted(it) }, color = Color(0xFFE8A93B)) },
                     { SettingsSegmentedRow(Icons.Rounded.AspectRatio, stringResource(R.string.settings_video_display_ratio), stringResource(settings.videoDisplayMode.labelRes), videoDisplayModeOptions(), settings.videoDisplayMode.name, color = Color(0xFF5E8DB4), onSelected = { onTick(); viewModel.setVideoDisplayMode(VideoDisplayMode.valueOf(it)) }) },
-                    { SettingsSwitchRow(Icons.Rounded.TouchApp, stringResource(R.string.settings_quick_actions), if (settings.quickActionButtons) stringResource(R.string.settings_quick_actions_enabled) else stringResource(R.string.settings_quick_actions_disabled), checked = settings.quickActionButtons, onCheckedChange = { onTick(); viewModel.setQuickActionButtons(it) }, color = Color(0xFF5E8DB4)) },
                     { SettingsSwitchRow(Icons.Rounded.Tune, stringResource(R.string.settings_swap_share_undo), if (settings.swapShareAndUndo) stringResource(R.string.settings_swap_share_undo_enabled) else stringResource(R.string.settings_swap_share_undo_disabled), checked = settings.swapShareAndUndo, onCheckedChange = { onTick(); viewModel.setSwapShareAndUndo(it) }, color = Color(0xFF5E8DB4)) },
                     { SettingsSegmentedRow(Icons.Rounded.Vibration, stringResource(R.string.settings_default_haptic), stringResource(settings.hapticLevel.labelRes), hapticLevelOptions(), settings.hapticLevel.name, color = Color(0xFF55A6C8), onSelected = { onSuccess(); viewModel.setHapticLevel(HapticLevel.valueOf(it)) }) },
                 ))
@@ -478,6 +481,7 @@ private fun SettingsPageContent(
             SettingsPage.DATA -> {
                 SectionTitle(stringResource(R.string.settings_page_data))
                 SettingsGroup(listOf<@Composable () -> Unit>(
+                    { SettingsRow(Icons.Rounded.CleaningServices, "累计整理", "照片 " + cumulativePhotoCount + " · 视频 " + cumulativeVideoCount + " · 共 " + (cumulativePhotoCount + cumulativeVideoCount) + " 项。即使原媒体随后被删除，已完成的整理仍会保留在此统计中", color = Color(0xFF6D9E65), onClick = {}) },
                     { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_changelog), stringResource(R.string.settings_changelog_desc, BuildConfig.VERSION_NAME), color = Color(0xFFE3B13B), onClick = { goTo(SettingsPage.CHANGELOG) }) },
                     { SettingsRow(Icons.Rounded.Info, stringResource(R.string.settings_privacy_policy), stringResource(R.string.settings_privacy_policy_desc), color = Color(0xFF55A6C8), onClick = { goTo(SettingsPage.PRIVACY) }) },
                     { SettingsRow(Icons.Rounded.TouchApp, stringResource(R.string.settings_help), stringResource(R.string.settings_help_desc), color = Color(0xFF6D9E65), onClick = { goTo(SettingsPage.HELP) }) },
@@ -1262,15 +1266,14 @@ private fun OrganizerDisplayCustomizer(
     onTogglePhotoTopBar: () -> Unit,
     onTogglePhotoFilterChips: () -> Unit,
     onTogglePhotoFolderChips: () -> Unit,
+    onTogglePhotoActionRail: () -> Unit,
     onTogglePhotoInfoBar: () -> Unit,
     onTogglePhotoGestureHint: () -> Unit,
-    onTogglePhotoShuffleButton: () -> Unit,
     onToggleVideoTopBar: () -> Unit,
     onToggleVideoActionRail: () -> Unit,
     onToggleVideoInfoPanel: () -> Unit,
     onToggleVideoFolderChips: () -> Unit,
     onToggleVideoProgressBar: () -> Unit,
-    onToggleVideoShuffleButton: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SettingsGroup(listOf<@Composable () -> Unit>(
@@ -1278,7 +1281,7 @@ private fun OrganizerDisplayCustomizer(
                 SettingsSwitchRow(
                     Icons.Rounded.Visibility,
                     "照片整理辅助控件",
-                    if (settings.photoFocusMode) "整理页只保留照片和一个显示控件入口" else "整理页显示筛选、进度、相册和图片信息",
+                    if (settings.photoFocusMode) "整理页只保留照片和撤回入口" else "整理页显示返回、进度、筛选、隐藏控件和底部信息",
                     checked = !settings.photoFocusMode,
                     onCheckedChange = { onTogglePhotoFocusMode() },
                     color = MaterialTheme.colorScheme.primary,
@@ -1288,7 +1291,7 @@ private fun OrganizerDisplayCustomizer(
         GlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), tonalAlpha = 0.82f) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("实时预览", style = MaterialTheme.typography.titleLarge)
-                Text("这是实际整理页的缩略排布预览。点顶部、筛选、文件夹、重新随机、右侧操作栏、底部信息等区域即可显示或隐藏；隐藏后会出现“显示某组件”的回填按钮。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("这是实际整理页的缩略排布预览。点按对应组件即可显示或隐藏；隐藏后会出现“点击显示”的回填按钮。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TwoSegmentSelector(selectedTab = selectedTab, onSelectTab = onSelectTab)
                 if (selectedTab == "photo") {
                     PhotoOrganizerMockPreview(
@@ -1296,9 +1299,9 @@ private fun OrganizerDisplayCustomizer(
                         onToggleTopBar = onTogglePhotoTopBar,
                         onToggleFilterChips = onTogglePhotoFilterChips,
                         onToggleFolderChips = onTogglePhotoFolderChips,
+                        onToggleActionRail = onTogglePhotoActionRail,
                         onToggleInfoBar = onTogglePhotoInfoBar,
                         onToggleGestureHint = onTogglePhotoGestureHint,
-                        onToggleShuffleButton = onTogglePhotoShuffleButton,
                     )
                 } else {
                     VideoOrganizerMockPreview(
@@ -1308,7 +1311,6 @@ private fun OrganizerDisplayCustomizer(
                         onToggleInfoPanel = onToggleVideoInfoPanel,
                         onToggleFolderChips = onToggleVideoFolderChips,
                         onToggleProgressBar = onToggleVideoProgressBar,
-                        onToggleShuffleButton = onToggleVideoShuffleButton,
                     )
                 }
             }
@@ -1320,9 +1322,9 @@ private fun OrganizerDisplayCustomizer(
                     ComponentToggleItem("顶部进度/筛选", settings.photoShowTopBar, onTogglePhotoTopBar),
                     ComponentToggleItem("图片/时间筛选", settings.photoShowFilterChips, onTogglePhotoFilterChips),
                     ComponentToggleItem("相册按钮", settings.photoShowFolderChips, onTogglePhotoFolderChips),
+                    ComponentToggleItem("底部分享/信息/撤回栏", settings.photoShowActionRail, onTogglePhotoActionRail),
                     ComponentToggleItem("图片信息", settings.photoShowInfoBar, onTogglePhotoInfoBar),
                     ComponentToggleItem("手势提示", settings.photoShowGestureHint, onTogglePhotoGestureHint),
-                    ComponentToggleItem("重新随机按钮", settings.photoShowShuffleButton, onTogglePhotoShuffleButton),
                 ),
             )
         } else {
@@ -1334,7 +1336,6 @@ private fun OrganizerDisplayCustomizer(
                     ComponentToggleItem("底部信息", settings.videoShowInfoPanel, onToggleVideoInfoPanel),
                     ComponentToggleItem("文件夹按钮", settings.videoShowFolderChips, onToggleVideoFolderChips),
                     ComponentToggleItem("进度条", settings.videoShowProgressBar, onToggleVideoProgressBar),
-                    ComponentToggleItem("重新随机按钮", settings.videoShowShuffleButton, onToggleVideoShuffleButton),
                 ),
             )
         }
@@ -1401,9 +1402,9 @@ private fun PhotoOrganizerMockPreview(
     onToggleTopBar: () -> Unit,
     onToggleFilterChips: () -> Unit,
     onToggleFolderChips: () -> Unit,
+    onToggleActionRail: () -> Unit,
     onToggleInfoBar: () -> Unit,
     onToggleGestureHint: () -> Unit,
-    onToggleShuffleButton: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -1424,67 +1425,104 @@ private fun PhotoOrganizerMockPreview(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text("沉浸式照片整理", style = MaterialTheme.typography.titleMedium, color = Color.White)
-            Text("中间是当前照片，顶部是筛选与随机，底部保留信息、相册和手势入口。", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.62f))
+            Text("中间是当前照片，顶部是进度、筛选和隐藏控件，底部是信息与操作入口。", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.62f))
         }
 
-        if (settings.photoShowGestureHint) {
-            Box(
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .width(188.dp)
+                .height(278.dp)
+                .clip(RoundedCornerShape(34.dp))
+                .background(Color.White.copy(alpha = 0.08f))
+                .border(
+                    1.dp,
+                    Color.White.copy(alpha = if (settings.photoShowGestureHint) 0.18f else 0.08f),
+                    RoundedCornerShape(34.dp),
+                )
+                .clickable(onClick = onToggleGestureHint),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.width(146.dp).height(206.dp).align(Alignment.Center).padding(top = 14.dp, start = 18.dp).clip(RoundedCornerShape(28.dp)).background(Color(0xFF334052)))
+            Box(Modifier.width(146.dp).height(206.dp).align(Alignment.Center).padding(bottom = 14.dp, end = 18.dp).clip(RoundedCornerShape(28.dp)).background(Color(0xFF6E7E93)))
+            Box(Modifier.width(144.dp).height(212.dp).align(Alignment.Center).clip(RoundedCornerShape(28.dp)).background(Color(0xFFD9E2EC))) {
+                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(72.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.44f)))))
+                Text(
+                    if (settings.photoShowGestureHint) "左右滑动 · 双指缩小" else "手势提示已隐藏",
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        if (!settings.photoFocusMode) {
+            Row(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .width(188.dp)
-                    .height(278.dp)
-                    .clip(RoundedCornerShape(34.dp))
-                    .background(Color.White.copy(alpha = 0.08f))
-                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(34.dp))
-                    .clickable(onClick = onToggleGestureHint),
-                contentAlignment = Alignment.Center,
+                    .align(Alignment.TopCenter)
+                    .padding(top = 58.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(Modifier.width(146.dp).height(206.dp).align(Alignment.Center).padding(top = 14.dp, start = 18.dp).clip(RoundedCornerShape(28.dp)).background(Color(0xFF334052)))
-                Box(Modifier.width(146.dp).height(206.dp).align(Alignment.Center).padding(bottom = 14.dp, end = 18.dp).clip(RoundedCornerShape(28.dp)).background(Color(0xFF6E7E93)))
-                Box(Modifier.width(144.dp).height(212.dp).align(Alignment.Center).clip(RoundedCornerShape(28.dp)).background(Color(0xFFD9E2EC))) {
-                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(72.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.44f)))))
-                    Text("双指缩小 · 那年今日", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp), style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.Bold)
+                PreviewDarkRailButton(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "返回", {})
+                Box(
+                    modifier = Modifier.weight(1f).widthIn(min = 0.dp),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (settings.photoShowTopBar) PreviewDarkComponentBlock("顶部进度", "42% · 剩余 120", onToggleTopBar, Modifier.width(196.dp))
+                        else PreviewDarkHiddenBlock("顶部进度", onToggleTopBar, Modifier.width(196.dp))
+                        if (settings.photoShowFilterChips) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                PreviewDarkComponentBlock("图片筛选", "全部 / 截图 / 实况", onToggleFilterChips, Modifier.width(150.dp))
+                                PreviewDarkComponentBlock("媒体标签", "照片 · 剩余 120", {}, Modifier.width(150.dp))
+                            }
+                        } else {
+                            PreviewDarkHiddenBlock("图片筛选", onToggleFilterChips, Modifier.width(308.dp))
+                        }
+                    }
                 }
+                PreviewDarkRailButton(Icons.Rounded.VisibilityOff, "隐藏控件", {})
+            }
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (settings.photoShowInfoBar) {
+                    PreviewDarkComponentBlock(
+                        "底部信息",
+                        if (settings.photoShowFolderChips) "日期 · 相册 · 大小" else "日期 · 大小",
+                        onToggleInfoBar,
+                        Modifier.weight(1f),
+                    )
+                } else {
+                    PreviewDarkHiddenBlock("底部信息", onToggleInfoBar, Modifier.weight(1f))
+                }
+                if (settings.photoShowFolderChips) {
+                    PreviewDarkComponentBlock("信息栏相册", "文件夹入口", onToggleFolderChips, Modifier.width(112.dp))
+                } else {
+                    PreviewDarkHiddenBlock("信息栏相册", onToggleFolderChips, Modifier.width(112.dp))
+                }
+                if (settings.photoShowActionRail) PreviewDarkComponentBlock("底部操作栏", "分享 · 信息 · 撤回", onToggleActionRail, Modifier.width(138.dp))
+                else PreviewDarkHiddenBlock("底部操作栏", onToggleActionRail, Modifier.width(138.dp))
             }
         } else {
-            PreviewDarkHiddenBlock("图片手势入口", onToggleGestureHint, Modifier.align(Alignment.Center).width(190.dp))
-        }
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 58.dp)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (settings.photoShowTopBar) PreviewDarkComponentBlock("顶部进度", "42% · 剩余 120", onToggleTopBar, Modifier.weight(1f))
-                else PreviewDarkHiddenBlock("顶部进度", onToggleTopBar, Modifier.weight(1f))
-                if (settings.photoShowShuffleButton) PreviewDarkComponentBlock("重新随机", "真实打散队列", onToggleShuffleButton, Modifier.weight(1f))
-                else PreviewDarkHiddenBlock("重新随机", onToggleShuffleButton, Modifier.weight(1f))
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (settings.photoShowFilterChips) {
-                    PreviewDarkComponentBlock("图片筛选", "全部 / 截图 / 实况", onToggleFilterChips, Modifier.weight(1f))
-                    PreviewDarkComponentBlock("时间筛选", "全部 / 今天 / 年月", onToggleFilterChips, Modifier.weight(1f))
-                } else {
-                    PreviewDarkHiddenBlock("图片筛选", onToggleFilterChips, Modifier.weight(1f))
-                    PreviewDarkHiddenBlock("时间筛选", onToggleFilterChips, Modifier.weight(1f))
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (settings.photoShowInfoBar) PreviewDarkComponentBlock("底部信息", "日期 · 文件夹 · 大小", onToggleInfoBar, Modifier.weight(1f))
-            else PreviewDarkHiddenBlock("底部信息", onToggleInfoBar, Modifier.weight(1f))
-            if (settings.photoShowFolderChips) PreviewDarkComponentBlock("相册", "文件夹入口", onToggleFolderChips, Modifier.width(112.dp))
-            else PreviewDarkHiddenBlock("相册", onToggleFolderChips, Modifier.width(112.dp))
+            PreviewDarkComponentBlock(
+                "沉浸模式",
+                "仅保留照片与撤回入口",
+                {},
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth(0.72f),
+            )
         }
     }
 }
@@ -1497,7 +1535,6 @@ private fun VideoOrganizerMockPreview(
     onToggleInfoPanel: () -> Unit,
     onToggleFolderChips: () -> Unit,
     onToggleProgressBar: () -> Unit,
-    onToggleShuffleButton: () -> Unit,
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -1505,7 +1542,7 @@ private fun VideoOrganizerMockPreview(
             .heightIn(min = 420.dp, max = 620.dp),
     ) {
         val previewHeight = (maxWidth / 0.72f).coerceIn(420.dp, 620.dp)
-        val showTopControls = settings.videoShowTopBar || settings.videoShowFolderChips || settings.videoShowShuffleButton
+        val showTopControls = settings.videoShowTopBar || settings.videoShowFolderChips
 
         Box(
             modifier = Modifier
@@ -1573,11 +1610,11 @@ private fun VideoOrganizerMockPreview(
                     dateMode = "all",
                     showProgress = settings.videoShowTopBar,
                     showFolderChips = settings.videoShowFolderChips,
-                    showShuffle = settings.videoShowShuffleButton,
+                    showShuffle = false,
                     onToggleDisplayMode = {},
                     onDateClick = {},
                     onFolderClick = onToggleFolderChips,
-                    onShuffle = onToggleShuffleButton,
+                    onShuffle = {},
                     modifier = Modifier.align(Alignment.TopCenter),
                     includeStatusBarsPadding = false,
                 )
@@ -1847,10 +1884,10 @@ private fun PreviewCircle(text: String, onClick: () -> Unit) {
 }
 
 private fun customizationSummary(settings: AppSettings): String {
-    val photo = enabledCount(listOf(settings.photoShowTopBar, settings.photoShowFilterChips, settings.photoShowFolderChips, settings.photoShowInfoBar, settings.photoShowGestureHint, settings.photoShowShuffleButton))
-    val video = enabledCount(listOf(settings.videoShowTopBar, settings.videoShowActionRail, settings.videoShowInfoPanel, settings.videoShowProgressBar, settings.videoShowShuffleButton))
-    val photoMode = if (settings.photoFocusMode) "照片辅助控件已隐藏" else "照片显示 " + photo + "/6"
-    return photoMode + " · 视频显示 " + video + "/5"
+    val photo = enabledCount(listOf(settings.photoShowTopBar, settings.photoShowFilterChips, settings.photoShowFolderChips, settings.photoShowInfoBar, settings.photoShowGestureHint))
+    val video = enabledCount(listOf(settings.videoShowTopBar, settings.videoShowActionRail, settings.videoShowInfoPanel, settings.videoShowProgressBar))
+    val photoMode = if (settings.photoFocusMode) "照片辅助控件已隐藏" else "照片显示 " + photo + "/5"
+    return photoMode + " · 视频显示 " + video + "/4"
 }
 
 private fun enabledCount(values: List<Boolean>): Int = values.count { it }

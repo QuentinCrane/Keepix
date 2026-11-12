@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Bundle
 import android.provider.MediaStore
 import com.futureape.kanleme.R
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -36,10 +37,19 @@ class MediaStoreActions @Inject constructor(
         MediaStore.createTrashRequest(resolver, uris, isTrashed)
     }
 
-    fun createDeleteAuthorizationRequest(mediaUris: Collection<String>): MediaAuthorizationResult =
-        createAuthorizationRequest(MediaOperationKind.PERMANENT_DELETE, mediaUris) { uris ->
-            MediaStore.createDeleteRequest(resolver, uris)
+    fun createDeleteAuthorizationRequest(mediaUris: Collection<String>): MediaAuthorizationResult {
+        val parsedUrisWithDuplicates = mediaUris.mapNotNull { rawUri ->
+            rawUri.takeIf(String::isNotBlank)?.let { runCatching { Uri.parse(it) }.getOrNull() }
         }
+        if (parsedUrisWithDuplicates.size != mediaUris.size) {
+            return MediaAuthorizationResult.Failed(context.getString(R.string.media_error_invalid_uri))
+        }
+        val parsedUris = parsedUrisWithDuplicates.distinct()
+        if (parsedUris.isEmpty() || parsedUris.any { !isValidMediaStoreUri(it) }) {
+            return MediaAuthorizationResult.Failed(context.getString(R.string.media_error_invalid_uri))
+        }
+        return createDeleteRequestWithStaleUriRecovery(parsedUris)
+    }
 
     fun verifyMediaDeleted(mediaUris: Collection<String>): MediaAuthorizationResult {
         val uris = mediaUris.mapNotNull { rawUri ->
@@ -53,15 +63,7 @@ class MediaStoreActions @Inject constructor(
         val stillPresentUris = mutableListOf<Uri>()
         uris.forEach { uri ->
             try {
-                resolver.query(
-                    uri,
-                    arrayOf(MediaStore.MediaColumns._ID),
-                    null,
-                    null,
-                    null,
-                ).use { cursor ->
-                    if (cursor?.moveToFirst() == true) stillPresentUris += uri else deletedUris += uri
-                }
+                if (mediaItemExists(uri)) stillPresentUris += uri else deletedUris += uri
             } catch (_: SecurityException) {
                 stillPresentUris += uri
             } catch (_: Throwable) {
@@ -120,9 +122,69 @@ class MediaStoreActions @Inject constructor(
         createPendingIntent = createPendingIntent,
     )
 
+    /** Includes system-trashed rows so preflight and post-delete checks don't mistake them for missing. */
+    private fun mediaItemExists(uri: Uri): Boolean {
+        val cursor = resolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), mediaStateQueryArgs(), null)
+            ?: throw IllegalStateException("Unable to query MediaStore item")
+        return cursor.use { it.moveToFirst() }
+    }
+
+    private fun createDeleteRequestWithStaleUriRecovery(initialUris: List<Uri>): MediaAuthorizationResult {
+        var uris = initialUris
+        repeat(2) {
+            if (uris.isEmpty()) return MediaAuthorizationResult.Completed
+            val pendingIntent = try {
+                MediaStore.createDeleteRequest(resolver, uris)
+            } catch (_: IllegalArgumentException) {
+                // MediaProvider can reject a URI whose row was removed outside the app after it
+                // entered the local trash list. Prune only rows confirmed absent, then retry.
+                val stillExisting = try {
+                    uris.filter(::mediaItemExists)
+                } catch (security: SecurityException) {
+                    return MediaAuthorizationResult.Failed(
+                        security.message ?: context.getString(R.string.media_error_authorization_failed),
+                    )
+                } catch (error: Exception) {
+                    return MediaAuthorizationResult.Failed(
+                        error.message ?: context.getString(R.string.media_error_authorization_failed),
+                    )
+                }
+                if (stillExisting.size == uris.size) {
+                    return MediaAuthorizationResult.Failed(context.getString(R.string.media_error_invalid_uri))
+                }
+                uris = stillExisting
+                return@repeat
+            } catch (security: SecurityException) {
+                return MediaAuthorizationResult.Failed(
+                    security.message ?: context.getString(R.string.media_error_authorization_failed),
+                )
+            } catch (error: Exception) {
+                return MediaAuthorizationResult.Failed(
+                    error.message ?: context.getString(R.string.media_error_authorization_failed),
+                )
+            }
+            return MediaAuthorizationResult.NeedsUserConsent(
+                MediaOperationRequest(
+                    operationId = UUID.randomUUID().toString(),
+                    kind = MediaOperationKind.PERMANENT_DELETE,
+                    uris = uris,
+                    pendingIntent = pendingIntent,
+                ),
+            )
+        }
+        return if (uris.isEmpty()) MediaAuthorizationResult.Completed
+        else MediaAuthorizationResult.Failed(context.getString(R.string.media_error_invalid_uri))
+    }
+
+    private fun mediaStateQueryArgs(): Bundle = Bundle().apply {
+        putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_INCLUDE)
+        putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_INCLUDE)
+    }
+
     companion object {
         internal fun isValidMediaStoreUri(uri: Uri): Boolean =
-            uri.scheme == "content" && !uri.authority.isNullOrBlank()
+            uri.scheme == "content" && uri.authority == MediaStore.AUTHORITY &&
+                runCatching { android.content.ContentUris.parseId(uri) > 0L }.getOrDefault(false)
 
         fun normalizeRelativePath(path: String): String {
             val clean = path.trim().replace('\\', '/').trim('/')

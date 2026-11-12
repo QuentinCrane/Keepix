@@ -187,13 +187,22 @@ fun MorphDestination(
     background: Color,
     gestureProgress: Float? = null,
     imageDestination: Boolean = false,
+    morphEnabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val registry = LocalMorphRegistry.current
     val animationsEnabled = LocalMorphAnimationsEnabled.current
-    val moving = registry?.movingEntryId == entryId
-    val origin = registry?.originFor(entryId)
-    DisposableEffect(entryId) { onDispose { registry?.releaseDisposed(entryId) } }
+    val moving = morphEnabled && registry?.movingEntryId == entryId
+    val origin = if (morphEnabled) registry?.originFor(entryId) else null
+    val latestOrigin by rememberUpdatedState(origin)
+    DisposableEffect(entryId, morphEnabled) {
+        onDispose {
+            registry?.let { morphRegistry ->
+                if (morphEnabled && morphRegistry.hiddenId == latestOrigin?.id) morphRegistry.hiddenId = null
+                morphRegistry.releaseDisposed(entryId)
+            }
+        }
+    }
     val progress = scope.transition.animateFloat(
         transitionSpec = { tween(if (animationsEnabled) MorphMotion.DurationMillis else 0, easing = MorphMotion.Easing) },
         label = "destination_morph",
@@ -218,13 +227,17 @@ fun MorphDestination(
         if (moving && animating) { keyboard?.hide(); focusManager.clearFocus() }
     }
     CompositionLocalProvider(LocalMorphOwner provides entryId) {
-        MorphFrame(
-            origin = if (scope.transition.targetState == EnterExitState.PostExit) origin?.let { registry?.anchors?.get(it.id) } else origin,
-            progress = { if (gestureDriven) gesture.value else if (moving) progress.value else 1f },
-            background = background,
-            imageDestination = imageDestination,
-            content = content,
-        )
+        if (morphEnabled) {
+            MorphFrame(
+                origin = if (scope.transition.targetState == EnterExitState.PostExit) origin?.let { registry?.anchors?.get(it.id) } else origin,
+                progress = { if (gestureDriven) gesture.value else if (moving) progress.value else 1f },
+                background = background,
+                imageDestination = imageDestination,
+                content = content,
+            )
+        } else {
+            content()
+        }
     }
 }
 

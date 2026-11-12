@@ -12,6 +12,9 @@ import com.futureape.kanleme.data.local.VideoEntity
 import com.futureape.kanleme.data.media.MediaAccessState
 import com.futureape.kanleme.data.media.AdvancedVideo
 import com.futureape.kanleme.data.media.VideoFolderKey
+import com.futureape.kanleme.data.media.AdvancedPhoto
+import com.futureape.kanleme.data.media.PhotoFolderKey
+import com.futureape.kanleme.data.media.normalizeAdvancedPhotoMovePath
 import com.futureape.kanleme.data.media.normalizeAdvancedVideoMovePath
 import com.futureape.kanleme.data.media.MediaAuthorizationResult
 import com.futureape.kanleme.data.media.MediaOperationKind
@@ -155,6 +158,7 @@ sealed interface PendingMediaAuthorizationTarget {
     data class PhotoMove(
         val photo: PhotoEntity,
         val targetRelativePath: String,
+        val advancedPhoto: AdvancedPhoto? = null,
     ) : PendingMediaAuthorizationTarget
 
     data class VideoMove(
@@ -197,6 +201,8 @@ class KanlemeViewModel @Inject constructor(
     private val similarAnalysisScheduler: SimilarAnalysisScheduler,
 ) : ViewModel() {
     val advancedVideos = AdvancedVideoLibrary(viewModelScope, repository)
+    val advancedPhotos = AdvancedPhotoLibrary(viewModelScope, repository)
+    val randomVideoFolder = RandomVideoFolderSession(viewModelScope)
 
     private companion object {
         const val PHOTO_DECK_LOAD_WINDOW = 420
@@ -374,6 +380,12 @@ class KanlemeViewModel @Inject constructor(
                 val persisted = settingsRepository.loadStartupSettings()
                 val photoScope = startupSeededScope(persisted.toPhotoCleaningScope())
                 val videoScope = startupSeededScope(persisted.toVideoCleaningScope())
+                if (photoScope.sortOrder == "random") {
+                    settingsRepository.setPhotoSortOrderWithSeed("random", photoScope.randomSeed)
+                }
+                if (videoScope.sortOrder == "random") {
+                    settingsRepository.setVideoSortOrderWithSeed("random", videoScope.randomSeed)
+                }
                 _photoScope.value = photoScope
                 _videoScope.value = videoScope
                 _organizerScopesReady.value = true
@@ -591,9 +603,33 @@ class KanlemeViewModel @Inject constructor(
                 }
             }
             is PendingMediaAuthorizationTarget.PhotoMove -> {
-                val result = repository.movePhotoToFolder(target.photo, target.targetRelativePath, writeAuthorized = true)
-                if (!result.success) error(result.message)
-                _message.value = dynamicUiText(result.message)
+                try {
+                    val currentPhoto = target.advancedPhoto?.let { repository.prepareAdvancedPhotoAction(it) } ?: target.photo
+                    val result = repository.movePhotoToFolder(currentPhoto, target.targetRelativePath, writeAuthorized = true)
+                    if (!result.success) error(result.message)
+                    target.advancedPhoto?.let { advanced ->
+                        val fresh = repository.prepareAdvancedPhotoAction(advanced, requireUnchanged = false)
+                        advancedPhotos.replacePhoto(advanced.uri, advanced.copy(
+                            name = fresh.displayName,
+                            folder = PhotoFolderKey(advanced.folder.volume, fresh.folderPath),
+                            sizeBytes = fresh.size,
+                            width = fresh.width,
+                            height = fresh.height,
+                            dateAddedMs = fresh.dateAdded * 1000L,
+                            mimeType = fresh.mimeType,
+                            dateModifiedMs = fresh.dateModified * 1000L,
+                            isScreenshot = fresh.isScreenshot,
+                            isSelfie = fresh.isSelfie,
+                            isMotion = fresh.isMotionPhoto,
+                            isGif = fresh.isGif,
+                            isRaw = fresh.isRaw,
+                            isLongImage = fresh.isLongImage,
+                        ))
+                    }
+                    _message.value = dynamicUiText(result.message)
+                } finally {
+                    target.advancedPhoto?.let { advancedPhotos.finishAction(it.uri) }
+                }
             }
             is PendingMediaAuthorizationTarget.VideoMove -> {
                 try {
@@ -639,8 +675,8 @@ class KanlemeViewModel @Inject constructor(
             }
             is PendingMediaAuthorizationTarget.UndoOperation,
             is PendingMediaAuthorizationTarget.UndoLastAction,
-            is PendingMediaAuthorizationTarget.PermanentDelete,
-            is PendingMediaAuthorizationTarget.PhotoMove,
+            is PendingMediaAuthorizationTarget.PermanentDelete -> Unit
+            is PendingMediaAuthorizationTarget.PhotoMove -> target.advancedPhoto?.let { advancedPhotos.finishAction(it.uri) }
             is PendingMediaAuthorizationTarget.PhotoArchive,
             is PendingMediaAuthorizationTarget.VideoArchive,
             is PendingMediaAuthorizationTarget.PhotoActionWithMove,
@@ -884,7 +920,11 @@ class KanlemeViewModel @Inject constructor(
 
     private fun startupSeededScope(scope: CleaningScope): CleaningScope {
         val normalized = if (scope.sortOrder.isBlank()) scope.copy(sortOrder = "random") else scope
-        return ensureRandomSeed(normalized)
+        return if (normalized.sortOrder == "random") {
+            normalized.copy(randomSeed = nextRandomSeed())
+        } else {
+            normalized
+        }
     }
 
     // Home preview must come from the same generated deck as the actual cleaning session,
@@ -1085,6 +1125,20 @@ class KanlemeViewModel @Inject constructor(
         _photoSessionActionCount.value = 0
         _lastPhotoAction.value = null
         _photoDeck.value = _photoDeck.value.withoutLocalPhotoExclusions()
+
+        val scope = _photoScope.value
+        val homePreview = _photoDeck.value
+            .distinctBy { it.mediaStoreId }
+            .take(HOME_PREVIEW_DECK_SIZE)
+        if (homePreview.isNotEmpty() && samePhotoDeckScope(photoDeckScope, scope)) {
+            _photoDeckPreview.value = homePreview
+            photoDeckPreviewScope = scope
+            photoDeckPreviewScopeLoaded = true
+            _photoDeckPreviewReady.value = true
+        } else {
+            if (!_photoDeckPreviewPreparing.value) reloadPhotoDeckPreview(scope)
+            ensurePhotoCleaningQueuePrepared(scope)
+        }
     }
 
     fun clearPhotoUndoAnimation(sequence: Long) {
@@ -1220,7 +1274,7 @@ class KanlemeViewModel @Inject constructor(
     }
 
     fun preparePhotoHomeQueue(scope: CleaningScope = _photoScope.value) {
-        photoCleaningSessionActive = false
+        if (photoCleaningSessionActive) return
         ensurePhotoCleaningQueuePrepared(scope)
     }
 
@@ -1336,9 +1390,6 @@ class KanlemeViewModel @Inject constructor(
             _photoDeckPreparing.value = false
         }
         if (_photoDeck.value.isNotEmpty() && !promotedPreview) {
-            if (session.sortOrder == "random") {
-                viewModelScope.launch { settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed) }
-            }
             _photoDeckPreparing.value = false
             return
         }
@@ -1351,7 +1402,6 @@ class KanlemeViewModel @Inject constructor(
         )
         val generation = nextPhotoDeckGeneration()
         photoDeckLoadJob = viewModelScope.launch {
-            if (session.sortOrder == "random") settingsRepository.setPhotoSortOrderWithSeed("random", session.randomSeed)
             try {
                 val loaded = repository
                     .loadPhotoDeck(session.copy(deckLoadWindow = PHOTO_DECK_LOAD_WINDOW))
@@ -1385,16 +1435,12 @@ class KanlemeViewModel @Inject constructor(
         clearPendingVideoKeeps()
         _videoDeck.value = _videoDeck.value.withoutLocalVideoExclusions()
         if (_videoDeck.value.isNotEmpty()) {
-            if (session.sortOrder == "random") {
-                viewModelScope.launch { settingsRepository.setVideoSortOrderWithSeed("random", session.randomSeed) }
-            }
             _videoDeckPreparing.value = false
             return
         }
         _videoDeckPreparing.value = true
         val generation = nextVideoDeckGeneration()
         videoDeckLoadJob = viewModelScope.launch {
-            if (session.sortOrder == "random") settingsRepository.setVideoSortOrderWithSeed("random", session.randomSeed)
             try {
                 val loaded = repository
                     .loadVideoDeck(session.copy(deckLoadWindow = VIDEO_DECK_LOAD_WINDOW))
@@ -2275,12 +2321,55 @@ class KanlemeViewModel @Inject constructor(
     fun setVideoDisplayMode(value: VideoDisplayMode) = viewModelScope.launch { settingsRepository.setVideoDisplayMode(value) }
 
     fun toggleVideoDisplayModeQuick() = viewModelScope.launch {
-        val next = if (settings.value.videoDisplayMode == VideoDisplayMode.FIT_SCREEN) {
-            VideoDisplayMode.IMMERSIVE_CROP
-        } else {
-            VideoDisplayMode.FIT_SCREEN
-        }
+        val modes = VideoDisplayMode.entries
+        val currentIndex = modes.indexOf(settings.value.videoDisplayMode).coerceAtLeast(-1)
+        val next = modes[(currentIndex + 1) % modes.size]
         settingsRepository.setVideoDisplayMode(next)
+    }
+
+    fun deleteAdvancedPhoto(photo: AdvancedPhoto) = viewModelScope.launch {
+        if (!advancedPhotos.beginAction(photo.uri)) return@launch
+        try {
+            val entity = repository.prepareAdvancedPhotoAction(photo)
+            check(repository.handlePhotoAction(entity, SwipeAction.Delete, appTrashOnly = true) > 0L) {
+                "照片未能移入回收站，请重新扫描后重试"
+            }
+            handledPhotoActionMediaIds += entity.mediaStoreId
+            invalidatePhotoDeckLoads()
+            _photoDeck.value = _photoDeck.value.filterNot { it.mediaStoreId == entity.mediaStoreId }
+            _photoDeckPreview.value = _photoDeckPreview.value.filterNot { it.mediaStoreId == entity.mediaStoreId }
+            advancedPhotos.removePhoto(photo.uri)
+            _message.value = uiText(R.string.advanced_delete_success)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            _message.value = error.message?.let(::dynamicUiText) ?: uiText(R.string.advanced_action_error)
+        } finally { advancedPhotos.finishAction(photo.uri) }
+    }
+
+    fun moveAdvancedPhoto(photo: AdvancedPhoto, relativePath: String) = viewModelScope.launch {
+        val path = normalizeAdvancedPhotoMovePath(relativePath)
+        if (path == null || path == photo.folder.relativePath) {
+            _message.value = uiText(R.string.advanced_move_invalid)
+            return@launch
+        }
+        if (_pendingMediaAuthorization.value != null) {
+            _message.value = uiText(R.string.message_media_authorization_in_progress)
+            return@launch
+        }
+        if (!advancedPhotos.beginAction(photo.uri)) return@launch
+        try {
+            val entity = repository.prepareAdvancedPhotoAction(photo)
+            val target = PendingMediaAuthorizationTarget.PhotoMove(entity, path, photo)
+            requestMediaAuthorization(MediaOperationKind.WRITE, listOf(entity.uri), false, target)
+            if (_pendingMediaAuthorization.value?.target != target) advancedPhotos.finishAction(photo.uri)
+        } catch (cancelled: CancellationException) {
+            advancedPhotos.finishAction(photo.uri)
+            throw cancelled
+        } catch (error: Exception) {
+            advancedPhotos.finishAction(photo.uri)
+            _message.value = error.message?.let(::dynamicUiText) ?: uiText(R.string.advanced_action_error)
+        }
     }
 
     fun cycleHapticLevel() = viewModelScope.launch {

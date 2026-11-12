@@ -7,7 +7,12 @@ import com.futureape.kanleme.ui.util.pinchMorph
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -46,6 +51,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -63,6 +69,7 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -329,13 +336,15 @@ fun PhotoCleanScreen(
         emptyStateVisible = true
     }
     val imagePolicy = remember { imagePrefetchPolicy(context.isLowRamDevice()) }
-    LaunchedEffect(deck, settings.photoGuideShown, runtimePolicy.prefetchCount, imagePolicy) {
-        showGuide = false
+    LaunchedEffect(deck, runtimePolicy.prefetchCount, imagePolicy) {
         deck.take(runtimePolicy.prefetchCount.coerceAtMost(imagePolicy.deckHighResolutionCount)).forEach { photo ->
             context.imageLoader.executeIfNotCached(
                 photoImageRequest(context, photo, "clean_prefetch", 1280, 1280)
             )
         }
+    }
+    LaunchedEffect(deck.isEmpty(), settings.photoGuideShown) {
+        showGuide = deck.isNotEmpty() && !settings.photoGuideShown
     }
 
     if (deck.isEmpty() && (batchSummary != null || batchFinishing)) {
@@ -456,7 +465,6 @@ fun PhotoCleanScreen(
     val remainingInBatch = sessionProgress.remaining.coerceAtLeast(1)
     val visibleDeck = deck.take(remainingInBatch.coerceAtMost(3))
     val dayMemoryVisible = showDayMemory || dayMemoryPinch.active
-    val dimAlpha by animateFloatAsState(targetValue = if (showGuide) 0.46f else 0f, label = "guide_dim")
 
     LaunchedEffect(dayMemoryVisible, memoryOriginPhoto.id) {
         if (dayMemoryVisible) {
@@ -465,7 +473,7 @@ fun PhotoCleanScreen(
     }
 
     fun perform(photo: PhotoEntity, action: SwipeAction, exitTargetX: Float, exitTargetY: Float) {
-        if (batchFinishing) return
+        if (batchFinishing || showGuide) return
         when (action) {
             SwipeAction.Keep -> haptics.keep()
             SwipeAction.Delete -> haptics.delete()
@@ -495,7 +503,7 @@ fun PhotoCleanScreen(
             .fillMaxSize()
             .detectScreenPinchToMemory(
                 key = currentPhoto.id,
-                disabled = showDayMemory,
+                disabled = showDayMemory || showGuide,
                 onProgress = ::previewDayMemory,
                 onCommit = ::commitDayMemory,
                 onCancel = { dayMemoryPinch = DayMemoryPinchState() },
@@ -509,8 +517,10 @@ fun PhotoCleanScreen(
                 mediaFilters = photoMediaFilters,
                 selectedMediaIndex = selectedMediaIndex,
                 onMediaSelected = { index ->
-                    haptics.tick()
-                    PHOTO_MEDIA_FILTER_TYPES.getOrNull(index)?.let(viewModel::setPhotoTypeFilter)
+                    if (!showGuide) {
+                        haptics.tick()
+                        PHOTO_MEDIA_FILTER_TYPES.getOrNull(index)?.let(viewModel::setPhotoTypeFilter)
+                    }
                 },
                 haptics = haptics,
                 progressPercent = progressPercent,
@@ -518,7 +528,7 @@ fun PhotoCleanScreen(
                 sessionActionCount = sessionActionCount,
                 undoAnimation = undoAnimation,
                 onBack = ::leaveCleaning,
-                onOpenPhoto = { photo -> haptics.tick(); onOpenPhoto(photo) },
+                onOpenPhoto = { photo -> if (!showGuide) { haptics.tick(); onOpenPhoto(photo) } },
                 onSwipeFeedbackChanged = { photoSwipeFeedback = it },
                 photoSwipeFeedback = photoSwipeFeedback,
                 onOpenDayMemory = {
@@ -540,20 +550,18 @@ fun PhotoCleanScreen(
                     }
                     perform(currentPhoto, action, exitTargetX, exitTargetY)
                 },
-                onShare = { haptics.tick(); sharePhoto(context, currentPhoto) },
-                onUndo = { haptics.undo(); viewModel.undoPhotoCleaningAction() },
-                onToggleFocus = { haptics.tick(); viewModel.setPhotoFocusMode(!settings.photoFocusMode) },
-                onShuffle = { haptics.threshold(); viewModel.reshufflePhotoCleaningSession() },
-                onDateClick = { haptics.tick(); showDatePicker = true },
-                onFolderClick = { haptics.tick(); showFolderPicker = true },
+                onShare = { if (!showGuide) { haptics.tick(); sharePhoto(context, currentPhoto) } },
+                onUndo = { if (!showGuide) { haptics.undo(); viewModel.undoPhotoCleaningAction() } },
+                onToggleFocus = { if (!showGuide) { haptics.tick(); viewModel.setPhotoFocusMode(!settings.photoFocusMode) } },
+                onDateClick = { if (!showGuide) { haptics.tick(); showDatePicker = true } },
+                onFolderClick = { if (!showGuide) { haptics.tick(); showFolderPicker = true } },
             )
-            if (dimAlpha > 0.01f) {
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dimAlpha)))
-            }
             androidx.compose.animation.AnimatedVisibility(visible = showGuide, modifier = Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    PhotoGuideDialog(onDismiss = { haptics.tick(); showGuide = false; viewModel.markPhotoGuideShown() })
-                }
+                PhotoPositionGuideOverlay(
+                    targets = guideTargets,
+                    onDismiss = { haptics.tick(); showGuide = false; viewModel.markPhotoGuideShown() },
+                    onPracticeCompleted = { haptics.threshold() },
+                )
             }
             OrganizerDatePickerAnimatedOverlay(
                 visible = showDatePicker,
@@ -782,12 +790,14 @@ private data class PositionGuideStep(
     val target: PhotoGuideTarget,
     @androidx.annotation.StringRes val title: Int,
     @androidx.annotation.StringRes val body: Int,
+    val requirePinch: Boolean = false,
 )
 
 @Composable
 private fun PhotoPositionGuideOverlay(
     targets: Map<PhotoGuideTarget, Rect>,
     onDismiss: () -> Unit,
+    onPracticeCompleted: () -> Unit = {},
 ) {
     var stepIndex by remember { mutableIntStateOf(0) }
     val steps = listOf(
@@ -802,6 +812,12 @@ private fun PhotoPositionGuideOverlay(
             body = R.string.photo_guide_card_body,
         ),
         PositionGuideStep(
+            target = PhotoGuideTarget.PhotoCard,
+            title = R.string.photo_guide_pinch_title,
+            body = R.string.photo_guide_pinch_body,
+            requirePinch = true,
+        ),
+        PositionGuideStep(
             target = PhotoGuideTarget.BottomInfo,
             title = R.string.photo_guide_info_title,
             body = R.string.photo_guide_info_body,
@@ -813,6 +829,27 @@ private fun PhotoPositionGuideOverlay(
         ),
     )
     val step = steps[stepIndex.coerceIn(0, steps.lastIndex)]
+    var pinchPracticed by remember(stepIndex) { mutableStateOf(false) }
+    val guideAccent = Color(0xFF7CC6F2)
+    val guideCardColor = Color(0xFF090A0C).copy(alpha = 0.92f)
+    val guidePrimaryColors = ButtonDefaults.buttonColors(
+        containerColor = Color.White.copy(alpha = 0.92f),
+        contentColor = Color(0xFF08111C),
+    )
+    val guideQuietColors = ButtonDefaults.buttonColors(
+        containerColor = Color.White.copy(alpha = 0.10f),
+        contentColor = Color.White,
+        disabledContainerColor = Color.White.copy(alpha = 0.08f),
+        disabledContentColor = Color.White.copy(alpha = 0.38f),
+    )
+    val guideQuietBorder = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+
+    LaunchedEffect(pinchPracticed, stepIndex) {
+        if (step.requirePinch && pinchPracticed) {
+            kotlinx.coroutines.delay(850)
+            if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss()
+        }
+    }
     val density = LocalDensity.current
     Box(Modifier.fillMaxSize()) {
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -836,7 +873,7 @@ private fun PhotoPositionGuideOverlay(
             val screenWidthPx = with(density) { maxWidth.toPx() }
             val screenHeightPx = with(density) { maxHeight.toPx() }
             Canvas(Modifier.fillMaxSize()) {
-                val scrim = Color.Black.copy(alpha = 0.18f)
+                val scrim = Color.Black.copy(alpha = 0.50f)
                 drawRect(scrim, topLeft = Offset.Zero, size = Size(screenWidthPx, highlightRect.top))
                 drawRect(scrim, topLeft = Offset(0f, highlightRect.bottom), size = Size(screenWidthPx, screenHeightPx - highlightRect.bottom))
                 drawRect(scrim, topLeft = Offset(0f, highlightRect.top), size = Size(highlightRect.left, highlightRect.height))
@@ -856,6 +893,17 @@ private fun PhotoPositionGuideOverlay(
                     style = Stroke(width = 4f),
                 )
             }
+            if (step.requirePinch) {
+                GuidePinchPracticeLayer(
+                    practiced = pinchPracticed,
+                    onPracticed = {
+                        if (!pinchPracticed) {
+                            pinchPracticed = true
+                            onPracticeCompleted()
+                        }
+                    },
+                )
+            }
             val cardOnTop = highlightRect.center.y > screenHeightPx * 0.56f
             Surface(
                 modifier = Modifier
@@ -863,27 +911,159 @@ private fun PhotoPositionGuideOverlay(
                     .padding(horizontal = 22.dp, vertical = 32.dp)
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                tonalElevation = 6.dp,
-                shadowElevation = 8.dp,
+                color = guideCardColor,
+                contentColor = Color.White,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.photo_guide_step, stepIndex + 1, steps.size), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(step.title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(stringResource(step.body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.photo_guide_step, stepIndex + 1, steps.size), style = MaterialTheme.typography.labelLarge, color = guideAccent)
+                    Text(stringResource(step.title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(stringResource(step.body), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.72f))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         if (stepIndex > 0) {
-                            Button(onClick = { stepIndex -= 1 }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text(stringResource(R.string.onboarding_previous)) }
+                            Button(
+                                onClick = { stepIndex -= 1 },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(999.dp),
+                                colors = guideQuietColors,
+                                border = guideQuietBorder,
+                            ) { Text(stringResource(R.string.onboarding_previous)) }
                         }
-                        Button(
-                            onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(999.dp),
-                        ) { Text(stringResource(if (stepIndex < steps.lastIndex) R.string.onboarding_next else R.string.photo_guide_done)) }
+                        if (step.requirePinch && !pinchPracticed) {
+                            Surface(
+                                onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() },
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = RoundedCornerShape(999.dp),
+                                color = Color.White.copy(alpha = 0.10f),
+                                contentColor = Color.White,
+                                border = guideQuietBorder,
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(stringResource(R.string.onboarding_skip), style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                            Button(
+                                onClick = {},
+                                enabled = false,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(999.dp),
+                                colors = guideQuietColors,
+                                border = guideQuietBorder,
+                            ) {
+                                Text(stringResource(R.string.photo_guide_practice_pending))
+                            }
+                        } else {
+                            Button(
+                                onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(999.dp),
+                                colors = guidePrimaryColors,
+                            ) { Text(stringResource(if (stepIndex < steps.lastIndex) R.string.onboarding_next else R.string.photo_guide_done)) }
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun GuidePinchPracticeLayer(
+    practiced: Boolean,
+    onPracticed: () -> Unit,
+) {
+    val pulse = rememberInfiniteTransition(label = "guide_pinch_pulse")
+    val pull by pulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1150, easing = FastOutSlowInEasing), RepeatMode.Restart),
+        label = "guide_pinch_pull",
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    var initialDistance = 0f
+                    var previousDistance = 0f
+                    var cumulativeScale = 1f
+                    val slop = viewConfiguration.touchSlop
+                    while (true) {
+                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                        val pressed = event.changes.filter { it.pressed }
+                        if (pressed.size < 2) {
+                            if (pressed.isEmpty()) break
+                            continue
+                        }
+                        pressed.forEach { it.consume() }
+                        val a = pressed[0].position
+                        val b = pressed[1].position
+                        val dx = a.x - b.x
+                        val dy = a.y - b.y
+                        val distance = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+                        if (initialDistance <= 0f && distance > slop) {
+                            initialDistance = distance
+                            previousDistance = distance
+                        } else if (previousDistance > 0f) {
+                            cumulativeScale *= distance / previousDistance.coerceAtLeast(1f)
+                            previousDistance = distance
+                        }
+                        if (initialDistance > 0f && (distance / initialDistance < 0.9f || cumulativeScale < 0.9f)) {
+                            onPracticed()
+                            break
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                if (practiced) {
+                    Surface(
+                        modifier = Modifier.size(64.dp),
+                        shape = CircleShape,
+                        color = Color.White,
+                        contentColor = Color(0xFF08111C),
+                        shadowElevation = 6.dp,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(30.dp))
+                        }
+                    }
+                } else {
+                    val spread = 20.dp + 26.dp * (1f - pull)
+                    GuideFingerDot(Modifier.offset(x = -spread))
+                    GuideFingerDot(Modifier.offset(x = spread))
+                }
+            }
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Color.Black.copy(alpha = 0.46f),
+                contentColor = Color.White,
+            ) {
+                Text(
+                    stringResource(if (practiced) R.string.photo_guide_practice_done else R.string.photo_guide_practice_hint),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuideFingerDot(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.size(34.dp),
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.85f),
+        border = BorderStroke(2.dp, Color(0xFF7CC6F2)),
+        shadowElevation = 3.dp,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Box(Modifier.size(10.dp).background(Color(0xFF7CC6F2).copy(alpha = 0.9f), CircleShape))
         }
     }
 }

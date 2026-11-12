@@ -59,7 +59,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -72,7 +74,6 @@ import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Swipe
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -94,6 +95,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -179,7 +181,6 @@ internal fun ImmersivePhotoCleanContent(
     onShare: () -> Unit,
     onUndo: () -> Unit,
     onToggleFocus: () -> Unit,
-    onShuffle: () -> Unit,
     onDateClick: () -> Unit,
     onFolderClick: () -> Unit,
 ) {
@@ -250,64 +251,77 @@ internal fun ImmersivePhotoCleanContent(
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .zIndex(5f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    KeepixRoundButton(
-                        icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                        contentDescription = stringResource(R.string.a11y_back),
-                        onClick = onBack,
-                    )
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    Box(
+                        modifier = Modifier.width(60.dp),
+                        contentAlignment = Alignment.TopStart,
                     ) {
-                        if (displayOptions.showTopBar) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                            ) {
-                                Text(
-                                    stringResource(R.string.immersive_progress_target, progressPercent),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White.copy(alpha = 0.82f),
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                KeepixProgressBar(progress = progressPercent / 100f)
-                            }
-                        }
-                        AnimatedVisibility(
-                            visible = !focusMode && displayOptions.showFilterChips,
-                            enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { -it / 3 },
-                            exit = fadeOut(tween(140)) + slideOutVertically(tween(180)) { -it / 4 },
+                        KeepixRoundButton(
+                            icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                            contentDescription = stringResource(R.string.a11y_back),
+                            modifier = Modifier.requiredSize(60.dp),
+                            onClick = onBack,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .widthIn(min = 0.dp),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                PhotoMediaFilterMenu(
-                                    filters = mediaFilters,
-                                    selectedIndex = selectedMediaIndex,
-                                    onSelected = onMediaSelected,
-                                )
-                                KeepixTopPill(
-                                    label = photoMediaKindLabel(currentPhoto),
-                                    trailing = remaining.toString(),
-                                    onClick = onDateClick,
-                                )
+                            if (displayOptions.showTopBar) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                ) {
+                                    Text(
+                                        stringResource(R.string.immersive_progress_target, progressPercent),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White.copy(alpha = 0.82f),
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    KeepixProgressBar(progress = progressPercent / 100f)
+                                }
+                            }
+                            AnimatedVisibility(
+                                visible = !focusMode && displayOptions.showFilterChips,
+                                enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { -it / 3 },
+                                exit = fadeOut(tween(140)) + slideOutVertically(tween(180)) { -it / 4 },
+                            ) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    PhotoMediaFilterMenu(
+                                        filters = mediaFilters,
+                                        selectedIndex = selectedMediaIndex,
+                                        onSelected = onMediaSelected,
+                                    )
+                                    KeepixTopPill(
+                                        label = photoMediaKindLabel(currentPhoto),
+                                        trailing = remaining.toString(),
+                                        onClick = onDateClick,
+                                    )
+                                }
                             }
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (displayOptions.showShuffleButton) {
-                            KeepixRoundButton(
-                                icon = Icons.Rounded.Shuffle,
-                                contentDescription = stringResource(R.string.a11y_shuffle),
-                                onClick = onShuffle,
-                            )
-                        }
+                    Box(
+                        modifier = Modifier.width(60.dp),
+                        contentAlignment = Alignment.TopEnd,
+                    ) {
                         KeepixRoundButton(
                             icon = if (focusMode) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
                             contentDescription = stringResource(
                                 if (focusMode) R.string.photo_show_controls else R.string.photo_hide_controls,
                             ),
+                            modifier = Modifier.requiredSize(60.dp),
                             onClick = onToggleFocus,
                         )
                     }
@@ -376,18 +390,6 @@ internal fun ImmersivePhotoCleanContent(
                     onActionCommitted = onActionCommitted,
                         onAction = onAction,
                 )
-
-                AnimatedVisibility(
-                    visible = !focusMode && settings.quickActionButtons,
-                    enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { it / 5 },
-                    exit = fadeOut(tween(140)) + slideOutVertically(tween(180)) { it / 5 },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 84.dp)
-                        .zIndex(6f),
-                ) {
-                    PhotoQuickActionDock(onAction = onQuickAction)
-                }
 
                 AnimatedVisibility(
                     visible = !focusMode,
@@ -495,36 +497,6 @@ private fun PhotoDiagnosticHud(
             color = Color.White.copy(alpha = 0.90f),
             maxLines = 1,
         )
-    }
-}
-
-@Composable
-private fun PhotoQuickActionDock(onAction: (SwipeAction) -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(999.dp),
-        color = Color.Black.copy(alpha = 0.28f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            KeepixRoundButton(
-                icon = Icons.Rounded.Check,
-                contentDescription = stringResource(R.string.a11y_keep),
-                onClick = { onAction(SwipeAction.Keep) },
-            )
-            KeepixRoundButton(
-                icon = Icons.Rounded.FavoriteBorder,
-                contentDescription = stringResource(R.string.a11y_favorite),
-                onClick = { onAction(SwipeAction.Favorite) },
-            )
-            KeepixRoundButton(
-                icon = Icons.Rounded.Delete,
-                contentDescription = stringResource(R.string.a11y_delete),
-                onClick = { onAction(SwipeAction.Delete) },
-            )
-        }
     }
 }
 

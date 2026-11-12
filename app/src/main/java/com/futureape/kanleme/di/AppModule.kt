@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import androidx.room.Room
 import com.futureape.kanleme.data.local.AppDatabase
+import com.futureape.kanleme.data.local.AppDatabaseMigrations
 import com.futureape.kanleme.data.repository.AppRepository
 import com.futureape.kanleme.data.repository.AppRepositoryImpl
 import dagger.Binds
@@ -29,7 +30,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "kanleme.db")
-            .fallbackToDestructiveMigration()
+            .addMigrations(*AppDatabaseMigrations.ALL)
             .build()
 
     @Provides

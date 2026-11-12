@@ -37,8 +37,8 @@ android {
         applicationId = "com.futureape.kanleme"
         minSdk = 30
         targetSdk = 36
-        versionCode = 60
-        versionName = "2.3.4"
+        versionCode = 61
+        versionName = "2.3.5"
 
         vectorDrawables.useSupportLibrary = true
         testInstrumentationRunner = "com.futureape.kanleme.HiltTestRunner"
@@ -48,6 +48,8 @@ android {
         compose = true
         buildConfig = true
     }
+
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
 
     signingConfigs {
         if (releaseSigningConfigured) {
@@ -141,6 +143,8 @@ dependencies {
 
     implementation("androidx.media3:media3-exoplayer:1.11.0")
     implementation("androidx.media3:media3-ui:1.11.0")
+    implementation("androidx.media3:media3-inspector-frame:1.11.0")
+    implementation("androidx.media3:media3-effect:1.11.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
     implementation("io.coil-kt.coil3:coil-gif:3.3.0")

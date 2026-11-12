@@ -65,8 +65,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -112,6 +114,7 @@ import kotlinx.coroutines.launch
 fun CleanHomeScreen(
     viewModel: KanlemeViewModel,
     contentPadding: PaddingValues,
+    isActive: Boolean,
     onPhoto: () -> Unit,
     onVideo: () -> Unit,
     onTimeline: () -> Unit,
@@ -148,8 +151,18 @@ fun CleanHomeScreen(
     var showDailyReport by remember { mutableStateOf(false) }
     var exportingDailyReport by remember { mutableStateOf(false) }
     var dailyReportExportError by remember { mutableStateOf<String?>(null) }
+    var hasBeenActive by rememberSaveable { mutableStateOf(false) }
+    var animateDeckEntry by rememberSaveable { mutableStateOf(false) }
     var lastEmptyPhotoPreviewReloadKey by remember { mutableStateOf<Any?>(null) }
     var lastPhotoQueuePrepareKey by remember { mutableStateOf<Any?>(null) }
+    LaunchedEffect(isActive) {
+        if (isActive) {
+            animateDeckEntry = !hasBeenActive
+            hasBeenActive = true
+        } else if (hasBeenActive) {
+            animateDeckEntry = false
+        }
+    }
     val selectedIsPhoto = true
     val hasTodayMemories = todayInHistoryPhotos.isNotEmpty() || todayInHistoryVideos.isNotEmpty()
     val openTodayIfAvailable = {
@@ -205,6 +218,7 @@ fun CleanHomeScreen(
     val scopedPhotoDeck = if (organizerScopesReady && photoDeckMatchesCurrentScope) photoDeck else emptyList()
     ImmersiveCleanHomeScreen(
         contentPadding = contentPadding,
+        animateDeckEntry = animateDeckEntry,
         dashboard = dashboard,
         settings = settings,
         photoScope = photoScope,

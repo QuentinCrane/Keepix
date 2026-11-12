@@ -8,6 +8,9 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -28,21 +31,31 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -71,6 +84,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
+import java.util.Locale
 import com.futureape.kanleme.R
 import com.futureape.kanleme.data.media.*
 import com.futureape.kanleme.ui.util.formatDuration
@@ -99,6 +114,7 @@ private fun AdvancedVideoContent(viewModel: KanlemeViewModel, onBack: () -> Unit
     var filterSheet by remember { mutableStateOf(false) }
     var viewingUri by rememberSaveable { mutableStateOf<String?>(null) }
     var deletingUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var gridView by rememberSaveable { mutableStateOf(false) }
     var firstResume by remember { mutableStateOf(true) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         access = MediaAccessSnapshot.current(context)
@@ -155,8 +171,11 @@ private fun AdvancedVideoContent(viewModel: KanlemeViewModel, onBack: () -> Unit
     }
 
     AdvancedPage(stringResource(R.string.advanced_video_title), onBack, stringResource(R.string.advanced_video_subtitle)) { padding ->
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+        val columns = ((maxWidth.value - 40f + 12f) / 182f).toInt().coerceIn(2, 6)
+        val gridRows = remember(results.videos, columns, gridView) { if (gridView) results.videos.chunked(columns) else emptyList() }
         LazyColumn(
-            Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp),
+            Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
@@ -191,29 +210,80 @@ private fun AdvancedVideoContent(viewModel: KanlemeViewModel, onBack: () -> Unit
             item {
                 OutlinedTextField(filter.query, { library.updateFilter(filter.copy(query = it)) },
                     Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.advanced_search)) }, singleLine = true,
+                    trailingIcon = {
+                        if (filter.query.isNotEmpty()) IconButton(onClick = { library.updateFilter(filter.copy(query = "")) }) {
+                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.advanced_search_clear))
+                        }
+                    },
                     shape = RoundedCornerShape(22.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = { filterSheet = true }) { Text(stringResource(R.string.advanced_filter)) }
-                    TextButton(onClick = { library.updateFilter(AdvancedVideoFilter()) }) { Text(stringResource(R.string.advanced_reset)) }
+                    val activeFilters = listOf(filter.resolution != VideoResolution.ALL, filter.bitrateBand != VideoBitrateBand.ALL,
+                        filter.size != VideoSizeRange(), filter.duration != VideoDuration.ALL,
+                        filter.orientation != VideoOrientation.ALL, filter.format != VideoFormat.ALL,
+                        filter.date != VideoDate.ALL).count { it }
+                    OutlinedButton(onClick = { filterSheet = true }) {
+                        Text(if (activeFilters == 0) stringResource(R.string.advanced_filter)
+                            else stringResource(R.string.advanced_filter_count, activeFilters))
+                    }
+                    TextButton(onClick = { library.updateFilter(AdvancedVideoFilter()) }, enabled = filter != AdvancedVideoFilter()) {
+                        Text(stringResource(R.string.advanced_reset))
+                    }
                 }
             }
             if (state.hasScanned && !state.scanning && results.filter == filter) {
                 item {
-                    Text(pluralStringResource(R.plurals.advanced_result_count, results.videos.size, results.videos.size, results.totalCount,
-                        formatSize(results.totalBytes)), style = MaterialTheme.typography.titleMedium)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(pluralStringResource(R.plurals.advanced_result_count, results.videos.size, results.videos.size, results.totalCount,
+                            formatSize(results.totalBytes)), style = MaterialTheme.typography.titleMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = !gridView,
+                                onClick = { gridView = false },
+                                label = { Text(stringResource(R.string.advanced_view_list)) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.ViewList, contentDescription = null) },
+                            )
+                            FilterChip(
+                                selected = gridView,
+                                onClick = { gridView = true },
+                                label = { Text(stringResource(R.string.advanced_view_grid)) },
+                                leadingIcon = { Icon(Icons.Rounded.GridView, contentDescription = null) },
+                            )
+                        }
+                    }
                 }
                 if (results.videos.isEmpty()) item {
                     Text(stringResource(R.string.advanced_no_match), style = MaterialTheme.typography.titleLarge)
                     Text(stringResource(R.string.advanced_no_match_hint), Modifier.padding(top = 8.dp))
                 }
-                items(results.videos, key = { it.uri }) { video ->
-                    VideoMetadataRow(video, busy = video.uri in state.busyUris,
-                        onView = { viewingUri = video.uri }, onExternal = { openAdvancedVideoExternally(context, video) },
-                        onDelete = { deletingUri = video.uri }, onMove = { chooseMoveFolder(video) })
+                if (gridView) {
+                    items(gridRows, key = { row -> "grid:" + row.first().uri }) { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Top) {
+                            row.forEach { video ->
+                                AdvancedVideoGridCard(
+                                    video = video,
+                                    busy = video.uri in state.busyUris,
+                                    modifier = Modifier.weight(1f),
+                                    onView = { viewingUri = video.uri },
+                                    onExternal = { openAdvancedVideoExternally(context, video) },
+                                    onDelete = { deletingUri = video.uri },
+                                    onMove = { chooseMoveFolder(video) },
+                                )
+                            }
+                            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                } else {
+                    items(results.videos, key = { it.uri }) { video ->
+                        VideoMetadataRow(video, busy = video.uri in state.busyUris,
+                            onView = { viewingUri = video.uri }, onExternal = { openAdvancedVideoExternally(context, video) },
+                            onDelete = { deletingUri = video.uri }, onMove = { chooseMoveFolder(video) })
+                    }
                 }
             } else if (!state.scanning && !state.hasScanned) item {
                 Text(stringResource(R.string.advanced_start_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else if (!state.scanning) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+        }
         }
     }
     if (folderSheet) VideoFolderSheet(state.folders, state.selectedFolders, state.includeSubfolders, state.loadingFolders,
@@ -231,8 +301,13 @@ private fun AdvancedVideoContent(viewModel: KanlemeViewModel, onBack: () -> Unit
         viewingUri?.let { uri -> state.videos.firstOrNull { it.uri == uri } }
     }
     viewing?.let { video ->
+        val index = remember(results.videos, video.uri) { results.videos.indexOfFirst { it.uri == video.uri } }
+        val adjacent = results.filter == filter && index >= 0
         LightweightVideoViewer(video, onDismiss = { viewingUri = null },
-            onDelete = { viewingUri = null; deletingUri = video.uri }, onMove = { chooseMoveFolder(video) })
+            onDelete = { viewingUri = null; deletingUri = video.uri }, onMove = { chooseMoveFolder(video) },
+            showAdjacent = adjacent && results.videos.size > 1,
+            onPrevious = results.videos.getOrNull(index - 1)?.takeIf { adjacent }?.let { previous -> { viewingUri = previous.uri } },
+            onNext = results.videos.getOrNull(index + 1)?.takeIf { adjacent }?.let { next -> { viewingUri = next.uri } })
     }
     val deleting = remember(state.videos, deletingUri) { deletingUri?.let { uri -> state.videos.firstOrNull { it.uri == uri } } }
     deleting?.let { video ->
@@ -245,6 +320,54 @@ private fun AdvancedVideoContent(viewModel: KanlemeViewModel, onBack: () -> Unit
                     Text(stringResource(R.string.advanced_delete_confirm))
                 }
             }, dismissButton = { TextButton(onClick = { deletingUri = null }) { Text(stringResource(R.string.advanced_cancel)) } })
+    }
+}
+
+@Composable
+private fun AdvancedVideoGridCard(
+    video: AdvancedVideo,
+    busy: Boolean,
+    modifier: Modifier = Modifier,
+    onView: () -> Unit,
+    onExternal: () -> Unit,
+    onDelete: () -> Unit,
+    onMove: () -> Unit,
+) {
+    var actionsExpanded by rememberSaveable(video.uri) { mutableStateOf(false) }
+    val unknown = stringResource(R.string.advanced_unknown)
+    ProfilePanel(modifier) {
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            AdvancedVideoCover(video, onView, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+            Text(video.name, Modifier.fillMaxWidth().heightIn(min = 40.dp).clickable(onClick = onView),
+                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(stringResource(R.string.advanced_metadata,
+                if (video.shortEdge > 0) video.width.toString() + " × " + video.height else unknown,
+                if (video.sizeBytes > 0) formatSize(video.sizeBytes) else unknown,
+                if (video.durationMs > 0) formatDuration(video.durationMs) else unknown,
+                averageBitrateLabel(video, unknown)),
+                style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(video.folder.relativePath, Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Box {
+                    IconButton(onClick = { actionsExpanded = true }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.advanced_more_actions))
+                    }
+                    DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.advanced_external)) },
+                            onClick = { actionsExpanded = false; onExternal() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.advanced_move)) },
+                            onClick = { actionsExpanded = false; onMove() }, enabled = !busy)
+                        DropdownMenuItem(text = { Text(stringResource(R.string.advanced_delete)) },
+                            onClick = { actionsExpanded = false; onDelete() }, enabled = !busy)
+                    }
+                }
+            }
+            if (busy) Text(stringResource(R.string.advanced_busy), color = ProfileScreenAccent,
+                style = MaterialTheme.typography.labelSmall)
+        }
     }
 }
 
@@ -264,7 +387,8 @@ private fun VideoMetadataRow(video: AdvancedVideo, busy: Boolean, onView: () -> 
                     Text(stringResource(R.string.advanced_metadata,
                         if (video.shortEdge > 0) video.width.toString() + " × " + video.height else unknown,
                         if (video.sizeBytes > 0) formatSize(video.sizeBytes) else unknown,
-                        if (video.durationMs > 0) formatDuration(video.durationMs) else unknown),
+                        if (video.durationMs > 0) formatDuration(video.durationMs) else unknown,
+                        averageBitrateLabel(video, unknown)),
                         style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -285,10 +409,28 @@ private fun VideoMetadataRow(video: AdvancedVideo, busy: Boolean, onView: () -> 
 }
 
 @Composable
+private fun averageBitrateLabel(video: AdvancedVideo, unknown: String): String {
+    val bitrate = video.estimatedAverageBitrateBps ?: return unknown
+    val reference = video.referenceBitrateBps
+    val formatted = if (reference != null) {
+        String.format(Locale.ROOT, "%.1f/%.1f Mbps", bitrate / 1_000_000.0, reference / 1_000_000.0)
+    } else if (bitrate < 1_000_000L) {
+        String.format(Locale.ROOT, "%.0f kbps", bitrate / 1_000.0)
+    } else {
+        String.format(Locale.ROOT, "%.1f Mbps", bitrate / 1_000_000.0)
+    }
+    return stringResource(R.string.advanced_bitrate_value, formatted)
+}
+
+@Composable
 private fun AdvancedVideoCover(video: AdvancedVideo, onView: () -> Unit, modifier: Modifier) {
     val context = LocalContext.current.applicationContext
     val thumbnail by produceState<Bitmap?>(null, AdvancedVideoThumbnails.key(video)) {
         value = AdvancedVideoThumbnails.load(context, video)
+        if (value == null) {
+            delay(600)
+            value = AdvancedVideoThumbnails.load(context, video, retryTransientFailure = true)
+        }
     }
     Box(modifier.clip(RoundedCornerShape(14.dp))
         .background(Color.White.copy(alpha = 0.06f)).clickable(onClick = onView), contentAlignment = Alignment.Center) {
@@ -297,6 +439,10 @@ private fun AdvancedVideoCover(video: AdvancedVideo, onView: () -> Unit, modifie
             Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
         else Icon(Icons.Rounded.Movie, stringResource(R.string.advanced_cover_missing) + ": " + video.name,
             Modifier.size(28.dp), tint = ProfileScreenAccent)
+        Icon(Icons.Rounded.PlayArrow, stringResource(R.string.advanced_internal),
+            Modifier.align(Alignment.Center).size(40.dp)
+                .background(Color.Black.copy(alpha = 0.68f), CircleShape).padding(8.dp),
+            tint = Color.White)
         Text(if (video.durationMs > 0) formatDuration(video.durationMs) else stringResource(R.string.advanced_unknown),
             Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(6.dp)).padding(3.dp),
             color = Color.White, style = MaterialTheme.typography.labelLarge)
@@ -318,9 +464,10 @@ private fun VideoFolderSheet(
         (it.key.volume + "/" + it.key.relativePath).contains(query, ignoreCase = true)
     } }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetMaxWidth = 900.dp,
         containerColor = ProfileScreenSurface, contentColor = androidx.compose.ui.graphics.Color.White,
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)) {
-        Column(Modifier.fillMaxWidth().heightIn(max = 640.dp).padding(horizontal = 20.dp),
+        Column(Modifier.fillMaxWidth().fillMaxHeight(0.94f).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.advanced_select_folders), style = MaterialTheme.typography.titleLarge)
             Text(stringResource(R.string.advanced_folder_direct), style = MaterialTheme.typography.bodySmall)
@@ -340,7 +487,7 @@ private fun VideoFolderSheet(
                         all = false
                         draft = if (folder.key in draft) draft - folder.key else draft + folder.key
                     }
-                    Row(Modifier.fillMaxWidth().clickable(onClick = toggle).padding(vertical = 6.dp),
+                    Row(Modifier.fillMaxWidth().clickable(onClick = toggle).padding(vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(!all && folder.key in draft, { toggle() })
                         Column(Modifier.weight(1f)) {
@@ -372,23 +519,28 @@ private fun VideoFilterSheet(initial: AdvancedVideoFilter, onDismiss: () -> Unit
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = ProfileScreenSurface, contentColor = androidx.compose.ui.graphics.Color.White,
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp)) {
-        Column(Modifier.fillMaxWidth().heightIn(max = 720.dp).padding(horizontal = 20.dp)) {
-            Text(stringResource(R.string.advanced_filter), style = MaterialTheme.typography.titleLarge)
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 680.dp).padding(horizontal = 16.dp)) {
+            Text(stringResource(R.string.advanced_filter), style = MaterialTheme.typography.titleMedium)
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
                     VideoChoices(R.string.advanced_resolution, VideoResolution.entries, draft.resolution) { draft = draft.copy(resolution = it) }
                     Text(stringResource(R.string.advanced_resolution_note), style = MaterialTheme.typography.bodySmall)
+                    VideoChoices(R.string.advanced_bitrate_quality, VideoBitrateBand.entries, draft.bitrateBand) {
+                        draft = draft.copy(bitrateBand = it)
+                    }
+                    Text(stringResource(R.string.advanced_bitrate_note), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 item {
                     Text(stringResource(R.string.advanced_size), style = MaterialTheme.typography.titleMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(minSize, { minSize = it }, Modifier.weight(1f), singleLine = true,
                             isError = range.isFailure, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            label = { Text(stringResource(R.string.advanced_size_min)) }, shape = RoundedCornerShape(18.dp))
+                            label = { Text(stringResource(R.string.advanced_size_min)) }, shape = RoundedCornerShape(16.dp))
                         OutlinedTextField(maxSize, { maxSize = it }, Modifier.weight(1f), singleLine = true,
                             isError = range.isFailure, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            label = { Text(stringResource(R.string.advanced_size_max)) }, shape = RoundedCornerShape(18.dp))
+                            label = { Text(stringResource(R.string.advanced_size_max)) }, shape = RoundedCornerShape(16.dp))
                     }
                     Text(stringResource(if (range.isFailure) R.string.advanced_size_error else R.string.advanced_size_hint),
                         style = MaterialTheme.typography.bodySmall,
@@ -401,7 +553,7 @@ private fun VideoFilterSheet(initial: AdvancedVideoFilter, onDismiss: () -> Unit
                 item { VideoChoices(R.string.advanced_date, VideoDate.entries, draft.date) { draft = draft.copy(date = it) } }
                 item { VideoChoices(R.string.advanced_sort, VideoSort.entries, draft.sort) { draft = draft.copy(sort = it) } }
             }
-            Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(onClick = { draft = AdvancedVideoFilter(query = initial.query); minSize = ""; maxSize = "" }) { Text(stringResource(R.string.advanced_reset)) }
                 Button(onClick = { range.getOrNull()?.let { onApply(draft.copy(size = it)) } }, enabled = range.isSuccess) { Text(stringResource(R.string.advanced_apply)) }
             }
@@ -412,7 +564,7 @@ private fun VideoFilterSheet(initial: AdvancedVideoFilter, onDismiss: () -> Unit
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SizePresets(min: String, max: String, onSelect: (String, String) -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         listOf(Triple("", "", R.string.advanced_all), Triple("", "100", R.string.advanced_size_small),
             Triple("500", "", R.string.advanced_size_large), Triple("1024", "", R.string.advanced_size_huge)).forEach {
             FilterChip(min == it.first && max == it.second, { onSelect(it.first, it.second) }, label = { Text(stringResource(it.third)) }, shape = RoundedCornerShape(999.dp))
@@ -423,8 +575,8 @@ private fun SizePresets(min: String, max: String, onSelect: (String, String) -> 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun <T : Enum<T>> VideoChoices(titleRes: Int, values: List<T>, selected: T, onSelect: (T) -> Unit) {
-    Text(stringResource(titleRes), style = MaterialTheme.typography.titleMedium)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Text(stringResource(titleRes), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 2.dp))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         values.forEach { value ->
             val label = videoFilterLabel(value)
             FilterChip(value == selected, { onSelect(value) }, label = { Text(label) }, shape = RoundedCornerShape(999.dp))
@@ -442,6 +594,10 @@ private fun videoFilterLabel(value: Enum<*>): String {
         VideoDuration.SHORT -> R.string.advanced_dur_short
         VideoDuration.MEDIUM -> R.string.advanced_dur_medium
         VideoDuration.LONG -> R.string.advanced_dur_long
+        VideoBitrateBand.VERY_LOW -> R.string.advanced_bitrate_very_low
+        VideoBitrateBand.LOW -> R.string.advanced_bitrate_low
+        VideoBitrateBand.REFERENCE -> R.string.advanced_bitrate_reference
+        VideoBitrateBand.HIGH -> R.string.advanced_bitrate_high
         VideoOrientation.LANDSCAPE -> R.string.advanced_landscape
         VideoOrientation.PORTRAIT -> R.string.advanced_portrait
         VideoOrientation.SQUARE -> R.string.advanced_square
@@ -455,6 +611,7 @@ private fun videoFilterLabel(value: Enum<*>): String {
         VideoSort.SMALLEST -> R.string.advanced_smallest
         VideoSort.RESOLUTION -> R.string.advanced_res_sort
         VideoSort.DURATION -> R.string.advanced_dur_sort
+        VideoSort.BITRATE -> R.string.advanced_bitrate_sort
         VideoSort.NAME -> R.string.advanced_name_sort
         else -> when (value.name) {
             "ALL" -> R.string.advanced_all

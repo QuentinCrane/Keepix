@@ -80,10 +80,14 @@ enum class GestureDirection(@StringRes val labelRes: Int, @StringRes val guideRe
     REVERSE_VERTICAL(R.string.gesture_direction_reverse_vertical, R.string.gesture_direction_reverse_vertical_guide),
 }
 
-enum class VideoDisplayMode(@StringRes val labelRes: Int, @StringRes val descriptionRes: Int) {
-    IMMERSIVE_CROP(R.string.video_display_mode_immersive_crop, R.string.video_display_mode_immersive_crop_desc),
-    FIT_SCREEN(R.string.video_display_mode_fit_screen, R.string.video_display_mode_fit_screen_desc),
-    FILL_WIDTH(R.string.video_display_mode_fill_width, R.string.video_display_mode_fill_width_desc),
+enum class VideoDisplayMode(
+    @StringRes val labelRes: Int,
+    @StringRes val descriptionRes: Int,
+    @StringRes val compactLabelRes: Int,
+) {
+    IMMERSIVE_CROP(R.string.video_display_mode_immersive_crop, R.string.video_display_mode_immersive_crop_desc, R.string.video_display_mode_immersive_crop_short),
+    FIT_SCREEN(R.string.video_display_mode_fit_screen, R.string.video_display_mode_fit_screen_desc, R.string.video_display_mode_fit_screen_short),
+    FILL_WIDTH(R.string.video_display_mode_fill_width, R.string.video_display_mode_fill_width_desc, R.string.video_display_mode_fill_width_short),
 }
 
 enum class HapticLevel(@StringRes val labelRes: Int) {

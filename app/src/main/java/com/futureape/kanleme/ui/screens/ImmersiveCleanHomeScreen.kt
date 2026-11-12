@@ -17,7 +17,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,8 +38,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -69,6 +66,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -116,6 +114,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun ImmersiveCleanHomeScreen(
     contentPadding: PaddingValues,
+    animateDeckEntry: Boolean,
     dashboard: DashboardStats,
     settings: AppSettings,
     photoScope: CleaningScope,
@@ -232,6 +231,7 @@ internal fun ImmersiveCleanHomeScreen(
                             preparing = if (selectedIsPhoto) photoPreparing else videoPreparing,
                             selectedIsPhoto = selectedIsPhoto,
                             canOpen = canOpenDeck,
+                            animateEntry = animateDeckEntry,
                             onClick = if (selectedIsPhoto) onPhoto else onVideo,
                         )
                     }
@@ -599,15 +599,39 @@ private fun KeepixHomeDeck(
     preparing: Boolean,
     selectedIsPhoto: Boolean,
     canOpen: Boolean,
+    animateEntry: Boolean,
     onClick: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
     val deckClickSource = remember { MutableInteractionSource() }
     val density = LocalDensity.current
     val visibleItems = items.take(3)
     val visibleKey = visibleItems.joinToString("|") { it.uri }
-    val deckEntryOffsets = remember { List(3) { Animatable(0f) } }
+    // Keep the source card's settled position across navigation so photo-screen
+    // shared transitions can collapse back to the exact place they expanded from.
+    var lastAnimatedKey by rememberSaveable { mutableStateOf<String?>(null) }
     val deckEntryStartPx = with(density) { 420.dp.toPx() }
+    val deckEntryOffsets = remember(visibleKey, deckEntryStartPx) {
+        val initialOffset = if (lastAnimatedKey == visibleKey) 0f else deckEntryStartPx
+        List(3) { Animatable(initialOffset) }
+    }
+    LaunchedEffect(visibleKey, animateEntry) {
+        if (visibleItems.isNotEmpty() && lastAnimatedKey != visibleKey) {
+            lastAnimatedKey = visibleKey
+            if (animateEntry) {
+                deckEntryOffsets.forEachIndexed { index, offset ->
+                    launch {
+                        kotlinx.coroutines.delay(index * 75L)
+                        offset.animateTo(
+                            targetValue = 0f,
+                            animationSpec = tween(540, easing = FastOutSlowInEasing),
+                        )
+                    }
+                }
+            } else {
+                deckEntryOffsets.forEach { it.snapTo(0f) }
+            }
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()

@@ -31,8 +31,9 @@ class MediaStoreScanner @Inject constructor(
         limit: Int? = null,
         afterGeneration: Long? = null,
         throughGeneration: Long? = null,
+        itemUri: String? = null,
     ): List<PhotoEntity> {
-        val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        val collection = itemUri?.let(Uri::parse) ?: MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
@@ -45,6 +46,7 @@ class MediaStoreScanner @Inject constructor(
             MediaStore.Images.Media.WIDTH,
             MediaStore.Images.Media.HEIGHT,
             MediaStore.Images.Media.ORIENTATION,
+            MediaStore.MediaColumns.VOLUME_NAME,
         )
         val result = mutableListOf<PhotoEntity>()
         queryMedia(
@@ -62,7 +64,9 @@ class MediaStoreScanner @Inject constructor(
                 val id = cursor.getLong(idCol)
                 val relativePath = cursor.string(MediaStore.Images.Media.RELATIVE_PATH)
                 val displayName = cursor.string(MediaStore.Images.Media.DISPLAY_NAME)?.ifBlank { "IMG_" + id } ?: "IMG_" + id
-                val uriObject = ContentUris.withAppendedId(collection, id)
+                val uriObject = if (itemUri == null) ContentUris.withAppendedId(collection, id) else
+                    ContentUris.withAppendedId(MediaStore.Images.Media.getContentUri(
+                        cursor.string(MediaStore.MediaColumns.VOLUME_NAME) ?: collection.pathSegments.first()), id)
                 val uri = uriObject.toString()
                 val mimeType = cursor.string(MediaStore.Images.Media.MIME_TYPE) ?: "image/*"
                 val size = cursor.long(MediaStore.Images.Media.SIZE)

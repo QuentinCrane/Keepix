@@ -47,7 +47,9 @@ Prefer Android platform capabilities over custom replacements:
 
 ## Current Release State
 
-Version `2.3.4` (`versionCode 60`) continues the cleanup-workspace direction:
+Version `2.3.5` (`versionCode 61`) continues the cleanup-workspace direction:
+
+- Advanced tools provide photo and video filters, random folder playback, and a local video player with manual orientation controls.
 
 - The home screen uses a modern white and light-blue visual style, supports horizontal switching between photo and video cleanup, and restores the recent media entry points.
 - Photo cleanup uses edge-triggered action feedback, a compact progress pill, fullscreen year and month filters, and a fullscreen viewer.

@@ -19,21 +19,24 @@
     <string name="onboarding_photo_body">点击照片可以放大查看；滑动到边缘会出现明显的保留、收藏、待删提示。</string>
     <string name="onboarding_photo_bullet_1">左右滑：保留</string>
     <string name="onboarding_photo_bullet_2">上滑 / 下滑：按设置执行收藏或待删</string>
-    <string name="onboarding_photo_bullet_3">可在设置里排除不想整理的文件夹</string>
+    <string name="onboarding_photo_bullet_3">双指捏合照片：回到"那年今日"</string>
+    <string name="onboarding_photo_bullet_4">可在设置里排除不想整理的文件夹</string>
     <string name="onboarding_video_title">视频整理方式</string>
     <string name="onboarding_video_subtitle">短视频式浏览，不强制一种比例</string>
     <string name="onboarding_video_body">视频有独立主页，可先切换排序、文件夹、显示比例，再进入沉浸式整理流。</string>
     <string name="onboarding_video_bullet_1">上下滑切换视频</string>
-    <string name="onboarding_video_bullet_2">长按 2 倍速，松开恢复</string>
+    <string name="onboarding_video_bullet_2">单击暂停，长按 2 倍速</string>
     <string name="onboarding_video_bullet_3">显示比例可选沉浸裁切 / 完整比例 / 铺满屏宽</string>
     <string name="onboarding_privacy_title">隐私与安全</string>
     <string name="onboarding_privacy_subtitle">本地整理，谨慎删除</string>
-    <string name="onboarding_privacy_body">看了么以本地 MediaStore 和 Room 为主，默认在本机完成整理与统计。</string>
-    <string name="onboarding_privacy_bullet_1">整理性格基于本机真实整理记录生成</string>
+    <string name="onboarding_privacy_body">看了么不联网也能完成整理：扫描、统计和删除全部在本机完成。</string>
+    <string name="onboarding_privacy_bullet_1">不注册账号，照片和视频只保存在本机</string>
     <string name="onboarding_privacy_bullet_2">排除文件夹会同时影响照片和视频</string>
     <string name="onboarding_privacy_bullet_3">删除默认进入待删确认，不直接物理删除</string>
     <string name="onboarding_previous">上一步</string>
     <string name="onboarding_next">下一步</string>
+    <string name="onboarding_skip">跳过</string>
+    <string name="onboarding_page_counter">%1$d / %2$d</string>
     <string name="onboarding_start">开始使用</string>
     <string name="onboarding_footer">首次说明之后，进入照片/视频整理页会出现对着真实页面位置的指示；也可在设置中重新播放定位式教程。</string>
 
@@ -79,9 +82,14 @@
     <string name="photo_batch_continue">继续整理</string>
     <string name="photo_batch_home">回首页</string>
     <string name="photo_guide_top_title">顶部操作栏</string>
-    <string name="photo_guide_top_body">这里是一行核心动作：保留、重新随机、图片筛选、时间筛选和剩余数量。筛选点开才展开。</string>
+    <string name="photo_guide_top_body">这里显示整理进度、图片筛选、时间筛选和剩余数量。筛选点开才展开。</string>
     <string name="photo_guide_card_title">中间照片卡片</string>
     <string name="photo_guide_card_body">点按图片进入大图；明显左右滑是保留，明显上下滑才会收藏或待删。斜向拖动不会轻易触发破坏性操作。</string>
+    <string name="photo_guide_pinch_title">双指捏合 · 那年今日</string>
+    <string name="photo_guide_pinch_body">在照片上双指捏合收缩，回到这张照片拍摄的那天；松手即可进入，回顾并整理当天的照片，按返回键退出。</string>
+    <string name="photo_guide_practice_hint">在屏幕上双指捏合试试</string>
+    <string name="photo_guide_practice_done">就是这样！</string>
+    <string name="photo_guide_practice_pending">捏合后继续</string>
     <string name="photo_guide_info_title">底部图片信息</string>
     <string name="photo_guide_info_body">这里集中显示拍摄时间、文件夹、类型、大小和剩余数量；点按信息条也能进入大图查看细节。</string>
     <string name="photo_guide_album_title">相册按钮</string>
@@ -209,11 +217,13 @@
     <string name="video_date_filter_title">视频时间筛选</string>
     <string name="video_archive_current_title">归档当前视频</string>
     <string name="video_guide_status_title">顶部视频状态栏</string>
-    <string name="video_guide_status_body">当前进度、待删数量和重新随机都在第一行，竖屏平板也不会被左侧 Dock 挤开。</string>
+    <string name="video_guide_status_body">整理进度、可释放空间和日期筛选都在顶部一行，点按随时切换整理范围。</string>
     <string name="video_guide_player_title">中间视频区域</string>
-    <string name="video_guide_player_body">单击视频区域可播放/暂停，左右滑切换沉浸观看和显示按钮；当前页才创建播放器，降低闪退和卡顿概率。</string>
+    <string name="video_guide_player_body">单击播放或暂停，上下滑切换上一个或下一个视频。</string>
+    <string name="video_guide_gesture_title">进阶手势</string>
+    <string name="video_guide_gesture_body">长按 2 倍速播放，松开恢复原速；左右滑快进或快退。</string>
     <string name="video_guide_actions_title">侧边操作栏</string>
-    <string name="video_guide_actions_body">播放/暂停只保留在侧边栏，保留、收藏、待删和分享集中在同一列，避免底部按钮与信息区重叠。</string>
+    <string name="video_guide_actions_body">保留、收藏、待删、分享和撤销集中在右侧一列，单手也能完成整理。</string>
     <string name="video_display_original">原比例</string>
     <string name="video_display_fullscreen">全屏</string>
     <string name="video_archive_label">指定归档</string>
@@ -276,6 +286,10 @@
     <string name="video_display_mode_fit_screen_desc">保留视频原始比例，横屏视频不会被强制竖屏裁切</string>
     <string name="video_display_mode_fill_width">铺满屏宽</string>
     <string name="video_display_mode_fill_width_desc">优先铺满屏幕宽度，适合横屏和混合素材</string>
+    <string name="video_display_mode_immersive_crop_short">裁切</string>
+    <string name="video_display_mode_fit_screen_short">原比例</string>
+    <string name="video_display_mode_fill_width_short">满宽</string>
+    <string name="video_display_mode_quick_action">切换显示方式，当前%1$s</string>
     <string name="haptic_level_off">关闭</string>
     <string name="haptic_level_light">轻微</string>
     <string name="haptic_level_medium">细腻</string>
@@ -380,6 +394,9 @@
     <string name="me_historical_freed">累计记录释放</string>
     <string name="me_estimated_freed">预计可释放</string>
     <string name="me_browsed">已浏览</string>
+    <string name="me_progress_label">全库浏览进度</string>
+    <string name="me_progress_value">%1$d%% · %2$d/%3$d 项</string>
+    <string name="me_progress_empty">暂无媒体</string>
     <string name="me_pending">待确认</string>
     <string name="me_viewed">浏览</string>
     <string name="me_releasable">预计释放</string>
@@ -706,6 +723,7 @@
     <string name="settings_help_content_title">使用帮助</string>
     <string name="settings_help_content_subtitle">按整理流程阅读即可，所有操作都围绕照片、视频、筛选和回收站展开。</string>
     <string-array name="settings_changelog_sections">
+        <item>v2.3.5 · 进阶筛选与横屏播放||新增照片和视频多条件筛选，支持连续浏览、照片缩放和长图阅读。|新增文件夹随机播放，支持包含子文件夹和重新播放当前列表。|播放器支持手动横竖屏切换、播放手势与状态恢复。|升级时迁移已有收藏、回收站和整理记录。</item>
         <item>v2.3.3 · 今日整理贴纸与导出||首页恢复当年今日和今日整理两个入口，今日整理以贴纸弹窗展示当天小结。|今日整理贴纸可导出为图片并通过系统分享，不需要额外存储权限。</item>
         <item>v2.3.2 · 照片卡组动画与队列稳定性||优化照片拖动、飞出和补牌动画，减少闪烁和突然跳位。|修复长图、截图和宽图的比例展示，并稳定整理动作后的队列补充。</item>
         <item>v2.2.9 · 动态照片、GIF、成就与发布优化||扫描支持 GIF、HEIC/HEIF/WEBP 动态线索和常见实况照片命名。|整理、收藏、回收站、时间线和预览统一支持 GIF 与实况播放。|相似照片检测、成就陈列柜、可释放空间提示和发布包裁剪同步升级。</item>
@@ -741,24 +759,13 @@
     <string-array name="settings_help_sections">
         <item>v2.2.5 · 记忆页、系统删除、视频暂停与后台检测||当年今日支持照片和视频混合记忆，视频支持暂停，回收站永久删除需系统确认，相似检测支持后台续接。</item>
         <item>1. 首次使用||授予照片和视频权限后，应用会从 MediaStore 建立本地索引。|数量不准确时，进入数据与更新并点击媒体库维护。</item>
-        <item>2. 定位式新手教程||首次进入整理页会在真实页面上指示顶部、中间区域、底部信息和操作按钮。|可在数据与更新中重新播放教程。</item>
-        <item>3. 照片整理||顶部按钮可保留当前图片，重新随机会生成新的队列。|图片和时间筛选支持全部、普通、截图、自拍、实况、长图与最近时间范围。|点按图片或信息栏可放大查看。</item>
-        <item>4. 手势操作||横向滑动用于保留，纵向滑动用于收藏或待删，方向可在设置中切换。|担心误触时可降低灵敏度或使用顶部按钮。</item>
+        <item>2. 定位式新手教程||首次进入整理页会在真实页面上指示顶部、中间区域、底部信息和操作按钮。|照片教程中的捏合一步需要实际做一次双指捏合才会继续，教程期间不会误动照片。|可在数据与更新中重新播放教程。</item>
+        <item>3. 照片整理||顶部显示进度、图片和时间筛选以及隐藏控件。|图片和时间筛选支持全部、普通、截图、自拍、实况、长图与最近时间范围。|点按图片或信息栏可放大查看。</item>
+        <item>4. 手势操作||横向滑动用于保留，纵向滑动用于收藏或待删，方向可在设置中切换。|在照片上双指捏合收缩，可进入"那年今日"回顾当天照片。|担心误触时可降低灵敏度或使用顶部按钮。</item>
         <item>5. 相册与排除文件夹||相册按钮用于选择归档目标，开启自动归档后保留或收藏可移动文件。|排除文件夹可让截图、下载等目录不进入队列。</item>
-        <item>6. 视频整理||视频整理采用上下刷视频。|顶部可重新随机，设置中可调整比例、默认静音和进度条。</item>
+        <item>6. 视频整理||视频整理采用上下刷视频。|顶部显示当前进度和筛选信息，设置中可调整比例、默认静音和进度条。</item>
         <item>7. 收藏与预览||收藏会集中显示照片和视频。|照片预览支持双击、双指缩放和拖动，底部提供相册查看、分享和待删。</item>
         <item>8. 回收站与撤销||误操作后优先使用撤销。|待删内容可在回收站恢复或永久删除，永久删除前请确认。</item>
         <item>9. 常见问题||队列数量不是相册总数，因为整理页使用连续缓冲并自动补充。|图片不显示时刷新媒体库并检查排除规则。|深色模式对比度异常时切换主题后重新进入页面。</item>
     </string-array>
-
-    <string name="onboarding_photo_bullet_4">可在设置里排除不想整理的文件夹</string>
-    <string name="onboarding_skip">跳过</string>
-    <string name="onboarding_page_counter">%1$d / %2$d</string>
-    <string name="photo_guide_pinch_title">双指捏合 · 那年今日</string>
-    <string name="photo_guide_pinch_body">在照片上双指捏合收缩，回到这张照片拍摄的那天；松手即可进入，回顾并整理当天的照片，按返回键退出。</string>
-    <string name="photo_guide_practice_hint">在屏幕上双指捏合试试</string>
-    <string name="photo_guide_practice_done">就是这样！</string>
-    <string name="photo_guide_practice_pending">捏合后继续</string>
-    <string name="video_guide_gesture_title">进阶手势</string>
-    <string name="video_guide_gesture_body">长按 2 倍速播放，松开恢复原速；左右滑快进或快退。</string>
 </resources>

@@ -48,6 +48,7 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.AspectRatio
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Folder
@@ -59,6 +60,7 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -184,7 +186,6 @@ fun VideoCleanScreen(
     val pagerState = rememberPagerState(pageCount = { videos.size.coerceAtLeast(1) })
     var lastAppliedShuffleSeed by remember { mutableStateOf(scope.randomSeed) }
     var lastSettledPage by remember { mutableIntStateOf(0) }
-    val dimAlpha by animateFloatAsState(targetValue = if (showGuide && videos.isNotEmpty()) 0.55f else 0f, label = "video_guide_dim")
 
     fun leaveCleaning() {
         viewModel.finishVideoCleaningSession(videos.getOrNull(pagerState.currentPage))
@@ -218,8 +219,8 @@ fun VideoCleanScreen(
         }
         lastSettledPage = pagerState.currentPage
     }
-    LaunchedEffect(videos, settings.videoGuideShown) {
-        showGuide = false
+    LaunchedEffect(videos.isNotEmpty(), settings.videoGuideShown) {
+        showGuide = videos.isNotEmpty() && !settings.videoGuideShown
     }
     LaunchedEffect(videos.size) {
         if (videos.isNotEmpty() && pagerState.currentPage >= videos.size) {
@@ -242,6 +243,7 @@ fun VideoCleanScreen(
     }
 
     fun performVideoAction(video: VideoEntity, action: SwipeAction) {
+        if (showGuide) return
         when (action) {
             SwipeAction.Keep -> haptics.keep()
             SwipeAction.Delete -> haptics.delete()
@@ -278,7 +280,8 @@ fun VideoCleanScreen(
         return
     }
 
-    val currentVideo = videos.getOrNull(pagerState.currentPage)
+    val currentVideoPage = pagerState.currentPage.coerceIn(0, videos.lastIndex)
+    val currentVideo = videos.getOrNull(currentVideoPage)
     val activeVideoPage = pagerState.targetPage.coerceIn(0, videos.lastIndex)
     val remainingVideos = (dashboard.videoCount - dashboard.processedVideoCount - pendingVideoKeeps.size)
         .coerceAtLeast(0)
@@ -300,15 +303,18 @@ fun VideoCleanScreen(
                 VerticalPager(
                     state = pagerState,
                     modifier = pagerModifier,
+                    userScrollEnabled = !showGuide,
                     beyondViewportPageCount = 1,
                     key = { page -> videos.getOrNull(page)?.mediaStoreId ?: page },
                 ) { page ->
                     val video = videos.getOrNull(page) ?: return@VerticalPager
+                    // Keep the last settled page alive until the pager finishes its transition. Its
+                    // player is paused by isCurrent, while its attached Surface holds the last frame.
                     VideoReelPage(
                         video = video,
                         settings = settings,
                         haptics = haptics,
-                        shouldPrepare = page == activeVideoPage,
+                        shouldPrepare = page == activeVideoPage || page == lastSettledPage,
                         isCurrent = page == activeVideoPage,
                         pageIndex = (dashboard.processedVideoCount + page + 1).coerceAtLeast(1),
                         total = dashboard.videoCount.coerceAtLeast(videos.size),
@@ -317,16 +323,19 @@ fun VideoCleanScreen(
                         chromeVisible = videoChromeVisible,
                         muted = videoMuted,
                         bottomContentPadding = bottomContentPadding,
+                        onToggleDisplayMode = { haptics.tick(); viewModel.toggleVideoDisplayModeQuick() },
                         onFavorite = { performVideoAction(video, SwipeAction.Favorite) },
                         onDelete = { performVideoAction(video, SwipeAction.Delete) },
                         onChromeVisibilityChange = { visible -> viewModel.setVideoChromeVisible(visible) },
                         onMuteChange = { muted -> sessionMuted = muted },
                         onUndo = {
-                            haptics.undo()
-                            val mediaStoreId = viewModel.undoVideoCleaningAction()
-                            if (mediaStoreId != null) {
-                                val index = videos.indexOfFirst { it.mediaStoreId == mediaStoreId }
-                                if (index >= 0) uiScope.launch { pagerState.animateScrollToPage(index) }
+                            if (!showGuide) {
+                                haptics.undo()
+                                val mediaStoreId = viewModel.undoVideoCleaningAction()
+                                if (mediaStoreId != null) {
+                                    val index = videos.indexOfFirst { it.mediaStoreId == mediaStoreId }
+                                    if (index >= 0) uiScope.launch { pagerState.animateScrollToPage(index) }
+                                }
                             }
                         },
                     )
@@ -335,7 +344,7 @@ fun VideoCleanScreen(
         }
 
         androidx.compose.animation.AnimatedVisibility(
-            visible = videoChromeVisible && (settings.videoShowTopBar || settings.videoShowFolderChips || settings.videoShowShuffleButton),
+            visible = videoChromeVisible && (settings.videoShowTopBar || settings.videoShowFolderChips),
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter),
@@ -348,7 +357,7 @@ fun VideoCleanScreen(
                     dateMode = scope.dateMode,
                     showProgress = settings.videoShowTopBar,
                     showFolderChips = settings.videoShowFolderChips,
-                    showShuffle = settings.videoShowShuffleButton,
+                    showShuffle = false,
                     onToggleDisplayMode = { haptics.tick(); viewModel.toggleVideoDisplayModeQuick() },
                     onDateClick = { haptics.tick(); showDatePicker = true },
                     onFolderClick = { haptics.tick(); showFolderPicker = true },
@@ -356,11 +365,8 @@ fun VideoCleanScreen(
                 )
         }
 
-        if (dimAlpha > 0.01f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dimAlpha)))
         androidx.compose.animation.AnimatedVisibility(visible = showGuide, modifier = Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                VideoGuideDialog(onDismiss = { haptics.tick(); showGuide = false; viewModel.markVideoGuideShown() })
-            }
+            VideoPositionGuideOverlay(onDismiss = { haptics.tick(); showGuide = false; viewModel.markVideoGuideShown() })
         }
         OrganizerDatePickerAnimatedOverlay(
             visible = showDatePicker,
@@ -414,6 +420,14 @@ private fun VideoPositionGuideOverlay(onDismiss: () -> Unit) {
             targetHeight = 500.dp,
         ),
         VideoPositionGuideStep(
+            title = R.string.video_guide_gesture_title,
+            body = R.string.video_guide_gesture_body,
+            targetAlignment = Alignment.Center,
+            cardAlignment = Alignment.TopCenter,
+            targetWidth = 320.dp,
+            targetHeight = 500.dp,
+        ),
+        VideoPositionGuideStep(
             title = R.string.video_guide_actions_title,
             body = R.string.video_guide_actions_body,
             targetAlignment = Alignment.CenterEnd,
@@ -424,6 +438,17 @@ private fun VideoPositionGuideOverlay(onDismiss: () -> Unit) {
         ),
     )
     val step = steps[stepIndex.coerceIn(0, steps.lastIndex)]
+    val guideAccent = Color(0xFF7CC6F2)
+    val guideCardColor = Color(0xFF090A0C).copy(alpha = 0.92f)
+    val guidePrimaryColors = ButtonDefaults.buttonColors(
+        containerColor = Color.White.copy(alpha = 0.92f),
+        contentColor = Color(0xFF08111C),
+    )
+    val guideQuietColors = ButtonDefaults.buttonColors(
+        containerColor = Color.White.copy(alpha = 0.10f),
+        contentColor = Color.White,
+    )
+    val guideQuietBorder = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.66f)))
         Box(
@@ -431,22 +456,36 @@ private fun VideoPositionGuideOverlay(onDismiss: () -> Unit) {
                 .align(step.targetAlignment)
                 .padding(step.targetPadding)
                 .size(width = step.targetWidth, height = step.targetHeight)
-                .border(2.dp, Color.White.copy(alpha = 0.86f), RoundedCornerShape(28.dp))
-                .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(28.dp)),
+                .border(2.dp, guideAccent.copy(alpha = 0.90f), RoundedCornerShape(28.dp))
+                .background(guideAccent.copy(alpha = 0.10f), RoundedCornerShape(28.dp)),
         )
         Surface(
             modifier = Modifier.align(step.cardAlignment).padding(horizontal = 22.dp, vertical = 42.dp).fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
-            color = Color.White.copy(alpha = 0.94f),
-            contentColor = Color.Black,
+            color = guideCardColor,
+            contentColor = Color.White,
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.photo_guide_step, stepIndex + 1, steps.size), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Text(stringResource(step.title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(stringResource(step.body), style = MaterialTheme.typography.bodyMedium, color = Color.Black.copy(alpha = 0.70f))
+                Text(stringResource(R.string.photo_guide_step, stepIndex + 1, steps.size), style = MaterialTheme.typography.labelLarge, color = guideAccent)
+                Text(stringResource(step.title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(stringResource(step.body), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.72f))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    if (stepIndex > 0) Button(onClick = { stepIndex -= 1 }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text(stringResource(R.string.onboarding_previous)) }
-                    Button(onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(999.dp)) { Text(stringResource(if (stepIndex < steps.lastIndex) R.string.onboarding_next else R.string.photo_guide_done)) }
+                    if (stepIndex > 0) {
+                        Button(
+                            onClick = { stepIndex -= 1 },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(999.dp),
+                            colors = guideQuietColors,
+                            border = guideQuietBorder,
+                        ) { Text(stringResource(R.string.onboarding_previous)) }
+                    }
+                    Button(
+                        onClick = { if (stepIndex < steps.lastIndex) stepIndex += 1 else onDismiss() },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(999.dp),
+                        colors = guidePrimaryColors,
+                    ) { Text(stringResource(if (stepIndex < steps.lastIndex) R.string.onboarding_next else R.string.photo_guide_done)) }
                 }
             }
         }
@@ -480,7 +519,7 @@ internal fun VideoOrganizerTopRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         VideoTopPill(
-            label = stringResource(if (displayMode == VideoDisplayMode.FIT_SCREEN) R.string.video_display_original else R.string.video_display_fullscreen),
+            label = stringResource(displayMode.labelRes),
             onClick = onToggleDisplayMode,
         )
         VideoTopPill(
@@ -559,6 +598,7 @@ private fun VideoReelPage(
     chromeVisible: Boolean,
     muted: Boolean,
     bottomContentPadding: Dp,
+    onToggleDisplayMode: () -> Unit,
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
     onChromeVisibilityChange: (Boolean) -> Unit,
@@ -659,12 +699,18 @@ private fun VideoReelPage(
     val videoSeekBackActionLabel = stringResource(R.string.a11y_video_seek_back)
     val videoSeekForwardActionLabel = stringResource(R.string.a11y_video_seek_forward)
 
+    val posterContentScale = when (settings.videoDisplayMode) {
+        VideoDisplayMode.IMMERSIVE_CROP -> ContentScale.Crop
+        VideoDisplayMode.FIT_SCREEN -> ContentScale.Fit
+        VideoDisplayMode.FILL_WIDTH -> ContentScale.FillWidth
+    }
+
     Box(Modifier.fillMaxSize()) {
         AsyncImage(
             model = playbackUri,
             contentDescription = video.displayName,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
+            contentScale = posterContentScale,
         )
         if (player != null && !playbackFailed) {
             AndroidView(
@@ -700,7 +746,7 @@ private fun VideoReelPage(
                 model = playbackUri,
                 contentDescription = video.displayName,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
+                contentScale = posterContentScale,
             )
         }
 
@@ -873,6 +919,7 @@ private fun VideoReelPage(
         ) {
             ReelActionRail(
                 muted = muted,
+                displayMode = settings.videoDisplayMode,
                 chromeVisible = chromeVisible,
                 sessionActionCount = sessionActionCount,
                 lastAction = lastAction,
@@ -884,6 +931,7 @@ private fun VideoReelPage(
                     haptics.tick()
                     onMuteChange(!muted)
                 },
+                onToggleDisplayMode = onToggleDisplayMode,
                 onFavorite = onFavorite,
                 onDelete = onDelete,
                 onUndo = onUndo,
@@ -1066,11 +1114,13 @@ private fun detailedVideoDate(timeMillis: Long): String? {
 @Composable
 private fun ReelActionRail(
     muted: Boolean,
+    displayMode: VideoDisplayMode,
     chromeVisible: Boolean,
     sessionActionCount: Int,
     lastAction: SwipeAction?,
     onToggleChrome: () -> Unit,
     onMute: () -> Unit,
+    onToggleDisplayMode: () -> Unit,
     onFavorite: () -> Unit,
     onDelete: () -> Unit,
     onUndo: () -> Unit,
@@ -1093,11 +1143,40 @@ private fun ReelActionRail(
                 onClick = onUndo,
             )
             ReelRailButton(if (chromeVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, stringResource(if (chromeVisible) R.string.video_action_hide else R.string.video_action_show), onToggleChrome)
+            VideoDisplayModeRailButton(displayMode, onToggleDisplayMode)
             ReelRailButton(if (muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp, stringResource(if (muted) R.string.video_action_mute else R.string.video_action_sound), onMute)
             ReelRailButton(Icons.Rounded.FavoriteBorder, stringResource(R.string.swipe_action_favorite), onFavorite)
             ReelRailButton(Icons.Rounded.Delete, stringResource(R.string.swipe_action_delete), onDelete)
             ReelRailButton(Icons.Rounded.Share, stringResource(R.string.a11y_share), onShare)
         }
+    }
+}
+
+@Composable
+private fun VideoDisplayModeRailButton(displayMode: VideoDisplayMode, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Surface(
+            modifier = Modifier.size(44.dp).focusable(),
+            shape = RoundedCornerShape(999.dp),
+            color = Color.White.copy(alpha = 0.12f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+            onClick = onClick,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Rounded.AspectRatio,
+                    contentDescription = stringResource(R.string.video_display_mode_quick_action, stringResource(displayMode.labelRes)),
+                    modifier = Modifier.size(22.dp),
+                    tint = Color.White,
+                )
+            }
+        }
+        Text(
+            stringResource(displayMode.compactLabelRes),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.90f),
+            maxLines = 1,
+        )
     }
 }
 

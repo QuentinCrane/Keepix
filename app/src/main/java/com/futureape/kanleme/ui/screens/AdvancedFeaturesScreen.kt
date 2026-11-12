@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalContentColor
@@ -87,7 +88,7 @@ internal fun AdvancedPage(
 }
 
 @Composable
-fun AdvancedFeaturesScreen(onBack: () -> Unit, onVideos: () -> Unit, onLicenses: () -> Unit) {
+fun AdvancedFeaturesScreen(onBack: () -> Unit, onPhotos: () -> Unit, onVideos: () -> Unit, onRandomVideos: () -> Unit, onLicenses: () -> Unit) {
     AdvancedPage(stringResource(R.string.advanced_title), onBack, stringResource(R.string.advanced_subtitle)) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp),
@@ -110,13 +111,31 @@ fun AdvancedFeaturesScreen(onBack: () -> Unit, onVideos: () -> Unit, onLicenses:
                 }
             }
             item {
+                ProfilePanel(Modifier.morphAnchor("advanced-random-video", 26.dp, color = ProfileScreenSurface,
+                    icon = Icons.Rounded.Shuffle, tint = ProfileScreenAccent).clickable(onClick = onRandomVideos)) {
+                    Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Icon(Icons.Rounded.Shuffle, contentDescription = null, modifier = Modifier.size(32.dp), tint = ProfileScreenAccent)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(stringResource(R.string.random_video_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.random_video_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            item {
                 Text(stringResource(R.string.advanced_photos), style = MaterialTheme.typography.titleLarge)
             }
             item {
-                ProfilePanel(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(Icons.Rounded.Image, contentDescription = null)
-                        Text(stringResource(R.string.advanced_photos_later), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                ProfilePanel(Modifier.morphAnchor("advanced-photo", 26.dp, color = ProfileScreenSurface,
+                    icon = Icons.Rounded.Image, tint = ProfileScreenAccent).clickable(onClick = onPhotos)) {
+                    Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Icon(Icons.Rounded.Image, contentDescription = null, modifier = Modifier.size(32.dp), tint = ProfileScreenAccent)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(stringResource(R.string.advanced_photo_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.advanced_photo_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }

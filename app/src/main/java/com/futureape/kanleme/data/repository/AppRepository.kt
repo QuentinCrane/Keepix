@@ -129,6 +129,13 @@ data class PermanentDeleteFinalization(
 )
 
 interface AppRepository {
+    suspend fun advancedPhotoFolders(): List<com.futureape.kanleme.data.media.PhotoFolder>
+    suspend fun prepareAdvancedPhotoAction(photo: com.futureape.kanleme.data.media.AdvancedPhoto, requireUnchanged: Boolean = true): PhotoEntity
+    suspend fun scanAdvancedPhotos(
+        folders: Set<com.futureape.kanleme.data.media.PhotoFolderKey>?,
+        includeSubfolders: Boolean = true,
+        onProgress: (Int) -> Unit,
+    ): List<com.futureape.kanleme.data.media.AdvancedPhoto>
     suspend fun advancedVideoFolders(): List<com.futureape.kanleme.data.media.VideoFolder>
     suspend fun prepareAdvancedVideoAction(video: com.futureape.kanleme.data.media.AdvancedVideo, requireUnchanged: Boolean = true): VideoEntity
     suspend fun scanAdvancedVideos(
@@ -159,7 +166,7 @@ interface AppRepository {
     suspend fun loadPhotoDeck(scope: CleaningScope): List<PhotoEntity>
     suspend fun loadVideoDeck(scope: CleaningScope): List<VideoEntity>
     suspend fun loadPhotoMemoryWindow(currentPhoto: PhotoEntity, dayCount: Int = 7, limit: Int = 420): List<PhotoEntity>
-    suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction, systemTrashAuthorized: Boolean = false): Long
+    suspend fun handlePhotoAction(photo: PhotoEntity, action: SwipeAction, systemTrashAuthorized: Boolean = false, appTrashOnly: Boolean = false): Long
     suspend fun handleVideoAction(video: VideoEntity, action: SwipeAction, systemTrashAuthorized: Boolean = false, appTrashOnly: Boolean = false): Long
     suspend fun createMediaAuthorizationRequest(
         kind: MediaOperationKind,

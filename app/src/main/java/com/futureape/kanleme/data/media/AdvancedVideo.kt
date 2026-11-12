@@ -23,6 +23,24 @@ data class AdvancedVideo(
     val mediaStoreId: Long get() = uri.substringAfterLast('/').toLong()
     val shortEdge: Int get() = minOf(width, height)
     val extension: String get() = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
+    /** Approximate total file bitrate; includes audio and container overhead. */
+    val estimatedAverageBitrateBps: Long?
+        get() {
+            if (sizeBytes <= 0L || durationMs <= 0L) return null
+            val estimate = sizeBytes.toDouble() * 8_000.0 / durationMs
+            return estimate.takeIf { it.isFinite() && it >= 1.0 }?.toLong()
+        }
+    /** SDR, standard-frame-rate reference bitrate by the shorter edge. */
+    val referenceBitrateBps: Long?
+        get() = when (shortEdge) {
+            in 360..479 -> 1_000_000L
+            in 480..719 -> 2_500_000L
+            in 720..1079 -> 5_000_000L
+            in 1080..1439 -> 8_000_000L
+            in 1440..2159 -> 16_000_000L
+            in 2160..Int.MAX_VALUE -> 35_000_000L
+            else -> null
+        }
 }
 
 fun normalizeAdvancedVideoMovePath(input: String): String? {
@@ -54,10 +72,11 @@ fun videoFolderInScope(folder: VideoFolderKey, selected: Set<VideoFolderKey>, in
 
 enum class VideoResolution { ALL, BELOW_HD, HD, FULL_HD, UHD, UNKNOWN }
 enum class VideoDuration { ALL, SHORT, MEDIUM, LONG, UNKNOWN }
+enum class VideoBitrateBand { ALL, VERY_LOW, LOW, REFERENCE, HIGH, UNKNOWN }
 enum class VideoOrientation { ALL, LANDSCAPE, PORTRAIT, SQUARE, UNKNOWN }
 enum class VideoFormat { ALL, MP4, MKV, WEBM, MOV, OTHER }
 enum class VideoDate { ALL, WEEK, MONTH, YEAR }
-enum class VideoSort { NEWEST, OLDEST, LARGEST, SMALLEST, RESOLUTION, DURATION, NAME }
+enum class VideoSort { NEWEST, OLDEST, LARGEST, SMALLEST, RESOLUTION, DURATION, BITRATE, NAME }
 
 data class VideoSizeRange(val minBytes: Long? = null, val maxBytes: Long? = null) {
     companion object {
@@ -78,6 +97,7 @@ data class VideoSizeRange(val minBytes: Long? = null, val maxBytes: Long? = null
 data class AdvancedVideoFilter(
     val query: String = "",
     val resolution: VideoResolution = VideoResolution.ALL,
+    val bitrateBand: VideoBitrateBand = VideoBitrateBand.ALL,
     val size: VideoSizeRange = VideoSizeRange(),
     val duration: VideoDuration = VideoDuration.ALL,
     val orientation: VideoOrientation = VideoOrientation.ALL,
@@ -96,6 +116,20 @@ data class AdvancedVideoFilter(
             VideoResolution.UHD -> edge >= 2160
             VideoResolution.UNKNOWN -> edge <= 0
         }) return false
+        if (bitrateBand != VideoBitrateBand.ALL) {
+            val bitrate = video.estimatedAverageBitrateBps
+            val reference = video.referenceBitrateBps
+            val halfReference = reference?.div(2L)
+            val highReference = reference?.let { it + it / 2L }
+            val actualBand = when {
+                bitrate == null || reference == null -> VideoBitrateBand.UNKNOWN
+                bitrate < requireNotNull(halfReference) -> VideoBitrateBand.VERY_LOW
+                bitrate < reference -> VideoBitrateBand.LOW
+                bitrate < requireNotNull(highReference) -> VideoBitrateBand.REFERENCE
+                else -> VideoBitrateBand.HIGH
+            }
+            if (actualBand != bitrateBand) return false
+        }
         if ((size.minBytes != null || size.maxBytes != null) && video.sizeBytes <= 0) return false
         if (size.minBytes != null && video.sizeBytes < size.minBytes) return false
         if (size.maxBytes != null && video.sizeBytes > size.maxBytes) return false
@@ -146,6 +180,7 @@ data class AdvancedVideoFilter(
             VideoSort.SMALLEST -> compareBy { it.sizeBytes }
             VideoSort.RESOLUTION -> compareByDescending { it.width.toLong() * it.height }
             VideoSort.DURATION -> compareByDescending { it.durationMs }
+            VideoSort.BITRATE -> compareByDescending<AdvancedVideo> { it.estimatedAverageBitrateBps ?: Long.MIN_VALUE }
             VideoSort.NAME -> Comparator { left: AdvancedVideo, right: AdvancedVideo ->
                 left.name.compareTo(right.name, ignoreCase = true)
             }

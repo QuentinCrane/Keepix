@@ -31,6 +31,9 @@ data class PhotoTypeStatsProjection(
 
 @Dao
 interface PhotoDao {
+    @androidx.room.Update
+    suspend fun updateMetadata(photo: PhotoEntity)
+
     @Query("""
         SELECT
             COUNT(*) AS all_count,
@@ -600,11 +603,11 @@ interface StatsDao {
         SELECT
             COALESCE(SUM(photo_delta), 0) AS photo_delta,
             COALESCE(SUM(video_delta), 0) AS video_delta,
-            COALESCE(SUM(CASE WHEN event_type IN ('kept', 'favorited', 'moved_to_app_trash', 'archived_moved') THEN affected_media_count ELSE 0 END), 0) AS cleaned_media_count,
+            COALESCE(SUM(CASE WHEN event_type IN ('kept', 'favorited', 'moved_to_app_trash', 'archived_moved', 'legacy_clean_action') THEN affected_media_count ELSE 0 END), 0) AS cleaned_media_count,
             COALESCE(SUM(favorite_delta), 0) AS favorite_delta,
             COALESCE(SUM(CASE WHEN event_type = 'favorited' AND favorite_delta > 0 THEN favorite_delta ELSE 0 END), 0) AS favorite_action_count,
             COALESCE(SUM(size_delta_bytes), 0) AS size_delta_bytes,
-            COALESCE(SUM(CASE WHEN event_type = 'moved_to_app_trash' THEN size_delta_bytes ELSE 0 END), 0) AS marked_size_bytes,
+            COALESCE(SUM(CASE WHEN event_type IN ('moved_to_app_trash', 'legacy_clean_action') THEN size_delta_bytes ELSE 0 END), 0) AS marked_size_bytes,
             COALESCE(SUM(action_count), 0) AS action_count,
             COALESCE(SUM(CASE WHEN event_type IN ('restored', 'compensated') THEN action_count ELSE 0 END), 0) AS undo_count
         FROM cleanup_events
@@ -636,14 +639,14 @@ interface StatsDao {
         FROM cleanup_events
         WHERE occurred_at >= :startMillis AND occurred_at < :endMillis
           AND folder_path IS NOT NULL AND folder_path != ''
-          AND event_type IN ('kept', 'favorited', 'moved_to_app_trash', 'archived_moved')
+          AND event_type IN ('kept', 'favorited', 'moved_to_app_trash', 'archived_moved', 'legacy_clean_action')
         GROUP BY folder_path
         ORDER BY affected_count DESC, folder_path ASC
         LIMIT 1
     """)
     suspend fun topFolderForPeriod(startMillis: Long, endMillis: Long): CleanupEventFolderAggregate?
 
-    @Query("SELECT DISTINCT local_date FROM cleanup_events WHERE event_type IN ('kept', 'favorited', 'moved_to_app_trash', 'archived_moved') AND affected_media_count > 0 AND action_count > 0 ORDER BY local_date")
+    @Query("SELECT DISTINCT local_date FROM cleanup_events WHERE event_type IN ('kept', 'favorited', 'moved_to_app_trash', 'archived_moved', 'legacy_clean_action') AND affected_media_count > 0 AND action_count > 0 ORDER BY local_date")
     suspend fun qualifyingCleanupDates(): List<String>
 
     @Query("SELECT * FROM achievement_progress WHERE achievement_id = :achievementId LIMIT 1")

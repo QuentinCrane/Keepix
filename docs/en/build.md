@@ -2,7 +2,7 @@
 
 Use Android Studio or the Gradle Wrapper from the project root.
 
-The current app version is `2.3.4`, `versionCode` is `60`, `minSdk = 30`, and both `compileSdk` and `targetSdk` are `36`.
+The current app version is `2.3.5`, `versionCode` is `61`, `minSdk = 30`, and both `compileSdk` and `targetSdk` are `36`.
 
 ## Debug Build
 

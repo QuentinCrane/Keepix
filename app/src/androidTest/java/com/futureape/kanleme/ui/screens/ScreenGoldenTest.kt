@@ -193,6 +193,7 @@ class ScreenGoldenTest {
     private fun assertHomeGolden(surface: String, theme: String, themeMode: ThemeMode) = assertScreenGolden("home", surface, theme, themeMode) { viewModel ->
         CleanHomeScreen(
             viewModel = viewModel,
+            isActive = true,
             contentPadding = PaddingValues(),
             onPhoto = {},
             onVideo = {},

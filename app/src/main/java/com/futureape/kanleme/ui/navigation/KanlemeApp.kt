@@ -16,6 +16,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -60,8 +62,8 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.futureape.kanleme.R
-import com.futureape.kanleme.ui.components.FloatingGlassNav
 import com.futureape.kanleme.ui.components.FloatingGlassRail
+import com.futureape.kanleme.ui.components.FloatingGlassNav
 import com.futureape.kanleme.ui.components.LiquidBackground
 import com.futureape.kanleme.ui.components.LocalMorphRegistry
 import com.futureape.kanleme.ui.components.LocalMorphOwner
@@ -74,6 +76,8 @@ import com.futureape.kanleme.ui.screens.FavoritesScreen
 import com.futureape.kanleme.ui.screens.MeScreen
 import com.futureape.kanleme.ui.screens.AdvancedFeaturesScreen
 import com.futureape.kanleme.ui.screens.AdvancedVideoScreen
+import com.futureape.kanleme.ui.screens.RandomVideoFolderScreen
+import com.futureape.kanleme.ui.screens.AdvancedPhotoScreen
 import com.futureape.kanleme.ui.screens.AdvancedLicensesScreen
 import com.futureape.kanleme.ui.screens.MediaPermissionGate
 import com.futureape.kanleme.ui.screens.OnboardingScreen
@@ -182,15 +186,32 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 startDestination = Destinations.HOME,
                 modifier = Modifier.fillMaxSize()
                     .background(transitionBackdrop),
-                enterTransition = { EnterTransition.None },
-                exitTransition = { ExitTransition.None },
-                popEnterTransition = { EnterTransition.None },
-                popExitTransition = { ExitTransition.None },
+                enterTransition = {
+                    val direction = primaryTabDirection(initialState.destination.route, targetState.destination.route)
+                    if (direction == null) EnterTransition.None
+                    else slideInHorizontally(animationSpec = tween(260)) { direction * it }
+                },
+                exitTransition = {
+                    val direction = primaryTabDirection(initialState.destination.route, targetState.destination.route)
+                    if (direction == null) ExitTransition.None
+                    else slideOutHorizontally(animationSpec = tween(260)) { -direction * it }
+                },
+                popEnterTransition = {
+                    val direction = primaryTabDirection(initialState.destination.route, targetState.destination.route)
+                    if (direction == null) EnterTransition.None
+                    else slideInHorizontally(animationSpec = tween(260)) { direction * it }
+                },
+                popExitTransition = {
+                    val direction = primaryTabDirection(initialState.destination.route, targetState.destination.route)
+                    if (direction == null) ExitTransition.None
+                    else slideOutHorizontally(animationSpec = tween(260)) { -direction * it }
+                },
             ) {
-                morphComposable(Destinations.HOME) {
+                morphComposable(Destinations.HOME, morphEnabled = false) {
                     CleanHomeScreen(
                         viewModel = viewModel,
                         contentPadding = PaddingValues(bottom = homeBottomPadding),
+                        isActive = current == Destinations.HOME,
                         onPhoto = {
                             viewModel.startPhotoCleaningSession()
                             navController.navigate(Destinations.PHOTO)
@@ -221,7 +242,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                         )
                     }
                 }
-                morphComposable(Destinations.VIDEO) {
+                morphComposable(Destinations.VIDEO, morphEnabled = false) {
                     VideoCleanScreen(
                         viewModel,
                         bottomContentPadding = if (useSideRail) 28.dp else 112.dp,
@@ -249,7 +270,7 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                     )
                 }
                 morphComposable(Destinations.SIMILAR) { SimilarPhotosScreen(viewModel, onBack = { navController.popBackStack() }, onOpenPhoto = { id -> navController.navigate(Destinations.photoViewer(id)) }) }
-                morphComposable(Destinations.ME) {
+                morphComposable(Destinations.ME, morphEnabled = false) {
                     MeScreen(
                         viewModel = viewModel,
                         contentPadding = PaddingValues(bottom = homeBottomPadding),
@@ -271,12 +292,20 @@ fun KanlemeApp(initialShortcutTarget: String?, shortcutNonce: Long = 0L, viewMod
                 morphComposable(Destinations.ADVANCED) {
                     AdvancedFeaturesScreen(
                         onBack = { navController.popBackStack() },
+                        onPhotos = { navController.navigate(Destinations.ADVANCED_PHOTO) },
                         onVideos = { navController.navigate(Destinations.ADVANCED_VIDEO) },
+                        onRandomVideos = { navController.navigate(Destinations.ADVANCED_RANDOM_VIDEO) },
                         onLicenses = { navController.navigate(Destinations.OPEN_SOURCE) },
                     )
                 }
+                morphComposable(Destinations.ADVANCED_PHOTO) {
+                    AdvancedPhotoScreen(viewModel, onBack = { navController.popBackStack() })
+                }
                 morphComposable(Destinations.ADVANCED_VIDEO) {
                     AdvancedVideoScreen(viewModel, onBack = { navController.popBackStack() })
+                }
+                morphComposable(Destinations.ADVANCED_RANDOM_VIDEO) {
+                    RandomVideoFolderScreen(viewModel, onBack = { navController.popBackStack() })
                 }
                 morphComposable(Destinations.OPEN_SOURCE) {
                     AdvancedLicensesScreen(onBack = { navController.popBackStack() })
@@ -437,22 +466,40 @@ private fun NonBlockingStatusChip(
     }
 }
 
+private fun primaryTabDirection(fromRoute: String?, toRoute: String?): Int? {
+    fun index(route: String?): Int? = when (route) {
+        Destinations.HOME -> 0
+        Destinations.VIDEO -> 1
+        Destinations.ME -> 2
+        else -> null
+    }
+    val from = index(fromRoute) ?: return null
+    val to = index(toRoute) ?: return null
+    return when {
+        from == to -> null
+        to > from -> 1
+        else -> -1
+    }
+}
+
 private fun NavGraphBuilder.morphComposable(
     route: String,
     arguments: List<NamedNavArgument> = emptyList(),
+    morphEnabled: Boolean = true,
     content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit,
 ) {
     composable(route = route, arguments = arguments) { entry ->
         val animatedScope = this
         val background = if (route in setOf(Destinations.PHOTO, Destinations.VIDEO, Destinations.VIEWER,
-                Destinations.ADVANCED, Destinations.ADVANCED_VIDEO, Destinations.OPEN_SOURCE))
+                Destinations.ADVANCED, Destinations.ADVANCED_PHOTO, Destinations.ADVANCED_VIDEO, Destinations.ADVANCED_RANDOM_VIDEO, Destinations.OPEN_SOURCE))
             Color.Black else MaterialTheme.colorScheme.background
         val window = LocalWindowInfo.current.containerSize
         val density = LocalDensity.current
         val useRail = with(density) { window.width.toDp() >= 840.dp } && window.width > window.height &&
             route in setOf(Destinations.HOME, Destinations.ME)
         // Keep the morph's coordinate space fixed when a destination changes navigation chrome.
-        MorphDestination(entry.id, animatedScope, background, imageDestination = route == Destinations.VIEWER) {
+        MorphDestination(entry.id, animatedScope, background, imageDestination = route == Destinations.VIEWER,
+            morphEnabled = morphEnabled) {
             Box(Modifier.fillMaxSize().padding(start = if (useRail) 92.dp else 0.dp)) { content(animatedScope, entry) }
         }
     }

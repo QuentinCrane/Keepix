@@ -3,6 +3,10 @@ package com.futureape.kanleme.data.repository
 import androidx.room.withTransaction
 import com.futureape.kanleme.data.media.AdvancedVideoScanner
 import com.futureape.kanleme.data.media.AdvancedVideo
+import com.futureape.kanleme.data.media.AdvancedPhotoScanner
+import com.futureape.kanleme.data.media.AdvancedPhoto
+import com.futureape.kanleme.data.media.PhotoFolder
+import com.futureape.kanleme.data.media.PhotoFolderKey
 import com.futureape.kanleme.data.media.VideoFolder
 import com.futureape.kanleme.data.media.VideoFolderKey
 import com.futureape.kanleme.data.local.AppDatabase
@@ -67,7 +71,69 @@ class AppRepositoryImpl @Inject constructor(
     private val settingsRepository: AppSettingsRepository,
     private val similarPhotoAnalyzer: SimilarPhotoAnalyzer,
     private val advancedVideoScanner: AdvancedVideoScanner,
+    private val advancedPhotoScanner: AdvancedPhotoScanner,
 ) : AppRepository {
+    override suspend fun advancedPhotoFolders(): List<PhotoFolder> = advancedPhotoScanner.folders()
+    override suspend fun scanAdvancedPhotos(
+        folders: Set<PhotoFolderKey>?, includeSubfolders: Boolean, onProgress: (Int) -> Unit,
+    ): List<AdvancedPhoto> = withContext(Dispatchers.IO) {
+        val scanned = advancedPhotoScanner.scan(folders, includeSubfolders, onProgress)
+        val trashed = scanned.map { it.mediaStoreId }.chunked(SQLITE_BIND_BATCH_SIZE)
+            .flatMap { photoDao.byMediaStoreIds(it) }.filter { it.deletionStatus != DeletionStatus.NONE }
+            .mapTo(mutableSetOf()) { it.mediaStoreId }
+        scanned.filterNot { it.mediaStoreId in trashed }
+    }
+
+    override suspend fun prepareAdvancedPhotoAction(photo: AdvancedPhoto, requireUnchanged: Boolean): PhotoEntity = withContext(Dispatchers.IO) {
+        val fresh = scanner.scanImages(limit = 1, itemUri = photo.uri).singleOrNull()
+            ?: throw IllegalStateException("照片已移除或无法读取，请重新扫描")
+        if (requireUnchanged) check(fresh.displayName == photo.name && fresh.size == photo.sizeBytes &&
+            fresh.folderPath == photo.folder.relativePath &&
+            (photo.dateModifiedMs <= 0L || fresh.dateModified * 1000L == photo.dateModifiedMs)) {
+            "照片信息已变化，请重新扫描后再操作"
+        }
+        db.withTransaction {
+            val old = photoDao.byMediaStoreIds(listOf(fresh.mediaStoreId)).singleOrNull()
+            if (old != null) {
+                val oldUri = if (old.uri == fresh.uri) old.uri else
+                    scanner.scanImages(limit = 1, itemUri = old.uri).singleOrNull()?.uri
+                check(oldUri == fresh.uri && (old.dateAdded <= 0L || fresh.dateAdded <= 0L || old.dateAdded == fresh.dateAdded)) {
+                    "照片身份已变化，请刷新媒体库后重试"
+                }
+                check(old.deletionStatus == DeletionStatus.NONE) { "照片已经在回收站中" }
+                val merged = old.copy(
+                    stableMediaKey = fresh.stableMediaKey,
+                    uri = fresh.uri,
+                    displayName = fresh.displayName,
+                    size = fresh.size,
+                    dateTaken = fresh.dateTaken,
+                    dateAdded = fresh.dateAdded,
+                    dateModified = fresh.dateModified,
+                    relativePath = fresh.relativePath,
+                    folderPath = fresh.folderPath,
+                    folderName = fresh.folderName,
+                    mimeType = fresh.mimeType,
+                    width = fresh.width,
+                    height = fresh.height,
+                    isMotionPhoto = fresh.isMotionPhoto,
+                    isGif = fresh.isGif,
+                    isRaw = fresh.isRaw,
+                    isLongImage = fresh.isLongImage,
+                    isScreenshot = fresh.isScreenshot,
+                    isSelfie = fresh.isSelfie,
+                    motionPhotoNeedsDetection = fresh.motionPhotoNeedsDetection,
+                    missingSince = null,
+                    updatedAt = System.currentTimeMillis(),
+                )
+                photoDao.updateMetadata(merged)
+                merged
+            } else {
+                photoDao.upsertAll(listOf(fresh))
+                requireNotNull(photoDao.byMediaStoreIds(listOf(fresh.mediaStoreId)).singleOrNull())
+            }
+        }
+    }
+
     override suspend fun advancedVideoFolders(): List<VideoFolder> = advancedVideoScanner.folders()
     override suspend fun scanAdvancedVideos(
         folders: Set<VideoFolderKey>?, includeSubfolders: Boolean, onProgress: (Int) -> Unit,
@@ -766,10 +832,11 @@ class AppRepositoryImpl @Inject constructor(
         photo: PhotoEntity,
         action: SwipeAction,
         systemTrashAuthorized: Boolean,
+        appTrashOnly: Boolean,
     ): Long = withContext(Dispatchers.IO) {
         val settings = if (action == SwipeAction.Delete) settingsRepository.settings.first() else null
         val systemTrashRequested = action == SwipeAction.Delete &&
-            (settings?.deleteMode == DeleteMode.SYSTEM_TRASH || systemTrashAuthorized)
+            !appTrashOnly && (settings?.deleteMode == DeleteMode.SYSTEM_TRASH || systemTrashAuthorized)
         if (systemTrashRequested && !systemTrashAuthorized) {
             throw IllegalStateException("系统回收站操作需要先完成用户确认")
         }

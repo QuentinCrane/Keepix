@@ -30,6 +30,8 @@
 
 撤销只追加 `restored` 或 `compensated` 事件并标记原操作已撤销，绝不删除历史事件。这样同一序列在日报、成就和年度窗口内可以对账。
 
+从数据库版本 13～17 升级时，旧版 `cleanup_events` 原表会保留，旧事件同时转换到当前账本。能够匹配操作记录的事件按原操作类型转换；缺少操作记录时使用 `legacy_clean_action`，保留旧版已有的照片数、视频数、体积、时间和来源，不凭空推断收藏或文件夹信息。因此旧事件中未记录的细节不能完整补回。
+
 ## 成就与连续天数
 
 - “累计整理”使用 `kept`、`favorited`、`moved_to_app_trash` 和 `archived_moved` 的 `affectedMediaCount`，不读取当前待删数量

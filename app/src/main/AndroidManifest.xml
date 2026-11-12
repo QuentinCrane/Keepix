@@ -86,6 +86,10 @@
             android:windowSoftInputMode="adjustResize"
             tools:targetApi="33"
             android:enableOnBackInvokedCallback="true">
+            <!-- Android 16 otherwise ignores the player's explicit rotation on large screens. -->
+            <property
+                android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
+                android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

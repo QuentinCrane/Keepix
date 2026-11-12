@@ -282,6 +282,10 @@
     <string name="video_display_mode_fit_screen_desc">Keep the original video ratio; landscape videos are not forced into portrait crop</string>
     <string name="video_display_mode_fill_width">Fill width</string>
     <string name="video_display_mode_fill_width_desc">Prefer filling screen width, good for landscape and mixed media</string>
+    <string name="video_display_mode_immersive_crop_short">Crop</string>
+    <string name="video_display_mode_fit_screen_short">Fit</string>
+    <string name="video_display_mode_fill_width_short">Width</string>
+    <string name="video_display_mode_quick_action">Change display mode, currently %1$s</string>
     <string name="haptic_level_off">Off</string>
     <string name="haptic_level_light">Light</string>
     <string name="haptic_level_medium">Medium</string>
@@ -380,6 +384,9 @@
     <string name="me_historical_freed">Recorded space freed</string>
     <string name="me_estimated_freed">Estimated space freed</string>
     <string name="me_browsed">Viewed</string>
+    <string name="me_progress_label">Library browsing</string>
+    <string name="me_progress_value">%1$d%% · %2$d/%3$d items</string>
+    <string name="me_progress_empty">No media</string>
     <string name="me_pending">Awaiting review</string>
     <string name="me_viewed">Viewed</string>
     <string name="me_releasable">Space to free</string>
@@ -706,6 +713,7 @@
     <string name="settings_help_content_title">Help</string>
     <string name="settings_help_content_subtitle">Follow the cleaning flow; every action centers on photos, videos, filters and the trash.</string>
     <string-array name="settings_changelog_sections">
+        <item>v2.3.5 · Advanced filters and landscape playback||Filter photos and videos, browse matching results, and zoom or read long images. |Play videos in a selected folder in random order, including subfolders if desired. |Switch the player orientation manually and keep playback state when rotating. |Existing favorites, trash entries, and cleanup records are migrated on upgrade.</item>
         <item>v2.3.3 · Daily summary stickers and export||The home page restores Today in History and Daily Summary as separate entries. Daily Summary opens as a sticker dialog. |Daily Summary stickers can be exported and shared without storage permission.</item>
         <item>v2.3.2 · Photo deck animation and queue stability||Improved drag, fly-out and refill animations to reduce flashes and jumps. |Fixed aspect handling for long, screenshot and wide photos and stabilized queue refill after actions.</item>
         <item>v2.2.9 · Motion photos, GIFs, achievements and release polish||Scanning recognizes GIF, HEIC/HEIF/WEBP motion clues and common motion-photo names. |Cleaning, favorites, trash, timeline and previews share GIF and motion playback support. |Similarity detection, the achievement cabinet, reclaimable-space hints and release shrinking were upgraded.</item>

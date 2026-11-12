@@ -2,7 +2,7 @@
 
 建议直接使用 Android Studio，或在项目根目录通过 Gradle Wrapper 构建。Windows 使用 `gradlew.bat`，macOS / Linux 使用 `./gradlew`。
 
-当前应用版本为 `2.3.4`，`versionCode` 为 `60`，`minSdk = 30`，`compileSdk = 36`，`targetSdk = 36`。
+当前应用版本为 `2.3.5`，`versionCode` 为 `61`，`minSdk = 30`，`compileSdk = 36`，`targetSdk = 36`。
 
 ```powershell
 .\gradlew.bat :app:assembleDebug

@@ -4,6 +4,8 @@ import com.futureape.kanleme.ui.components.morphAnchor
 
 import android.net.Uri
 import android.os.SystemClock
+import android.view.LayoutInflater
+import androidx.core.view.doOnLayout
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -128,9 +130,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -138,8 +142,6 @@ import androidx.media3.ui.PlayerView
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
-
-private val PositionGuideAccent = Color(0xFF8FA8FF)
 
 @Composable
 fun ScreenHeader(title: String, subtitle: String? = null, onBack: (() -> Unit)? = null) {
@@ -505,6 +507,7 @@ fun SwipePhotoCard(
     val photoRatio = remember(photo.id, photo.width, photo.height, photo.exifWidth, photo.exifHeight, photo.exifOrientation) { photoDisplayAspectRatio(photo) }
     val canInlinePlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
     var inlineMotionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
+    var inlineMotionFirstFrameRendered by remember(photo.id) { mutableStateOf(false) }
     var inlineMotionLoading by remember(photo.id) { mutableStateOf(false) }
     var inlineMotionUnavailable by remember(photo.id) { mutableStateOf(false) }
     var inlineMotionManualHint by remember(photo.id) { mutableStateOf(false) }
@@ -545,6 +548,7 @@ fun SwipePhotoCard(
             return
         }
         inlineMotionLoading = true
+        inlineMotionFirstFrameRendered = false
         inlineMotionUnavailable = false
         inlineMotionManualHint = manual
         when (val source = resolveMotionPhotoPlaybackSource(context, photo)) {
@@ -562,6 +566,7 @@ fun SwipePhotoCard(
 
     LaunchedEffect(photo.id, canInlinePlayMotion) {
         inlineMotionSource = null
+        inlineMotionFirstFrameRendered = false
         inlineMotionUnavailable = false
         inlineMotionLoading = false
         inlineMotionManualHint = canInlinePlayMotion
@@ -862,14 +867,43 @@ fun SwipePhotoCard(
         ) {
             val motionPreview = inlineMotionSource
             if (motionPreview != null) {
+                PhotoFitImageWithSoftFill(
+                    photo = photo,
+                    modifier = Modifier.fillMaxSize(),
+                    contentDescription = null,
+                )
                 InlineMotionPhotoPlayer(
                     uri = motionPreview.uri,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().graphicsLayer {
+                        alpha = if (inlineMotionFirstFrameRendered) 1f else 0f
+                    },
                     playOnce = true,
-                    onEnded = { inlineMotionSource = null; inlineMotionManualHint = true },
+                    onFirstFrame = { inlineMotionFirstFrameRendered = true },
+                    onEnded = {
+                        inlineMotionSource = null
+                        inlineMotionFirstFrameRendered = false
+                        inlineMotionManualHint = true
+                    },
+                    onPlaybackError = {
+                        inlineMotionSource = null
+                        inlineMotionFirstFrameRendered = false
+                        inlineMotionUnavailable = true
+                        inlineMotionManualHint = true
+                    },
                 )
             } else {
                 PhotoFitImageWithSoftFill(photo = photo, modifier = Modifier.fillMaxSize(), contentDescription = photo.displayName)
+            }
+            val waitingForMotionFrame = motionPreview != null && !inlineMotionFirstFrameRendered
+            if (canInlinePlayMotion && (inlineMotionLoading || waitingForMotionFrame || inlineMotionUnavailable)) {
+                InlineMotionStatusPill(
+                    isVisible = true,
+                    isPlaying = false,
+                    isLoading = inlineMotionLoading || waitingForMotionFrame,
+                    isUnavailable = inlineMotionUnavailable,
+                    manualHint = false,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+                )
             }
             if (canInlinePlayMotion && motionPreview == null) {
                 MotionPhotoTinyIcon(Modifier.align(Alignment.TopStart).padding(14.dp))
@@ -993,12 +1027,15 @@ fun InlineMotionPhotoPlayer(
     modifier: Modifier = Modifier,
     playOnce: Boolean = true,
     onEnded: () -> Unit = {},
+    onFirstFrame: () -> Unit = {},
+    onPlaybackError: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val player = remember(uri, playOnce) {
         ExoPlayer.Builder(context).build().apply {
             repeatMode = if (playOnce) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ONE
-            playWhenReady = true
+            // Start only after AndroidView has attached and laid out the video surface.
+            playWhenReady = false
             setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -1012,11 +1049,22 @@ fun InlineMotionPhotoPlayer(
             prepare()
         }
     }
+    val startPlaybackOnce = remember(player) { AtomicBoolean(false) }
     val currentOnEnded by rememberUpdatedState(onEnded)
+    val currentOnFirstFrame by rememberUpdatedState(onFirstFrame)
+    val currentOnPlaybackError by rememberUpdatedState(onPlaybackError)
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playOnce && playbackState == Player.STATE_ENDED) currentOnEnded()
+            }
+
+            override fun onRenderedFirstFrame() {
+                currentOnFirstFrame()
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                currentOnPlaybackError()
             }
         }
         player.addListener(listener)
@@ -1029,16 +1077,23 @@ fun InlineMotionPhotoPlayer(
     AndroidView(
         modifier = modifier.background(Color.Black),
         factory = { ctx ->
-            PlayerView(ctx).apply {
-                useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                this.player = player
-            }
+            LayoutInflater.from(ctx).inflate(R.layout.inline_motion_photo_player, null, false) as PlayerView
         },
         update = { view ->
-            view.player = player
+            if (view.player !== player) view.player = player
             view.useController = false
             view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            if (startPlaybackOnce.compareAndSet(false, true)) {
+                view.doOnLayout {
+                    view.post {
+                        if (view.isAttachedToWindow && view.player === player && player.playbackState != Player.STATE_ENDED) {
+                            player.playWhenReady = true
+                        } else if (view.player !== player) {
+                            startPlaybackOnce.set(false)
+                        }
+                    }
+                }
+            }
         },
     )
 }
@@ -1293,78 +1348,6 @@ private fun ProgressBubble(value: Int) {
 private fun RailIcon(icon: ImageVector, description: String, onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.size(54.dp)) {
         Icon(icon, contentDescription = description, tint = Color.White, modifier = Modifier.size(28.dp))
-    }
-}
-
-@Composable
-fun PhotoGuideDialog(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(0.86f),
-        shape = RoundedCornerShape(34.dp),
-        color = Color(0xFF101923).copy(alpha = 0.96f),
-        contentColor = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
-        shadowElevation = 0.dp,
-    ) {
-        Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(R.string.guide_title), style = MaterialTheme.typography.headlineSmall, color = Color.White)
-            Spacer(Modifier.height(22.dp))
-            GuideRow(Icons.Rounded.Visibility, stringResource(R.string.photo_guide_card_title), stringResource(R.string.photo_guide_card_body))
-            GuideRow(Icons.Rounded.Visibility, stringResource(R.string.guide_double_tap), stringResource(R.string.guide_toggle_chrome))
-            GuideRow(Icons.Rounded.MoreHoriz, stringResource(R.string.guide_undo_title), stringResource(R.string.guide_undo_body))
-            GuideRow(Icons.Rounded.Folder, stringResource(R.string.photo_guide_album_title), stringResource(R.string.photo_guide_album_body))
-            Spacer(Modifier.height(16.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onDismiss),
-                shape = RoundedCornerShape(16.dp),
-                color = PositionGuideAccent,
-            ) { Box(contentAlignment = Alignment.Center) { Text(stringResource(R.string.photo_guide_done), color = Color(0xFF08111C), style = MaterialTheme.typography.titleMedium) } }
-        }
-    }
-}
-
-@Composable
-fun VideoGuideDialog(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(0.86f),
-        shape = RoundedCornerShape(34.dp),
-        color = Color(0xFF101923).copy(alpha = 0.96f),
-        contentColor = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
-        shadowElevation = 0.dp,
-    ) {
-        Column(Modifier.padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(R.string.guide_title), style = MaterialTheme.typography.headlineSmall, color = Color.White)
-            Spacer(Modifier.height(22.dp))
-            GuideRow(Icons.Rounded.Swipe, stringResource(R.string.video_guide_swipe_vertical), stringResource(R.string.video_guide_swipe_vertical_body))
-            GuideRow(Icons.Rounded.Swipe, stringResource(R.string.video_guide_swipe_horizontal), stringResource(R.string.video_guide_swipe_horizontal_body))
-            GuideRow(Icons.Rounded.MoreHoriz, stringResource(R.string.video_guide_long_press), stringResource(R.string.video_guide_long_press_body))
-            GuideRow(Icons.Rounded.Visibility, stringResource(R.string.guide_double_tap), stringResource(R.string.guide_toggle_chrome))
-            Spacer(Modifier.height(16.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onDismiss),
-                shape = RoundedCornerShape(16.dp),
-                color = PositionGuideAccent,
-            ) { Box(contentAlignment = Alignment.Center) { Text(stringResource(R.string.video_guide_done), color = Color(0xFF08111C), style = MaterialTheme.typography.titleMedium) } }
-        }
-    }
-}
-
-@Composable
-private fun GuideRow(icon: ImageVector, title: String, text: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Surface(
-            modifier = Modifier.size(56.dp),
-            shape = RoundedCornerShape(14.dp),
-            color = PositionGuideAccent.copy(alpha = 0.14f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
-        ) {
-            Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = PositionGuideAccent) }
-        }
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = Color.White)
-            Text(text, style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.70f))
-        }
     }
 }
 

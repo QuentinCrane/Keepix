@@ -82,6 +82,9 @@ import com.futureape.kanleme.R
 import com.futureape.kanleme.ui.util.formatSize
 import com.futureape.kanleme.ui.util.MotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.photoImageRequest
+import com.futureape.kanleme.ui.util.photoContentUri
+import com.futureape.kanleme.ui.components.LongImageViewer
+import com.futureape.kanleme.ui.components.isLongImageCandidate
 import com.futureape.kanleme.ui.util.resolveMotionPhotoPlaybackSource
 import com.futureape.kanleme.ui.util.photoMediaKindLabel
 import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
@@ -181,12 +184,15 @@ fun PhotoViewerScreen(
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val photo = photos[page]
+            val onZoomChanged: (Boolean) -> Unit = { isZoomed ->
+                if (page == pagerState.currentPage) {
+                    zoomedPhotoId = if (isZoomed) photo.id else null
+                }
+            }
             ZoomableViewerPhoto(
                 photo = photo,
                 modifier = Modifier.fillMaxSize(),
-                onZoomChanged = { isZoomed ->
-                    zoomedPhotoId = if (isZoomed) photo.id else null
-                },
+                onZoomChanged = onZoomChanged,
             )
         }
 
@@ -363,9 +369,26 @@ private fun ZoomableViewerPhoto(
     var motionSource by remember(photo.id) { mutableStateOf<MotionPhotoPlaybackSource.Ready?>(null) }
     var motionLoading by remember(photo.id) { mutableStateOf(false) }
     var motionError by remember(photo.id) { mutableStateOf<String?>(null) }
+    var longPreviewFailed by remember(photo.id, photo.uri) { mutableStateOf(false) }
+    var longPreviewZoomed by remember(photo.id, photo.uri) { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val canPlayMotion = (photo.isMotionPhoto || photo.motionPhotoNeedsDetection || photo.isSeparateVideo || !photo.motionVideoUri.isNullOrBlank()) && !photo.isGif
+    val useLongPreview = !longPreviewFailed && !photo.isGif &&
+        isLongImageCandidate(photo.width, photo.height, photo.mimeType)
+
+    fun playMotion() {
+        if (!canPlayMotion || motionLoading) return
+        motionLoading = true
+        motionError = null
+        scope.launch {
+            when (val source = resolveMotionPhotoPlaybackSource(context, photo)) {
+                is MotionPhotoPlaybackSource.Ready -> motionSource = source
+                is MotionPhotoPlaybackSource.Unavailable -> motionError = source.reason
+            }
+            motionLoading = false
+        }
+    }
 
     fun clampOffset(value: Offset, targetScale: Float): Offset {
         if (targetScale <= 1.01f || containerSize.width <= 0 || containerSize.height <= 0) return Offset.Zero
@@ -377,29 +400,19 @@ private fun ZoomableViewerPhoto(
         )
     }
 
-    LaunchedEffect(scale, motionSource) {
-        onZoomChanged(scale > 1.01f || motionSource != null)
+    LaunchedEffect(scale, motionSource, useLongPreview) {
+        if (motionSource != null || !useLongPreview) {
+            onZoomChanged(scale > 1.01f || motionSource != null)
+        }
     }
 
     Box(
         modifier = modifier
             .onSizeChanged { containerSize = it }
-            .pointerInput(photo.id, motionSource) {
-                if (motionSource == null) {
+            .pointerInput(photo.id, motionSource, useLongPreview) {
+                if (motionSource == null && !useLongPreview) {
                     detectTapGestures(
-                        onLongPress = {
-                            if (canPlayMotion && !motionLoading) {
-                                motionLoading = true
-                                motionError = null
-                                scope.launch {
-                                    when (val source = resolveMotionPhotoPlaybackSource(context, photo)) {
-                                        is MotionPhotoPlaybackSource.Ready -> motionSource = source
-                                        is MotionPhotoPlaybackSource.Unavailable -> motionError = source.reason
-                                    }
-                                    motionLoading = false
-                                }
-                            }
-                        },
+                        onLongPress = { playMotion() },
                         onDoubleTap = {
                             if (scale > 1.01f) {
                                 scale = 1f
@@ -412,8 +425,8 @@ private fun ZoomableViewerPhoto(
                     )
                 }
             }
-            .pointerInput(photo.id, containerSize, motionSource) {
-                if (motionSource == null) {
+            .pointerInput(photo.id, containerSize, motionSource, useLongPreview) {
+                if (motionSource == null && !useLongPreview) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
                         do {
@@ -443,21 +456,37 @@ private fun ZoomableViewerPhoto(
                 onClose = { motionSource = null },
             )
         } else {
-            AsyncImage(
-                model = photoImageRequest(context, photo, "viewer_photo", 1440, 1920),
-                contentDescription = photo.displayName,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                        translationX = offset.x
-                        translationY = offset.y
+            if (useLongPreview) {
+                LongImageViewer(
+                    uri = photoContentUri(photo),
+                    description = photo.displayName,
+                    modifier = Modifier.fillMaxSize(),
+                    mimeType = photo.mimeType,
+                    bottomInset = if (canPlayMotion) 175.dp else 110.dp,
+                    onHorizontalPanChanged = { zoomed ->
+                        longPreviewZoomed = zoomed
+                        onZoomChanged(zoomed)
                     },
-                contentScale = ContentScale.Fit,
-            )
+                    onLongPress = ::playMotion,
+                    fallback = { LaunchedEffect(photo.id) { longPreviewFailed = true } },
+                )
+            } else {
+                AsyncImage(
+                    model = photoImageRequest(context, photo, "viewer_photo", 1440, 1920),
+                    contentDescription = photo.displayName,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offset.x
+                            translationY = offset.y
+                        },
+                    contentScale = ContentScale.Fit,
+                )
+            }
 
-            if (canPlayMotion && scale <= 1.01f) {
+            if (canPlayMotion && scale <= 1.01f && (!useLongPreview || !longPreviewZoomed)) {
                 Surface(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -477,17 +506,7 @@ private fun ZoomableViewerPhoto(
                             Text(stringResource(R.string.motion_preparing), style = MaterialTheme.typography.labelMedium)
                         } else {
                             FilledTonalIconButton(
-                                onClick = {
-                                    motionLoading = true
-                                    motionError = null
-                                    scope.launch {
-                                        when (val source = resolveMotionPhotoPlaybackSource(context, photo)) {
-                                            is MotionPhotoPlaybackSource.Ready -> motionSource = source
-                                            is MotionPhotoPlaybackSource.Unavailable -> motionError = source.reason
-                                        }
-                                        motionLoading = false
-                                    }
-                                },
+                                onClick = ::playMotion,
                                 modifier = Modifier.size(40.dp),
                             ) {
                                 Icon(Icons.Rounded.PlayArrow, contentDescription = stringResource(R.string.a11y_play_motion))

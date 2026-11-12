@@ -101,6 +101,9 @@ import com.futureape.kanleme.ui.util.openMediaInSystemGallery
 import com.futureape.kanleme.ui.util.openPhotoInSystemGallery
 import com.futureape.kanleme.ui.util.shareMedia
 import com.futureape.kanleme.ui.util.trashImageRequest
+import com.futureape.kanleme.ui.util.trashContentUri
+import com.futureape.kanleme.ui.components.LongImageViewer
+import com.futureape.kanleme.ui.components.isLongImageCandidate
 import com.futureape.kanleme.ui.util.trashThumbnailImageRequest
 import com.futureape.kanleme.ui.viewmodel.KanlemeViewModel
 import kotlinx.coroutines.delay
@@ -497,6 +500,8 @@ private fun TrashPreviewOverlay(
     val startIndex = items.indexOfFirst { it.id == initialItem.id }.takeIf { it >= 0 } ?: 0
     val pagerState = rememberPagerState(initialPage = startIndex) { items.size }
     val currentItem = items.getOrNull(pagerState.currentPage) ?: initialItem
+    var horizontallyPannedItemId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(pagerState.currentPage) { horizontallyPannedItemId = null }
     var dayMemoryAnchor by remember(initialItem.id) { mutableStateOf<PhotoEntity?>(null) }
     var dayMemoryVisible by remember(initialItem.id) { mutableStateOf(false) }
 
@@ -511,10 +516,31 @@ private fun TrashPreviewOverlay(
         HorizontalPager(
             state = pagerState,
             key = { page -> items.getOrNull(page)?.id ?: page },
+            userScrollEnabled = horizontallyPannedItemId == null,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val item = items.getOrNull(page) ?: return@HorizontalPager
-            ZoomableTrashMedia(item = item, modifier = Modifier.fillMaxSize())
+            val existingPreview: @Composable () -> Unit = {
+                ZoomableTrashMedia(item = item, modifier = Modifier.fillMaxSize())
+            }
+            if (item.mediaType != "video" && isLongImageCandidate(item.width, item.height, item.mimeType)) {
+                LongImageViewer(
+                    uri = trashContentUri(item),
+                    description = item.displayName,
+                    modifier = Modifier.fillMaxSize(),
+                    mimeType = item.mimeType,
+                    topInset = 64.dp,
+                    bottomInset = 210.dp,
+                    onHorizontalPanChanged = { canPan ->
+                        if (page == pagerState.currentPage) {
+                            horizontallyPannedItemId = if (canPan) item.id else null
+                        }
+                    },
+                    fallback = existingPreview,
+                )
+            } else {
+                existingPreview()
+            }
         }
 
         Box(

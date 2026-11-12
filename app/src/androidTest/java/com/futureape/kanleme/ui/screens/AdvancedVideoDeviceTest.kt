@@ -63,6 +63,15 @@ class AdvancedVideoDeviceTest {
     private lateinit var originalDeleteMode: DeleteMode
     private fun label(res: Int) = context.getString(res)
 
+    private fun grantMediaReadAccess() {
+        val permissions = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            listOf("android.permission.READ_MEDIA_VIDEO", "android.permission.READ_MEDIA_IMAGES")
+        } else listOf("android.permission.READ_EXTERNAL_STORAGE")
+        permissions.forEach { permission ->
+            instrumentation.uiAutomation.executeShellCommand("pm grant " + context.packageName + " " + permission).close()
+        }
+    }
+
     @Before fun prepare() {
         hiltRule.inject()
         originalDeleteMode = runBlocking { settingsRepository.settings.first().deleteMode }
@@ -122,9 +131,9 @@ class AdvancedVideoDeviceTest {
         assertTrue(entered)
         screenshot("me-advanced-entry")
         composeRule.activity.setContent {
-            KanlemeTheme(themeMode = ThemeMode.LIGHT) { AdvancedFeaturesScreen({}, {}, {}) }
+            KanlemeTheme(themeMode = ThemeMode.LIGHT) { AdvancedFeaturesScreen({}, {}, {}, {}, {}) }
         }
-        composeRule.onNodeWithText(label(R.string.advanced_photos_later)).assertIsDisplayed()
+        composeRule.onNodeWithText(label(R.string.advanced_photo_title)).assertIsDisplayed()
         screenshot("advanced-hub")
         composeRule.activity.setContent {
             KanlemeTheme(themeMode = ThemeMode.LIGHT) { AdvancedLicensesScreen({}) }
@@ -170,7 +179,7 @@ class AdvancedVideoDeviceTest {
         }
         composeRule.onNodeWithContentDescription(label(R.string.a11y_back)).performClick()
         settleMorph()
-        composeRule.onNodeWithText(label(R.string.advanced_photos_later)).assertIsDisplayed()
+        composeRule.onNodeWithText(label(R.string.advanced_photo_title)).assertIsDisplayed()
     }
 
     private fun allViews(root: View): Sequence<View> = sequence {
@@ -217,6 +226,7 @@ class AdvancedVideoDeviceTest {
     }
 
     @Test fun playerAdvancesAndReleasesOnCloseAndBackground() {
+        grantMediaReadAccess()
         insertVideo("Movies/kanleme-advanced/playback/", "advanced-playback.mp4")
         showVideos()
         composeRule.onNodeWithText(label(R.string.advanced_scan)).performClick()
@@ -241,6 +251,93 @@ class AdvancedVideoDeviceTest {
         composeRule.onAllNodesWithText(label(R.string.advanced_back)).onLast().performClick()
         composeRule.waitUntil(5_000) { composeRule.runOnIdle { currentPlayerView() == null } }
         screenshot("video-viewer-closed")
+    }
+
+    @Test fun manualRotationRestoresPlaybackAndThePreviousActivityOrientation() {
+        val originalOnboarding = runBlocking { settingsRepository.settings.first().onboardingShown }
+        try {
+            grantMediaReadAccess()
+            runBlocking { settingsRepository.setOnboardingShown(true) }
+            insertVideo("Movies/RotationTest/", "rotation-test.mp4")
+            composeRule.waitUntil(30_000) {
+                composeRule.onAllNodesWithContentDescription(label(R.string.nav_me)).fetchSemanticsNodes().isNotEmpty()
+            }
+            val originalOrientation = composeRule.activity.requestedOrientation
+            composeRule.onNodeWithContentDescription(label(R.string.nav_me)).performClick()
+            composeRule.onNodeWithText(label(R.string.advanced_title)).performScrollTo()
+            composeRule.onRoot().performTouchInput { swipeUp(startY = height * 0.8f, endY = height * 0.4f) }
+            composeRule.onNodeWithText(label(R.string.advanced_title)).performClick()
+            composeRule.onNodeWithText(label(R.string.advanced_video_title)).performClick()
+            composeRule.onNodeWithText(label(R.string.advanced_scan)).performClick()
+            composeRule.waitUntil(30_000) {
+                composeRule.onAllNodesWithText("rotation-test.mp4").fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithText("rotation-test.mp4").performScrollTo().performClick()
+            composeRule.waitUntil(30_000) { instrumentation.runOnMainSyncValue { currentPlayerView()?.player != null } }
+            composeRule.onNodeWithText(label(R.string.advanced_mute)).performClick()
+            composeRule.onNodeWithText(label(R.string.advanced_speed), substring = true).performClick()
+            composeRule.onNodeWithText("1.5×").performClick()
+            composeRule.runOnIdle { currentPlayerView()?.player?.apply { seekTo(1_200); pause() } }
+            composeRule.onNodeWithContentDescription(label(R.string.advanced_rotate_landscape)).performClick()
+            composeRule.waitUntil(30_000) {
+                composeRule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE &&
+                    instrumentation.runOnMainSyncValue { currentPlayerView()?.player != null }
+            }
+            composeRule.onNodeWithContentDescription(label(R.string.advanced_rotate_portrait)).assertIsDisplayed()
+            composeRule.runOnIdle {
+                val restored = requireNotNull(currentPlayerView()?.player)
+                assertFalse(restored.playWhenReady)
+                assertTrue("Playback position should survive rotation", restored.currentPosition >= 1_000)
+                assertEquals(0f, restored.volume, 0f)
+                assertEquals(1.5f, restored.playbackParameters.speed, 0f)
+            }
+            screenshot("advanced-player-landscape")
+            composeRule.onNodeWithContentDescription(label(R.string.advanced_rotate_portrait)).performClick()
+            composeRule.waitUntil(30_000) {
+                composeRule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+            }
+            composeRule.onNodeWithContentDescription(label(R.string.advanced_rotate_landscape)).performClick()
+            composeRule.waitUntil(30_000) {
+                composeRule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            }
+            instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+            composeRule.waitUntil(30_000) {
+                composeRule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+            }
+            composeRule.onNodeWithContentDescription(label(R.string.advanced_rotate_landscape)).assertIsDisplayed()
+            composeRule.onNodeWithText(label(R.string.advanced_back)).performClick()
+            composeRule.waitUntil(10_000) { composeRule.activity.requestedOrientation == originalOrientation }
+        } finally {
+            runBlocking { settingsRepository.setOnboardingShown(originalOnboarding) }
+        }
+    }
+
+    @Test fun filteredVideosCanBeBrowsedWithoutReturningToTheList() {
+        grantMediaReadAccess()
+        insertVideo("Movies/AdjacentTest/", "adjacent-test-a.mp4")
+        insertVideo("Movies/AdjacentTest/", "adjacent-test-b.mp4")
+        showVideos()
+        composeRule.onNodeWithText(label(R.string.advanced_scan)).performClick()
+        composeRule.waitUntil(30_000) { ::viewModel.isInitialized && viewModel.advancedVideos.state.value.hasScanned }
+        composeRule.onNodeWithText(label(R.string.advanced_search)).performTextInput("adjacent-test")
+        composeRule.waitUntil(30_000) { viewModel.advancedVideos.results.value.videos.size == 2 }
+        val ordered = viewModel.advancedVideos.results.value.videos
+        composeRule.onNodeWithText(ordered.first().name).performScrollTo().performClick()
+        composeRule.waitUntil(30_000) { instrumentation.runOnMainSyncValue { currentPlayerView()?.player != null } }
+        composeRule.onNodeWithText(label(R.string.advanced_mute)).performClick()
+        composeRule.onNodeWithText(label(R.string.random_video_next)).performClick()
+        composeRule.waitUntil(30_000) {
+            instrumentation.runOnMainSyncValue {
+                currentPlayerView()?.player?.currentMediaItem?.localConfiguration?.uri.toString() == ordered.last().uri
+            }
+        }
+        composeRule.runOnIdle { assertEquals(0f, requireNotNull(currentPlayerView()?.player).volume, 0f) }
+        composeRule.onNodeWithText(label(R.string.random_video_previous)).performClick()
+        composeRule.waitUntil(30_000) {
+            instrumentation.runOnMainSyncValue {
+                currentPlayerView()?.player?.currentMediaItem?.localConfiguration?.uri.toString() == ordered.first().uri
+            }
+        }
     }
 
     @Test fun largeMetadataLibraryRecordsFilterLatency() {

@@ -282,6 +282,10 @@
     <string name="video_display_mode_fit_screen_desc">保留影片原始比例，橫向影片不會被強制直向裁切</string>
     <string name="video_display_mode_fill_width">鋪滿螢幕寬度</string>
     <string name="video_display_mode_fill_width_desc">優先鋪滿螢幕寬度，適合橫向和混合素材</string>
+    <string name="video_display_mode_immersive_crop_short">裁切</string>
+    <string name="video_display_mode_fit_screen_short">原比例</string>
+    <string name="video_display_mode_fill_width_short">滿寬</string>
+    <string name="video_display_mode_quick_action">切換顯示方式，目前%1$s</string>
     <string name="haptic_level_off">關閉</string>
     <string name="haptic_level_light">輕微</string>
     <string name="haptic_level_medium">細膩</string>
@@ -380,6 +384,9 @@
     <string name="me_historical_freed">累計記錄釋放</string>
     <string name="me_estimated_freed">預計可釋放</string>
     <string name="me_browsed">已瀏覽</string>
+    <string name="me_progress_label">媒體庫瀏覽進度</string>
+    <string name="me_progress_value">%1$d%% · %2$d/%3$d 項</string>
+    <string name="me_progress_empty">暫無媒體</string>
     <string name="me_pending">待確認</string>
     <string name="me_viewed">瀏覽</string>
     <string name="me_releasable">預計釋放</string>
@@ -706,6 +713,7 @@
     <string name="settings_help_content_title">使用說明</string>
     <string name="settings_help_content_subtitle">依照整理流程閱讀即可，所有操作都圍繞照片、影片、篩選和回收站。</string>
     <string-array name="settings_changelog_sections">
+        <item>v2.3.5 · 進階篩選與橫向播放||新增照片與影片多條件篩選，支援連續瀏覽、照片縮放和長圖閱讀。|新增資料夾隨機播放，支援包含子資料夾和重新播放目前清單。|播放器支援手動切換橫直向、播放手勢與狀態還原。|升級時遷移既有收藏、垃圾桶和整理記錄。</item>
         <item>v2.3.3 · 今日整理貼紙與匯出||首頁恢復當年今日和今日整理兩個入口，今日整理以貼紙彈窗顯示當天摘要。|今日整理貼紙可匯出並分享，不需要額外儲存權限。</item>
         <item>v2.3.2 · 照片卡組動畫與佇列穩定性||改善照片拖曳、飛出和補牌動畫，減少閃爍與跳位。|修正長圖、截圖和寬圖比例，穩定操作後的佇列補充。</item>
         <item>v2.2.9 · 動態照片、GIF、成就與發布優化||掃描支援 GIF、HEIC/HEIF/WEBP 動態線索和常見原況照片命名。|整理、收藏、回收站、時間線和預覽統一支援 GIF 與原況播放。|相似照片、成就陳列櫃、可釋放空間提示和發布包裁剪同步升級。</item>
